@@ -1,22 +1,31 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: A3 Sales OS API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: leads
+    description: Lead/CRM operations
+  - name: tasks
+    description: Task operations
+  - name: templates
+    description: Template operations
+  - name: assets
+    description: Asset operations
+  - name: dashboard
+    description: Dashboard operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +33,514 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /leads:
+    get:
+      operationId: getLeads
+      tags: [leads]
+      summary: Get all leads
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: pipelineType
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: projectType
+          in: query
+          schema:
+            type: string
+        - name: source
+          in: query
+          schema:
+            type: string
+        - name: location
+          in: query
+          schema:
+            type: string
+        - name: followUpDueToday
+          in: query
+          schema:
+            type: boolean
+        - name: overdue
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of leads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Lead"
+    post:
+      operationId: createLead
+      tags: [leads]
+      summary: Create a new lead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadInput"
+      responses:
+        "201":
+          description: Created lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+
+  /leads/{id}:
+    get:
+      operationId: getLead
+      tags: [leads]
+      summary: Get a single lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lead details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+    put:
+      operationId: updateLead
+      tags: [leads]
+      summary: Update a lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadInput"
+      responses:
+        "200":
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+    delete:
+      operationId: deleteLead
+      tags: [leads]
+      summary: Delete a lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /leads/{id}/duplicate:
+    post:
+      operationId: duplicateLead
+      tags: [leads]
+      summary: Duplicate a lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Duplicated lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+
+  /leads/{id}/status:
+    patch:
+      operationId: updateLeadStatus
+      tags: [leads]
+      summary: Quick status update
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+              required:
+                - status
+      responses:
+        "200":
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+
+  /leads/import:
+    post:
+      operationId: importLeads
+      tags: [leads]
+      summary: Import leads from CSV data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                leads:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/LeadInput"
+              required:
+                - leads
+      responses:
+        "200":
+          description: Import results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported:
+                    type: integer
+                  skipped:
+                    type: integer
+                  total:
+                    type: integer
+                required:
+                  - imported
+                  - skipped
+                  - total
+
+  /tasks:
+    get:
+      operationId: getTasks
+      tags: [tasks]
+      summary: Get all tasks
+      parameters:
+        - name: leadId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: dueFilter
+          in: query
+          schema:
+            type: string
+            enum: [today, overdue, next7days]
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Create a new task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /tasks/{id}:
+    put:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Update a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      summary: Delete a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /tasks/{id}/complete:
+    patch:
+      operationId: completeTask
+      tags: [tasks]
+      summary: Mark task as complete
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Completed task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /templates:
+    get:
+      operationId: getTemplates
+      tags: [templates]
+      summary: Get all templates
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Template"
+    post:
+      operationId: createTemplate
+      tags: [templates]
+      summary: Create a new template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateInput"
+      responses:
+        "201":
+          description: Created template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+
+  /templates/{id}:
+    put:
+      operationId: updateTemplate
+      tags: [templates]
+      summary: Update a template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateInput"
+      responses:
+        "200":
+          description: Updated template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+    delete:
+      operationId: deleteTemplate
+      tags: [templates]
+      summary: Delete a template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /assets:
+    get:
+      operationId: getAssets
+      tags: [assets]
+      summary: Get all assets
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Asset"
+    post:
+      operationId: createAsset
+      tags: [assets]
+      summary: Create a new asset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssetInput"
+      responses:
+        "201":
+          description: Created asset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+
+  /assets/{id}:
+    put:
+      operationId: updateAsset
+      tags: [assets]
+      summary: Update an asset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssetInput"
+      responses:
+        "200":
+          description: Updated asset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Asset"
+    delete:
+      operationId: deleteAsset
+      tags: [assets]
+      summary: Delete an asset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get dashboard KPIs and summary data
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardData"
+
+  /activity:
+    get:
+      operationId: getActivity
+      tags: [dashboard]
+      summary: Get recent activity feed
+      responses:
+        "200":
+          description: Activity feed
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +551,361 @@ components:
       required:
         - status
 
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    Lead:
+      type: object
+      properties:
+        id:
+          type: integer
+        pipelineType:
+          type: string
+        companyName:
+          type: string
+        contactName:
+          type: string
+        title:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        linkedin:
+          type: string
+        location:
+          type: string
+        industry:
+          type: string
+        venueProperty:
+          type: string
+        projectType:
+          type: string
+        estimatedBudget:
+          type: number
+        status:
+          type: string
+        lastContactDate:
+          type: string
+        nextStep:
+          type: string
+        nextFollowUpDate:
+          type: string
+        notes:
+          type: string
+        dealValueEstimate:
+          type: number
+        proposalValue:
+          type: number
+        closeProbability:
+          type: number
+        forecastValue:
+          type: number
+        source:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - pipelineType
+        - companyName
+        - contactName
+        - status
+        - createdAt
+        - updatedAt
+
+    LeadInput:
+      type: object
+      properties:
+        pipelineType:
+          type: string
+        companyName:
+          type: string
+        contactName:
+          type: string
+        title:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        linkedin:
+          type: string
+        location:
+          type: string
+        industry:
+          type: string
+        venueProperty:
+          type: string
+        projectType:
+          type: string
+        estimatedBudget:
+          type: number
+        status:
+          type: string
+        lastContactDate:
+          type: string
+        nextStep:
+          type: string
+        nextFollowUpDate:
+          type: string
+        notes:
+          type: string
+        dealValueEstimate:
+          type: number
+        proposalValue:
+          type: number
+        closeProbability:
+          type: number
+        source:
+          type: string
+      required:
+        - pipelineType
+        - companyName
+        - contactName
+        - status
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+        leadId:
+          type: integer
+        taskType:
+          type: string
+        dueDate:
+          type: string
+        status:
+          type: string
+        notes:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        leadCompanyName:
+          type: string
+        leadContactName:
+          type: string
+      required:
+        - id
+        - taskType
+        - status
+        - createdAt
+        - updatedAt
+
+    TaskInput:
+      type: object
+      properties:
+        leadId:
+          type: integer
+        taskType:
+          type: string
+        dueDate:
+          type: string
+        status:
+          type: string
+        notes:
+          type: string
+      required:
+        - taskType
+        - status
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - category
+        - body
+        - createdAt
+        - updatedAt
+
+    TemplateInput:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+      required:
+        - name
+        - category
+        - body
+
+    Asset:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        url:
+          type: string
+        linkedLeadId:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - title
+        - category
+        - createdAt
+        - updatedAt
+
+    AssetInput:
+      type: object
+      properties:
+        title:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        url:
+          type: string
+        linkedLeadId:
+          type: integer
+      required:
+        - title
+        - category
+
+    DashboardData:
+      type: object
+      properties:
+        totalLeads:
+          type: integer
+        newLeads:
+          type: integer
+        contacted:
+          type: integer
+        replied:
+          type: integer
+        qualified:
+          type: integer
+        meetingsBooked:
+          type: integer
+        meetingsCompleted:
+          type: integer
+        proposalsSent:
+          type: integer
+        negotiation:
+          type: integer
+        closedWon:
+          type: integer
+        closedLost:
+          type: integer
+        nurture:
+          type: integer
+        totalPipelineValue:
+          type: number
+        totalForecastValue:
+          type: number
+        closedRevenue:
+          type: number
+        followUpsDueToday:
+          type: integer
+        overdueFollowUps:
+          type: integer
+        pipelineByStage:
+          type: array
+          items:
+            type: object
+            properties:
+              stage:
+                type: string
+              count:
+                type: integer
+              value:
+                type: number
+            required:
+              - stage
+              - count
+              - value
+        pipelineByType:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              count:
+                type: integer
+              value:
+                type: number
+            required:
+              - type
+              - count
+              - value
+      required:
+        - totalLeads
+        - newLeads
+        - contacted
+        - replied
+        - qualified
+        - meetingsBooked
+        - meetingsCompleted
+        - proposalsSent
+        - negotiation
+        - closedWon
+        - closedLost
+        - nurture
+        - totalPipelineValue
+        - totalForecastValue
+        - closedRevenue
+        - followUpsDueToday
+        - overdueFollowUps
+        - pipelineByStage
+        - pipelineByType
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        description:
+          type: string
+        leadId:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - type
+        - description
+        - createdAt

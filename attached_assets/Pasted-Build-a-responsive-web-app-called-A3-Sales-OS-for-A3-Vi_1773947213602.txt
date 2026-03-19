@@ -1,0 +1,340 @@
+Build a responsive web app called “A3 Sales OS” for A3 Visual.
+
+DESIGN / UI:
+- Modern startup style
+- Color palette: blue, yellow, black, and white
+- Clean dashboard layout
+- Mobile-friendly
+- No login required
+- Smooth, polished UI with cards, tables, drag-and-drop pipeline, clean spacing, and modern buttons
+- Make it feel like an internal sales operating system, not a generic CRM
+
+CORE PURPOSE:
+This app is a lightweight internal sales CRM and outbound operating system for tracking leads, pipeline, follow-ups, proposals, forecasting, outreach templates, and KPIs for A3 Visual.
+
+MAIN SECTIONS / NAVIGATION:
+Create a left sidebar or top nav with these sections:
+1. Dashboard
+2. Leads / CRM
+3. Pipeline
+4. Tasks / Follow-Ups
+5. Templates
+6. Assets
+7. Import / Export
+
+APP REQUIREMENTS:
+
+1) DASHBOARD
+Build a dashboard with KPI cards and summary views.
+Include:
+- Total Leads
+- New Leads
+- Contacted
+- Replied
+- Qualified
+- Meetings Booked
+- Meetings Completed
+- Proposals Sent
+- Negotiation
+- Closed Won
+- Closed Lost
+- Nurture
+- Total Pipeline Value
+- Total Forecast Value
+- Closed Revenue
+- Follow-Ups Due Today
+- Overdue Follow-Ups
+
+Add:
+- simple charts for pipeline by stage
+- simple chart for pipeline by type (Event vs Agency)
+- recent activity feed
+- upcoming tasks panel
+
+2) LEADS / CRM DATABASE
+Create a CRM table with sortable columns, filters, search, and editable records.
+
+Fields for each lead:
+- id
+- pipelineType (Event or Agency)
+- companyName
+- contactName
+- title
+- email
+- phone
+- linkedin
+- location
+- industry
+- venueProperty
+- projectType
+- estimatedBudget
+- status
+- lastContactDate
+- nextStep
+- nextFollowUpDate
+- notes
+- dealValueEstimate
+- proposalValue
+- closeProbability
+- forecastValue
+- source
+
+RULES:
+- forecastValue should auto-calculate based on proposalValue or dealValueEstimate times closeProbability percentage
+- make fields editable in modal or side panel
+- allow adding new leads manually
+- allow deleting leads
+- allow duplicating a lead
+- allow quick status change
+- allow quick next follow-up date update
+- allow notes history area if possible
+
+FILTERS:
+- search by company/contact/email
+- filter by pipelineType
+- filter by status
+- filter by projectType
+- filter by source
+- filter by follow-up due today
+- filter overdue
+- filter by location
+
+3) PIPELINE VIEW
+Create a Kanban drag-and-drop pipeline board using these stages exactly:
+- New Lead
+- Contacted
+- Replied
+- Qualified
+- Meeting Booked
+- Meeting Completed
+- Proposal Sent
+- Negotiation
+- Closed Won
+- Closed Lost
+- Nurture
+
+Requirements:
+- cards draggable between columns
+- card shows company, contact, pipeline type, proposal/deal amount, and follow-up date
+- color accents for Event vs Agency
+- clicking card opens full lead detail modal
+- moving a card updates status automatically
+
+4) TASKS / FOLLOW-UPS
+Create a task manager tied to leads.
+
+Fields:
+- task id
+- linked lead id
+- task type
+- due date
+- status
+- notes
+
+Task types:
+- Follow-up
+- Call
+- Send Deck
+- Proposal
+- Check-In
+- Meeting Prep
+- Post-Meeting Follow-Up
+
+Requirements:
+- auto-highlight overdue tasks in red
+- show due today
+- show next 7 days
+- allow creating task from lead record
+- allow marking complete
+- dashboard should pull counts from this section
+
+5) TEMPLATES
+Create a saved templates library with categories:
+- Cold Email
+- Follow-Up Email
+- LinkedIn Message
+- SMS
+- Referral / Partner Outreach
+
+Preload templates with editable starter content.
+
+Preload these templates:
+
+Template 1: Cold Email Intro
+Subject: quick question
+
+Body:
+Hi [First Name],
+
+Quick question—who handles event production, printing, or visual installations for [Company Name]?
+
+I work with A3 Visual, and we support hotels, venues, and agencies with large format, fabrication, and immersive builds (projection mapping, branded environments, etc.).
+
+If that’s you, happy to connect—if not, would you mind pointing me in the right direction?
+
+Thanks so much,
+Alyssa
+
+Template 2: Follow-Up
+Hi [First Name],
+
+Just wanted to follow up here—would love to connect briefly and see what you have coming up this season.
+
+We’ve been supporting a number of venues and agencies with fast-turn, high-impact installs, especially for events and activations.
+
+Open to a quick intro next week?
+
+Best,
+Alyssa
+
+Template 3: Value Follow-Up
+Hi [First Name],
+
+We recently helped a [venue / agency] elevate their event experience with custom fabrication + large format installs—happy to share examples if helpful.
+
+Would it be worth a quick conversation?
+
+Best,
+Alyssa
+
+Template 4: Soft Close
+Hi [First Name],
+
+Totally understand if timing isn’t right—just wanted to keep the door open.
+
+If anything comes up where you need support on printing, fabrication, or immersive installs, I’d love to be a resource.
+
+Best,
+Alyssa
+
+Template 5: LinkedIn Connect
+Hi [Name], would love to connect—working with venues and agencies on event production + visual environments.
+
+Template 6: LinkedIn Follow-Up
+Thanks for connecting!
+
+Curious—do you currently handle event production and installs internally, or work with external partners?
+
+Requirements:
+- allow create/edit/delete templates
+- allow copy-to-clipboard button
+- allow category filters
+- keep templates stored in app state/local persistence
+
+6) ASSETS
+Create an assets section for storing links/files/notes tied to sales process.
+
+Asset categories:
+- Brochure
+- Capabilities Deck
+- Case Study
+- Proposal Example
+- Photos / Completed Work
+- Brand Assets
+- Outreach Docs
+
+Requirements:
+- allow upload or attach link
+- store title, category, description
+- searchable asset library
+- allow linking assets to leads if possible
+
+7) IMPORT / EXPORT
+Create import/export tools.
+
+IMPORT:
+- CSV import for leads
+- map CSV columns to lead fields
+- preview before import
+- basic duplicate handling by email + company
+
+EXPORT:
+- export all leads to CSV
+- export filtered view to CSV
+- export tasks to CSV
+
+8) DATA / STORAGE
+Use a clean frontend architecture and persistent storage suitable for Replit.
+Preferred:
+- local database or persistent storage, not just temporary memory
+- seed with demo data for both Event and Agency pipelines
+- include around 10 sample leads so the interface is testable immediately
+
+9) AUTOMATIONS / SMART BEHAVIOR
+Include these lightweight automations:
+- overdue follow-up warning banners
+- forecast value auto-calculation
+- dashboard KPIs auto-update
+- when status changes to Proposal Sent and proposalValue exists, suggest adding follow-up task
+- when status changes to Meeting Booked, suggest meeting prep task
+- when status changes to Closed Won, move closed revenue into dashboard metrics
+
+10) FORM OPTIONS / DROPDOWNS
+Use these exact dropdown values:
+
+Pipeline Type:
+- Event
+- Agency
+
+Project Type:
+- Event Activation
+- Conference
+- Hotel Event
+- Brand Activation
+- Experiential Install
+- Fabrication
+- Large Format Printing
+- Projection Mapping
+- Ongoing Partnership
+
+Status:
+- New Lead
+- Contacted
+- Replied
+- Qualified
+- Meeting Booked
+- Meeting Completed
+- Proposal Sent
+- Negotiation
+- Closed Won
+- Closed Lost
+- Nurture
+
+Source:
+- ZoomInfo
+- LinkedIn
+- Referral
+- Website
+- Cold Call
+- Email
+- Existing Relationship
+- Other
+
+11) UX REQUIREMENTS
+- Make everything easy for a non-technical sales user
+- Keep forms clean and intuitive
+- Use clear labels
+- Make the dashboard attractive and useful
+- Make overdue items obvious
+- Make the CRM table easy to scan
+- Keep mobile responsive for iPhone
+- Use modals/drawers for editing records
+- Add confirmation before deleting
+
+12) FUTURE-READY ARCHITECTURE
+Structure code cleanly so this can later support:
+- team users
+- login/auth
+- email sending integration
+- calendar integration
+- reminders
+- proposal tracking expansion
+- partner portals
+
+13) FINAL DELIVERABLE
+At the end, provide:
+- fully working app
+- seeded demo data
+- clean code structure
+- simple instructions inside a README for how to run and edit
+- note where colors, dropdown values, and sample templates can be changed

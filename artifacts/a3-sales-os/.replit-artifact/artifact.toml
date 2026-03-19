@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "A3 Sales OS"
+version = "1.0.0"
+id = "artifacts/a3-sales-os"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22440
+
+[services.development]
+run = "pnpm --filter @workspace/a3-sales-os run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/a3-sales-os", "run", "build" ]
+publicDir = "artifacts/a3-sales-os/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22440"
+BASE_PATH = "/"

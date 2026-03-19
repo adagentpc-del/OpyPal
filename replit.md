@@ -2,7 +2,7 @@
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+A3 Sales OS - Internal sales CRM and outbound operating system for A3 Visual. Built as a pnpm workspace monorepo using TypeScript.
 
 ## Stack
 
@@ -12,85 +12,141 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
 - **Database**: PostgreSQL + Drizzle ORM
+- **Frontend**: React + Vite + Tailwind CSS + shadcn/ui
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **Charts**: Recharts
+- **Drag & Drop**: @hello-pangea/dnd
+- **Forms**: react-hook-form + @hookform/resolvers
 
 ## Structure
 
 ```text
 artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
+├── artifacts/
+│   ├── api-server/         # Express API server (port 8080)
+│   └── a3-sales-os/        # React + Vite frontend (port 22440)
+├── lib/
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
 │   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+├── scripts/                # Utility scripts
+│   └── src/seed.ts         # Database seed script
+├── pnpm-workspace.yaml
+├── tsconfig.base.json
+└── package.json
 ```
+
+## Application Features
+
+### Dashboard
+- KPI cards: Total Leads, Active Leads, Pipeline Value, Meetings Booked, Overdue Follow-ups
+- Pipeline by Stage bar chart
+- Pipeline by Type pie chart
+- Recent activity feed
+- Upcoming tasks panel
+
+### Leads / CRM
+- Full CRM table with sortable columns, search, and filters
+- Filter by pipeline type, status, project type, source, location, follow-up due today, overdue
+- Add/edit/delete/duplicate leads via modal
+- Quick status change
+- Auto-calculated forecast value (proposalValue or dealValueEstimate * closeProbability)
+
+### Pipeline (Kanban)
+- Drag-and-drop board with 11 stages
+- Color-coded cards for Event (blue) vs Agency (yellow)
+- Cards show company, contact, deal amount, follow-up date
+- Moving cards auto-updates lead status
+
+### Tasks / Follow-Ups
+- Task manager linked to leads
+- Task types: Follow-up, Call, Send Deck, Proposal, Check-In, Meeting Prep, Post-Meeting Follow-Up
+- Filter by due today, overdue, next 7 days
+- Mark tasks as complete
+- Overdue tasks highlighted in red
+
+### Templates
+- Saved outreach templates library
+- Categories: Cold Email, Follow-Up Email, LinkedIn Message, SMS, Referral / Partner Outreach
+- Copy-to-clipboard, create/edit/delete
+- Pre-loaded with 6 starter templates
+
+### Assets
+- Asset library with categories: Brochure, Capabilities Deck, Case Study, etc.
+- Attach links, searchable
+- Can link assets to leads
+
+### Import / Export
+- CSV import with column mapping and preview
+- Duplicate detection by email + company
+- Export leads and tasks to CSV
+
+## Database Schema
+
+Tables in `lib/db/src/schema/`:
+- `leads` - CRM lead records
+- `tasks` - Tasks/follow-ups linked to leads
+- `templates` - Outreach templates
+- `assets` - Sales assets/resources
+- `activity` - Activity log for dashboard feed
+
+## API Routes
+
+All routes are in `artifacts/api-server/src/routes/`:
+- `GET/POST /api/leads` - List/create leads
+- `GET/PUT/DELETE /api/leads/:id` - CRUD individual leads
+- `POST /api/leads/:id/duplicate` - Duplicate a lead
+- `PATCH /api/leads/:id/status` - Quick status update
+- `POST /api/leads/import` - Bulk CSV import
+- `GET/POST /api/tasks` - List/create tasks
+- `PUT/DELETE /api/tasks/:id` - Update/delete tasks
+- `PATCH /api/tasks/:id/complete` - Mark task complete
+- `GET/POST /api/templates` - List/create templates
+- `PUT/DELETE /api/templates/:id` - Update/delete templates
+- `GET/POST /api/assets` - List/create assets
+- `PUT/DELETE /api/assets/:id` - Update/delete assets
+- `GET /api/dashboard` - Dashboard KPIs
+- `GET /api/activity` - Recent activity feed
+
+## Dropdown Values (Customizable)
+
+**Pipeline Types:** Event, Agency
+**Project Types:** Event Activation, Conference, Hotel Event, Brand Activation, Experiential Install, Fabrication, Large Format Printing, Projection Mapping, Ongoing Partnership
+**Statuses:** New Lead, Contacted, Replied, Qualified, Meeting Booked, Meeting Completed, Proposal Sent, Negotiation, Closed Won, Closed Lost, Nurture
+**Sources:** ZoomInfo, LinkedIn, Referral, Website, Cold Call, Email, Existing Relationship, Other
+**Task Types:** Follow-up, Call, Send Deck, Proposal, Check-In, Meeting Prep, Post-Meeting Follow-Up
+**Template Categories:** Cold Email, Follow-Up Email, LinkedIn Message, SMS, Referral / Partner Outreach
+**Asset Categories:** Brochure, Capabilities Deck, Case Study, Proposal Example, Photos / Completed Work, Brand Assets, Outreach Docs
+
+## Color Theme
+
+The color palette (blue, yellow, black, white) is defined in `artifacts/a3-sales-os/src/index.css` as CSS custom properties in HSL format.
+
+## Commands
+
+- `pnpm --filter @workspace/scripts run seed` - Seed database with demo data
+- `pnpm --filter @workspace/api-spec run codegen` - Regenerate API client code
+- `pnpm --filter @workspace/db run push` - Push schema changes to database
+- `pnpm run typecheck` - Full workspace typecheck
+- `pnpm run build` - Build all packages
 
 ## TypeScript & Composite Projects
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
+Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references.
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+- **Always typecheck from the root** — run `pnpm run typecheck`
+- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck
+- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array
 
-## Root Scripts
+## Future-Ready
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
-
-## Packages
-
-### `artifacts/api-server` (`@workspace/api-server`)
-
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
-
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
-
-### `lib/db` (`@workspace/db`)
-
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
-
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
-
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
-
-### `lib/api-spec` (`@workspace/api-spec`)
-
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
-
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
-
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
-
-### `lib/api-zod` (`@workspace/api-zod`)
-
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
-
-### `lib/api-client-react` (`@workspace/api-client-react`)
-
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
-
-### `scripts` (`@workspace/scripts`)
-
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+The codebase is structured to later support:
+- Team users / login / auth
+- Email sending integration
+- Calendar integration
+- Reminders
+- Proposal tracking expansion
+- Partner portals

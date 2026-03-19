@@ -1,0 +1,23 @@
+packages:
+  "recharts": "For dashboard KPI charts and pipeline visualizations"
+  "@hello-pangea/dnd": "For the drag-and-drop Kanban pipeline board"
+  "date-fns": "For formatting dates in tasks, leads, and activity feeds"
+  "react-hook-form": "For robust form state management in dialogs"
+  "@hookform/resolvers": "For Zod schema validation with react-hook-form"
+  "zod": "For defining client-side form validation schemas"
+  "clsx": "For conditional tailwind class merging"
+  "tailwind-merge": "For merging tailwind classes safely"
+  "lucide-react": "For UI iconography"
+
+images:
+  - path: "artifacts/a3-sales-os/public/images/auth-bg.png"
+    description: "Abstract geometric background with subtle deep blue and bright yellow accents, corporate and clean"
+    aspect_ratio: "16:9"
+  - path: "artifacts/a3-sales-os/public/images/logo.png"
+    description: "Minimalist corporate logo featuring A3 in deep blue and yellow"
+    aspect_ratio: "1:1"
+
+notes:
+  - "Assuming @workspace/api-client-react is available for React Query hooks"
+  - "Using wouter for routing"
+  - "API uses standard REST patterns on /api"
