@@ -164,6 +164,41 @@ export interface ActivityItem {
   createdAt: string;
 }
 
+export type SyncStatusStatus =
+  (typeof SyncStatusStatus)[keyof typeof SyncStatusStatus];
+
+export const SyncStatusStatus = {
+  connected: "connected",
+  syncing: "syncing",
+  error: "error",
+  disconnected: "disconnected",
+} as const;
+
+export interface SyncStatus {
+  status: SyncStatusStatus;
+  lastSync?: string | null;
+  error?: string | null;
+}
+
+export interface SyncTestResult {
+  connected: boolean;
+  status: string;
+  lastSync?: string | null;
+  error?: string | null;
+}
+
+export interface FullSyncResult {
+  synced: number;
+  status: string;
+  lastSync?: string | null;
+  error?: string | null;
+}
+
+export interface SeedResult {
+  message: string;
+  seeded: number;
+}
+
 export type GetLeadsParams = {
   search?: string;
   pipelineType?: string;

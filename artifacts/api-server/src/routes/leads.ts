@@ -13,6 +13,7 @@ import {
   UpdateLeadStatusBody,
   ImportLeadsBody,
 } from "@workspace/api-zod";
+import { syncLeadToSheet, deleteLeadFromSheet, fullSyncToSheet } from "../lib/sheets-sync";
 
 const router: IRouter = Router();
 
@@ -91,6 +92,8 @@ router.post("/leads", async (req, res) => {
       leadId: lead.id,
     });
 
+    syncLeadToSheet(lead).catch(() => {});
+
     res.status(201).json(lead);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
@@ -139,6 +142,8 @@ router.put("/leads/:id", async (req, res) => {
       leadId: lead.id,
     });
 
+    syncLeadToSheet(lead).catch(() => {});
+
     res.json(lead);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
@@ -157,6 +162,8 @@ router.delete("/leads/:id", async (req, res) => {
       type: "lead_deleted",
       description: `Lead deleted: ${lead.companyName}`,
     });
+
+    deleteLeadFromSheet(id).catch(() => {});
 
     res.json({ message: "Lead deleted" });
   } catch (err: any) {
@@ -182,6 +189,8 @@ router.post("/leads/:id/duplicate", async (req, res) => {
       leadId: lead.id,
     });
 
+    syncLeadToSheet(lead).catch(() => {});
+
     res.status(201).json(lead);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
@@ -206,6 +215,8 @@ router.patch("/leads/:id/status", async (req, res) => {
       leadId: lead.id,
     });
 
+    syncLeadToSheet(lead).catch(() => {});
+
     res.json(lead);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
@@ -217,6 +228,7 @@ router.post("/leads/import", async (req, res) => {
     const { leads } = ImportLeadsBody.parse(req.body);
     let imported = 0;
     let skipped = 0;
+    const importedLeads: any[] = [];
 
     for (const leadData of leads) {
       if (leadData.email && leadData.companyName) {
@@ -239,15 +251,21 @@ router.post("/leads/import", async (req, res) => {
         leadData.closeProbability?.toString() ?? null
       );
 
-      await db.insert(leadsTable).values({
+      const [lead] = await db.insert(leadsTable).values({
         ...leadData,
         estimatedBudget: leadData.estimatedBudget?.toString(),
         dealValueEstimate: leadData.dealValueEstimate?.toString(),
         proposalValue: leadData.proposalValue?.toString(),
         closeProbability: leadData.closeProbability?.toString(),
         forecastValue,
-      });
+      }).returning();
+      importedLeads.push(lead);
       imported++;
+    }
+
+    if (importedLeads.length > 0) {
+      const allLeads = await db.select().from(leadsTable).orderBy(leadsTable.id);
+      fullSyncToSheet(allLeads).catch(() => {});
     }
 
     res.json({ imported, skipped, total: leads.length });

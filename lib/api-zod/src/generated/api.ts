@@ -544,3 +544,40 @@ export const GetActivityResponseItem = zod.object({
   createdAt: zod.string(),
 });
 export const GetActivityResponse = zod.array(GetActivityResponseItem);
+
+/**
+ * @summary Get Google Sheets sync status
+ */
+export const GetSyncStatusResponse = zod.object({
+  status: zod.enum(["connected", "syncing", "error", "disconnected"]),
+  lastSync: zod.string().nullish(),
+  error: zod.string().nullish(),
+});
+
+/**
+ * @summary Test Google Sheets connection
+ */
+export const TestSyncConnectionResponse = zod.object({
+  connected: zod.boolean(),
+  status: zod.string(),
+  lastSync: zod.string().nullish(),
+  error: zod.string().nullish(),
+});
+
+/**
+ * @summary Full sync all leads to Google Sheet
+ */
+export const FullSyncResponse = zod.object({
+  synced: zod.number(),
+  status: zod.string(),
+  lastSync: zod.string().nullish(),
+  error: zod.string().nullish(),
+});
+
+/**
+ * @summary Seed CRM from Google Sheet if database is empty
+ */
+export const SeedFromSheetResponse = zod.object({
+  message: zod.string(),
+  seeded: zod.number(),
+});

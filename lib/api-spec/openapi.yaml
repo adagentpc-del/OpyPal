@@ -19,6 +19,8 @@ tags:
     description: Asset operations
   - name: dashboard
     description: Dashboard operations
+  - name: sync
+    description: Google Sheets sync operations
 
 paths:
   /healthz:
@@ -541,6 +543,58 @@ paths:
                 items:
                   $ref: "#/components/schemas/ActivityItem"
 
+  /sync/status:
+    get:
+      operationId: getSyncStatus
+      tags: [sync]
+      summary: Get Google Sheets sync status
+      responses:
+        "200":
+          description: Sync status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncStatus"
+
+  /sync/test:
+    post:
+      operationId: testSyncConnection
+      tags: [sync]
+      summary: Test Google Sheets connection
+      responses:
+        "200":
+          description: Connection test result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncTestResult"
+
+  /sync/full:
+    post:
+      operationId: fullSync
+      tags: [sync]
+      summary: Full sync all leads to Google Sheet
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FullSyncResult"
+
+  /sync/seed:
+    post:
+      operationId: seedFromSheet
+      tags: [sync]
+      summary: Seed CRM from Google Sheet if database is empty
+      responses:
+        "200":
+          description: Seed result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeedResult"
+
 components:
   schemas:
     HealthStatus:
@@ -909,3 +963,63 @@ components:
         - type
         - description
         - createdAt
+
+    SyncStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [connected, syncing, error, disconnected]
+        lastSync:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+      required:
+        - status
+
+    SyncTestResult:
+      type: object
+      properties:
+        connected:
+          type: boolean
+        status:
+          type: string
+        lastSync:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+      required:
+        - connected
+        - status
+
+    FullSyncResult:
+      type: object
+      properties:
+        synced:
+          type: integer
+        status:
+          type: string
+        lastSync:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+      required:
+        - synced
+        - status
+
+    SeedResult:
+      type: object
+      properties:
+        message:
+          type: string
+        seeded:
+          type: integer
+      required:
+        - message
+        - seeded

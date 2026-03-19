@@ -21,6 +21,7 @@ import type {
   Asset,
   AssetInput,
   DashboardData,
+  FullSyncResult,
   GetAssetsParams,
   GetLeadsParams,
   GetTasksParams,
@@ -31,6 +32,9 @@ import type {
   Lead,
   LeadInput,
   MessageResponse,
+  SeedResult,
+  SyncStatus,
+  SyncTestResult,
   Task,
   TaskInput,
   Template,
@@ -2093,3 +2097,321 @@ export function useGetActivity<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get Google Sheets sync status
+ */
+export const getGetSyncStatusUrl = () => {
+  return `/api/sync/status`;
+};
+
+export const getSyncStatus = async (
+  options?: RequestInit,
+): Promise<SyncStatus> => {
+  return customFetch<SyncStatus>(getGetSyncStatusUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSyncStatusQueryKey = () => {
+  return [`/api/sync/status`] as const;
+};
+
+export const getGetSyncStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSyncStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getSyncStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetSyncStatusQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getSyncStatus>>> = ({
+    signal,
+  }) => getSyncStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSyncStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSyncStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSyncStatus>>
+>;
+export type GetSyncStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get Google Sheets sync status
+ */
+
+export function useGetSyncStatus<
+  TData = Awaited<ReturnType<typeof getSyncStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getSyncStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSyncStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Test Google Sheets connection
+ */
+export const getTestSyncConnectionUrl = () => {
+  return `/api/sync/test`;
+};
+
+export const testSyncConnection = async (
+  options?: RequestInit,
+): Promise<SyncTestResult> => {
+  return customFetch<SyncTestResult>(getTestSyncConnectionUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getTestSyncConnectionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testSyncConnection>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof testSyncConnection>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["testSyncConnection"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof testSyncConnection>>,
+    void
+  > = () => {
+    return testSyncConnection(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TestSyncConnectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof testSyncConnection>>
+>;
+
+export type TestSyncConnectionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Test Google Sheets connection
+ */
+export const useTestSyncConnection = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof testSyncConnection>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof testSyncConnection>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getTestSyncConnectionMutationOptions(options));
+};
+
+/**
+ * @summary Full sync all leads to Google Sheet
+ */
+export const getFullSyncUrl = () => {
+  return `/api/sync/full`;
+};
+
+export const fullSync = async (
+  options?: RequestInit,
+): Promise<FullSyncResult> => {
+  return customFetch<FullSyncResult>(getFullSyncUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getFullSyncMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof fullSync>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof fullSync>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["fullSync"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof fullSync>>,
+    void
+  > = () => {
+    return fullSync(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type FullSyncMutationResult = NonNullable<
+  Awaited<ReturnType<typeof fullSync>>
+>;
+
+export type FullSyncMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Full sync all leads to Google Sheet
+ */
+export const useFullSync = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof fullSync>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof fullSync>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getFullSyncMutationOptions(options));
+};
+
+/**
+ * @summary Seed CRM from Google Sheet if database is empty
+ */
+export const getSeedFromSheetUrl = () => {
+  return `/api/sync/seed`;
+};
+
+export const seedFromSheet = async (
+  options?: RequestInit,
+): Promise<SeedResult> => {
+  return customFetch<SeedResult>(getSeedFromSheetUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getSeedFromSheetMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof seedFromSheet>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof seedFromSheet>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["seedFromSheet"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof seedFromSheet>>,
+    void
+  > = () => {
+    return seedFromSheet(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SeedFromSheetMutationResult = NonNullable<
+  Awaited<ReturnType<typeof seedFromSheet>>
+>;
+
+export type SeedFromSheetMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Seed CRM from Google Sheet if database is empty
+ */
+export const useSeedFromSheet = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof seedFromSheet>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof seedFromSheet>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getSeedFromSheetMutationOptions(options));
+};

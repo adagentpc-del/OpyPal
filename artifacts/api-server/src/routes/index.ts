@@ -5,6 +5,7 @@ import tasksRouter from "./tasks";
 import templatesRouter from "./templates";
 import assetsRouter from "./assets";
 import dashboardRouter from "./dashboard";
+import syncRouter from "./sync";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(tasksRouter);
 router.use(templatesRouter);
 router.use(assetsRouter);
 router.use(dashboardRouter);
+router.use(syncRouter);
 
 export default router;

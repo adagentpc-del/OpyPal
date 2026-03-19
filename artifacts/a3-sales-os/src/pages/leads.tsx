@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout";
-import { useGetLeads, useCreateLead, useUpdateLead, useDeleteLead, useDuplicateLead, useUpdateLeadStatus, getGetLeadsQueryKey, getGetDashboardQueryKey } from "@workspace/api-client-react";
+import { useGetLeads, useCreateLead, useUpdateLead, useDeleteLead, useDuplicateLead, useUpdateLeadStatus, useGetSyncStatus, getGetLeadsQueryKey, getGetDashboardQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Search, Trash2, Edit2, Building2, Copy, ChevronDown, X, Filter } from "lucide-react";
+import { Plus, Search, Trash2, Edit2, Building2, Copy, ChevronDown, X, Filter, Cloud, CloudOff, Loader2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -52,6 +52,7 @@ export default function Leads() {
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { data: syncStatus } = useGetSyncStatus({ query: { refetchInterval: 10000 } });
 
   const { data: leads, isLoading } = useGetLeads({
     search: search || undefined,
@@ -147,7 +148,10 @@ export default function Leads() {
       <div className="flex flex-col gap-4 h-full pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Leads & CRM</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold">Leads & CRM</h1>
+              <SyncBadge status={syncStatus?.status} />
+            </div>
             <p className="text-muted-foreground text-sm mt-1">Manage your pipeline and client database.</p>
           </div>
           <Button onClick={openNew} className="bg-primary hover:bg-primary/90 text-white rounded-xl shadow-md self-start sm:self-auto">
@@ -370,5 +374,23 @@ function SelectField({ label, value, options, onChange, allowEmpty }: { label: s
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
     </div>
+  );
+}
+
+function SyncBadge({ status }: { status?: string }) {
+  if (!status) return null;
+  const config: Record<string, { icon: any; label: string; classes: string }> = {
+    connected: { icon: Cloud, label: "Synced", classes: "bg-emerald-100 text-emerald-700" },
+    syncing: { icon: Loader2, label: "Syncing", classes: "bg-blue-100 text-blue-700" },
+    error: { icon: AlertCircle, label: "Sync Error", classes: "bg-red-100 text-red-700" },
+    disconnected: { icon: CloudOff, label: "Disconnected", classes: "bg-gray-100 text-gray-600" },
+  };
+  const c = config[status] || config.disconnected;
+  const Icon = c.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg ${c.classes}`}>
+      <Icon className={`h-3 w-3 ${status === "syncing" ? "animate-spin" : ""}`} />
+      {c.label}
+    </span>
   );
 }
