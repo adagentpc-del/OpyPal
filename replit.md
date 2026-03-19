@@ -86,6 +86,19 @@ App ID | Pipeline Type | Company Name | Contact Name | Title | Email | Phone | L
 - Sync status indicator badge (Connected / Syncing / Error / Disconnected)
 - All lead mutations sync to Google Sheets MASTER CRM tab
 
+### Outreach Queue
+- Daily outbound execution workspace with 4 views: New Imports, Due Today, Overdue, Awaiting Reply
+- Smart lead cards showing company, contact, title, email, pipeline, status, next step, follow-up, source
+- Draft generation from templates with placeholder substitution ([First Name], [Company Name], etc.)
+- Draft preview, edit, copy, and Send via Outlook with post-send confirmation
+- Quick follow-up actions: Tomorrow, 2 business days, Next week, Custom date
+- Snooze (push 1 business day) and Skip (hide from queue)
+- Batch actions: Generate Drafts, Mark as Contacted, Set Follow-Up, Export
+- Sorting: newest imported, oldest follow-up, highest value, pipeline type
+- Filtering: pipeline, source, status, location
+- Priority highlighting: red for overdue, yellow for due today, ZoomInfo badge for prioritized imports
+- Drafts stored in browser localStorage (keyed by lead ID)
+
 ### Pipeline (Kanban)
 - Drag-and-drop board with 11 stages
 - Color-coded cards for Event (blue) vs Agency (yellow)

@@ -11,6 +11,7 @@ import {
   Bell,
   Menu,
   X,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Leads / CRM", href: "/leads", icon: Users },
   { name: "Pipeline", href: "/pipeline", icon: KanbanSquare },
+  { name: "Outreach Queue", href: "/outreach", icon: Zap },
   { name: "Tasks", href: "/tasks", icon: CheckSquare },
   { name: "Templates", href: "/templates", icon: FileText },
   { name: "Assets", href: "/assets", icon: Images },

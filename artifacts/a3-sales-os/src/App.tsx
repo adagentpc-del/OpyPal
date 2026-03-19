@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "./pages/dashboard";
 import Leads from "./pages/leads";
 import Pipeline from "./pages/pipeline";
+import OutreachQueue from "./pages/outreach-queue";
 import Tasks from "./pages/tasks";
 import Templates from "./pages/templates";
 import Assets from "./pages/assets";
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/leads" component={Leads} />
       <Route path="/pipeline" component={Pipeline} />
+      <Route path="/outreach" component={OutreachQueue} />
       <Route path="/tasks" component={Tasks} />
       <Route path="/templates" component={Templates} />
       <Route path="/assets" component={Assets} />
