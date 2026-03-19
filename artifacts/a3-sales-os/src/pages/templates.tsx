@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout";
-import { useGetTemplates, useCreateTemplate, useUpdateTemplate, useDeleteTemplate, getGetTemplatesQueryKey } from "@workspace/api-client-react";
+import { useGetTemplates, useCreateTemplate, useUpdateTemplate, useDeleteTemplate, getGetTemplatesQueryKey, useGetLeads } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Copy, Plus, Edit2, Trash2, X } from "lucide-react";
+import { Copy, Plus, Edit2, Trash2, X, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -18,9 +18,51 @@ export default function Templates() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const { data: leads } = useGetLeads();
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [form, setForm] = useState({ name: "", category: "Cold Email", subject: "", body: "" });
+
+  const [sendModalOpen, setSendModalOpen] = useState(false);
+  const [sendTemplate, setSendTemplate] = useState<any>(null);
+  const [sendEmail, setSendEmail] = useState("");
+  const [sendSearch, setSendSearch] = useState("");
+
+  const leadEmails = useMemo(() => {
+    if (!leads) return [];
+    return leads
+      .filter((l: any) => l.email)
+      .map((l: any) => ({ email: l.email, company: l.companyName, contact: l.contactName }));
+  }, [leads]);
+
+  const filteredLeadEmails = useMemo(() => {
+    if (!sendSearch) return leadEmails;
+    const q = sendSearch.toLowerCase();
+    return leadEmails.filter(
+      (l) => l.email.toLowerCase().includes(q) || l.company?.toLowerCase().includes(q) || l.contact?.toLowerCase().includes(q)
+    );
+  }, [leadEmails, sendSearch]);
+
+  const openSendModal = (template: any) => {
+    setSendTemplate(template);
+    setSendEmail("");
+    setSendSearch("");
+    setSendModalOpen(true);
+  };
+
+  const handleSendViaOutlook = () => {
+    if (!sendEmail) {
+      toast({ title: "Please enter or select a recipient email", variant: "destructive" });
+      return;
+    }
+    const subject = encodeURIComponent(sendTemplate?.subject || "");
+    const body = encodeURIComponent(sendTemplate?.body || "");
+    const mailto = `mailto:${encodeURIComponent(sendEmail)}?subject=${subject}&body=${body}`;
+    window.open(mailto, "_blank");
+    setSendModalOpen(false);
+    toast({ title: "Opening email client..." });
+  };
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getGetTemplatesQueryKey() });
 
@@ -93,6 +135,7 @@ export default function Templates() {
                   <div className="flex justify-between items-start mb-2">
                     <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded-md">{template.category}</span>
                     <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openSendModal(template)} title="Send via Outlook"><Mail className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyToClipboard(template.body)} title="Copy"><Copy className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(template)} title="Edit"><Edit2 className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(template.id, template.name)} title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -147,6 +190,61 @@ export default function Templates() {
             <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
               <Button variant="outline" onClick={() => setModalOpen(false)} className="rounded-xl">Cancel</Button>
               <Button onClick={handleSave} className="bg-primary text-white rounded-xl">{editingTemplate ? "Save" : "Create"}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {sendModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-16 px-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSendModalOpen(false)} />
+          <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border z-10">
+            <div className="px-6 py-4 border-b border-border flex justify-between items-center">
+              <h2 className="text-lg font-bold">Send via Outlook</h2>
+              <Button variant="ghost" size="icon" onClick={() => setSendModalOpen(false)}><X className="h-5 w-5" /></Button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-muted/30 rounded-xl p-3">
+                <p className="text-xs text-muted-foreground font-medium mb-1">Template</p>
+                <p className="text-sm font-semibold">{sendTemplate?.name}</p>
+                {sendTemplate?.subject && <p className="text-xs text-muted-foreground mt-0.5">Subj: {sendTemplate.subject}</p>}
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1.5">Recipient Email</label>
+                <input
+                  type="email"
+                  value={sendEmail}
+                  onChange={(e) => { setSendEmail(e.target.value); setSendSearch(e.target.value); }}
+                  placeholder="Enter email or search leads..."
+                  className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none"
+                />
+              </div>
+              {sendSearch && filteredLeadEmails.length > 0 && (
+                <div className="border border-border rounded-xl max-h-40 overflow-y-auto">
+                  {filteredLeadEmails.map((lead, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors flex justify-between items-center border-b border-border/30 last:border-0"
+                      onClick={() => { setSendEmail(lead.email); setSendSearch(""); }}
+                    >
+                      <span className="font-medium truncate">{lead.email}</span>
+                      <span className="text-xs text-muted-foreground ml-2 shrink-0">
+                        {lead.contact || lead.company || ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {sendSearch && filteredLeadEmails.length === 0 && sendEmail.includes("@") && (
+                <p className="text-xs text-muted-foreground">No matching leads. The entered email will be used.</p>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setSendModalOpen(false)} className="rounded-xl">Cancel</Button>
+              <Button onClick={handleSendViaOutlook} className="bg-primary text-white rounded-xl gap-2">
+                <Mail className="h-4 w-4" /> Send via Outlook
+              </Button>
             </div>
           </div>
         </div>
