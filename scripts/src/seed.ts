@@ -311,14 +311,14 @@ async function seed() {
     {
       name: "Cold Email Intro",
       category: "Cold Email",
-      subject: "quick question",
+      subject: "Quick Question",
       body: `Hi [First Name],
 
-Quick question—who handles event production, printing, or visual installations for [Company Name]?
+Quick question, who handles event production, printing, or visual installations for [Company Name]?
 
 I work with A3 Visual, and we support hotels, venues, and agencies with large format, fabrication, and immersive builds (projection mapping, branded environments, etc.).
 
-If that's you, happy to connect—if not, would you mind pointing me in the right direction?
+If that's you, happy to connect. If not, would you mind pointing me in the right direction?
 
 Thanks so much,
 Alyssa`,
@@ -326,10 +326,10 @@ Alyssa`,
     {
       name: "Follow-Up",
       category: "Follow-Up Email",
-      subject: "Following up",
+      subject: "Following Up",
       body: `Hi [First Name],
 
-Just wanted to follow up here—would love to connect briefly and see what you have coming up this season.
+Just wanted to follow up here. Would love to connect briefly and see what you have coming up this season.
 
 We've been supporting a number of venues and agencies with fast-turn, high-impact installs, especially for events and activations.
 
@@ -341,10 +341,10 @@ Alyssa`,
     {
       name: "Value Follow-Up",
       category: "Follow-Up Email",
-      subject: "Quick share",
+      subject: "Quick Share",
       body: `Hi [First Name],
 
-We recently helped a [venue / agency] elevate their event experience with custom fabrication + large format installs—happy to share examples if helpful.
+We recently helped a [venue / agency] elevate their event experience with custom fabrication + large format installs. Happy to share examples if helpful.
 
 Would it be worth a quick conversation?
 
@@ -354,10 +354,10 @@ Alyssa`,
     {
       name: "Soft Close",
       category: "Follow-Up Email",
-      subject: "Keeping the door open",
+      subject: "Keeping The Door Open",
       body: `Hi [First Name],
 
-Totally understand if timing isn't right—just wanted to keep the door open.
+Totally understand if timing isn't right. Just wanted to keep the door open.
 
 If anything comes up where you need support on printing, fabrication, or immersive installs, I'd love to be a resource.
 
@@ -367,22 +367,22 @@ Alyssa`,
     {
       name: "LinkedIn Connect",
       category: "LinkedIn Message",
-      body: `Hi [Name], would love to connect—working with venues and agencies on event production + visual environments.`,
+      body: `Hi [Name], would love to connect. Working with venues and agencies on event production + visual environments.`,
     },
     {
       name: "LinkedIn Follow-Up",
       category: "LinkedIn Message",
       body: `Thanks for connecting!
 
-Curious—do you currently handle event production and installs internally, or work with external partners?`,
+Curious, do you currently handle event production and installs internally, or work with external partners?`,
     },
     {
       name: "Initial Outreach + A3 Deck",
       category: "Cold Email",
-      subject: "quick question",
+      subject: "Quick Question",
       body: `Hi [First Name],
 
-Quick question—who handles event production, printing, visual installations, or experiential builds for [Company Name]?
+Quick question, who handles event production, printing, visual installations, or experiential builds for [Company Name]?
 
 I work with A3 Visual, and we support hotels, venues, agencies, and event teams with large format printing, fabrication, immersive environments, and projection mapping.
 
