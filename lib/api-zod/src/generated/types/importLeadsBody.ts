@@ -5,8 +5,8 @@
  * A3 Sales OS API
  * OpenAPI spec version: 0.1.0
  */
-import type { LeadInput } from "./leadInput";
+import type { LeadImportInput } from "./leadImportInput";
 
 export type ImportLeadsBody = {
-  leads: LeadInput[];
+  leads: LeadImportInput[];
 };

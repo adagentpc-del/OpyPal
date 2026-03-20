@@ -224,7 +224,7 @@ paths:
                 leads:
                   type: array
                   items:
-                    $ref: "#/components/schemas/LeadInput"
+                    $ref: "#/components/schemas/LeadImportInput"
               required:
                 - leads
       responses:
@@ -245,6 +245,50 @@ paths:
                   - imported
                   - skipped
                   - total
+
+  /leads/{id}/history:
+    get:
+      operationId: getLeadHistory
+      tags: [leads]
+      summary: Get outreach history for a lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Outreach history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OutreachHistoryEntry"
+    post:
+      operationId: createLeadHistory
+      tags: [leads]
+      summary: Log an outreach action for a lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OutreachHistoryInput"
+      responses:
+        "201":
+          description: Created history entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachHistoryEntry"
 
   /tasks:
     get:
@@ -725,6 +769,100 @@ components:
         - companyName
         - contactName
         - status
+
+    LeadImportInput:
+      type: object
+      properties:
+        companyName:
+          type: string
+        contactName:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        location:
+          type: string
+        title:
+          type: string
+        pipelineType:
+          type: string
+        status:
+          type: string
+        source:
+          type: string
+        nextStep:
+          type: string
+        nextFollowUpDate:
+          type: string
+        industry:
+          type: string
+        linkedin:
+          type: string
+        venueProperty:
+          type: string
+        projectType:
+          type: string
+        estimatedBudget:
+          type: number
+        dealValueEstimate:
+          type: number
+        proposalValue:
+          type: number
+        closeProbability:
+          type: number
+        notes:
+          type: string
+        lastContactDate:
+          type: string
+      required:
+        - companyName
+        - contactName
+
+    OutreachHistoryEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        leadId:
+          type: integer
+        actionType:
+          type: string
+        templateName:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+        assets:
+          type: string
+        sender:
+          type: string
+        sentAt:
+          type: string
+      required:
+        - id
+        - leadId
+        - actionType
+        - sentAt
+
+    OutreachHistoryInput:
+      type: object
+      properties:
+        actionType:
+          type: string
+        templateName:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+        assets:
+          type: string
+        sender:
+          type: string
+      required:
+        - actionType
 
     Task:
       type: object

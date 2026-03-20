@@ -32,6 +32,8 @@ import type {
   Lead,
   LeadInput,
   MessageResponse,
+  OutreachHistoryEntry,
+  OutreachHistoryInput,
   SeedResult,
   SyncStatus,
   SyncTestResult,
@@ -809,6 +811,180 @@ export const useImportLeads = <
   TContext
 > => {
   return useMutation(getImportLeadsMutationOptions(options));
+};
+
+/**
+ * @summary Get outreach history for a lead
+ */
+export const getGetLeadHistoryUrl = (id: number) => {
+  return `/api/leads/${id}/history`;
+};
+
+export const getLeadHistory = async (
+  id: number,
+  options?: RequestInit,
+): Promise<OutreachHistoryEntry[]> => {
+  return customFetch<OutreachHistoryEntry[]>(getGetLeadHistoryUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLeadHistoryQueryKey = (id: number) => {
+  return [`/api/leads/${id}/history`] as const;
+};
+
+export const getGetLeadHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLeadHistory>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLeadHistory>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetLeadHistoryQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getLeadHistory>>> = ({
+    signal,
+  }) => getLeadHistory(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLeadHistory>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLeadHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLeadHistory>>
+>;
+export type GetLeadHistoryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get outreach history for a lead
+ */
+
+export function useGetLeadHistory<
+  TData = Awaited<ReturnType<typeof getLeadHistory>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLeadHistory>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLeadHistoryQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Log an outreach action for a lead
+ */
+export const getCreateLeadHistoryUrl = (id: number) => {
+  return `/api/leads/${id}/history`;
+};
+
+export const createLeadHistory = async (
+  id: number,
+  outreachHistoryInput: OutreachHistoryInput,
+  options?: RequestInit,
+): Promise<OutreachHistoryEntry> => {
+  return customFetch<OutreachHistoryEntry>(getCreateLeadHistoryUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(outreachHistoryInput),
+  });
+};
+
+export const getCreateLeadHistoryMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLeadHistory>>,
+    TError,
+    { id: number; data: BodyType<OutreachHistoryInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createLeadHistory>>,
+  TError,
+  { id: number; data: BodyType<OutreachHistoryInput> },
+  TContext
+> => {
+  const mutationKey = ["createLeadHistory"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createLeadHistory>>,
+    { id: number; data: BodyType<OutreachHistoryInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return createLeadHistory(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateLeadHistoryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createLeadHistory>>
+>;
+export type CreateLeadHistoryMutationBody = BodyType<OutreachHistoryInput>;
+export type CreateLeadHistoryMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Log an outreach action for a lead
+ */
+export const useCreateLeadHistory = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLeadHistory>>,
+    TError,
+    { id: number; data: BodyType<OutreachHistoryInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createLeadHistory>>,
+  TError,
+  { id: number; data: BodyType<OutreachHistoryInput> },
+  TContext
+> => {
+  return useMutation(getCreateLeadHistoryMutationOptions(options));
 };
 
 /**

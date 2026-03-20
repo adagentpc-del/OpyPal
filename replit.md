@@ -78,10 +78,19 @@ App ID | Pipeline Type | Company Name | Contact Name | Title | Email | Phone | L
 - Upcoming tasks panel
 
 ### Leads / CRM
-- Full CRM table with sortable columns, search, and filters
-- Filter by pipeline type, status, project type, source, location, follow-up due today, overdue
-- Add/edit/delete/duplicate leads via modal
-- Quick status change
+- Clean CRM table with essential columns: Company, Contact, Phone, Email, Location, Pipeline, Status, Next Step, Follow-Up, Source
+- Additional details (Title, Industry, Venue, Project Type, Budget, Deal fields, LinkedIn, Notes) in lead detail drawer under collapsible section
+- Click any row to open lead detail drawer (right-side panel)
+- Lead drawer has 5 sections: Contact Info, CRM Status, Outreach, Outreach History, Additional Details
+- Outreach section: template selector, editable email preview with placeholder substitution, asset attachment selector, Copy Email, Send via Outlook, Mark as Contacted
+- Asset selector shows uploaded assets from Assets page, with Capabilities Deck badge; assets with URLs included in email body
+- Outreach History: logged sent emails with template used, subject, body, assets selected, sender, timestamp
+- Post-send confirmation: "Did you send this email?" → Yes saves outreach_history record + updates lead status
+- outreach_history table: leadId, actionType, templateName, subject, body, assets, sender, sentAt
+- New Lead modal simplified: Company, Contact, Phone, Email, Location, Pipeline, Source
+- Edit mode in drawer shows all fields organized by section
+- Filter by pipeline, status, source, due today, overdue
+- Quick status change dropdown in table
 - Auto-calculated forecast value (proposalValue or dealValueEstimate * closeProbability)
 - Sync status indicator badge (Connected / Syncing / Error / Disconnected)
 - All lead mutations sync to Google Sheets MASTER CRM tab
@@ -123,8 +132,14 @@ App ID | Pipeline Type | Company Name | Contact Name | Title | Email | Phone | L
 - Attach links, searchable
 
 ### Import / Export
-- CSV import with column mapping and preview
-- Duplicate detection by email + company
+- CSV import requires only 5 columns: Company Name, Contact Name, Phone, Email, Location
+- Auto-fills: Source=ZoomInfo, Status=New Lead, NextStep=Initial outreach, NextFollowUpDate=tomorrow (next business day)
+- Auto-infers Pipeline (Event vs Agency) from company name, title, industry keywords
+- Smart header matching with aliases (e.g. "Company" → companyName, "Job Title" → title)
+- Duplicate detection: matches by email OR (companyName + contactName)
+- Shows required field mapping status with colored badges
+- Preview first 5 rows before import
+- Import summary card: rows uploaded, imported, duplicates skipped
 - Export leads and tasks to CSV
 - Imported leads are synced to Google Sheets
 
@@ -136,6 +151,7 @@ Tables in `lib/db/src/schema/`:
 - `templates` - Outreach templates (local only)
 - `assets` - Sales assets/resources (local only)
 - `activity` - Activity log for dashboard feed (local only)
+- `outreach_history` - Logged sent emails per lead (leadId, actionType, templateName, subject, body, assets, sender, sentAt)
 
 ## API Routes
 
@@ -144,7 +160,9 @@ All routes are in `artifacts/api-server/src/routes/`:
 - `GET/PUT/DELETE /api/leads/:id` - CRUD individual leads
 - `POST /api/leads/:id/duplicate` - Duplicate a lead
 - `PATCH /api/leads/:id/status` - Quick status update
-- `POST /api/leads/import` - Bulk CSV import
+- `POST /api/leads/import` - Bulk CSV import (5 required fields, auto-defaults, pipeline inference, dedup by email OR name)
+- `GET /api/leads/:id/history` - Get outreach history for a lead
+- `POST /api/leads/:id/history` - Log outreach action (Email Sent, etc.)
 - `GET/POST /api/tasks` - List/create tasks
 - `PUT/DELETE /api/tasks/:id` - Update/delete tasks
 - `PATCH /api/tasks/:id/complete` - Mark task complete

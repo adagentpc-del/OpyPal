@@ -65,6 +65,51 @@ export interface LeadInput {
   source?: string;
 }
 
+export interface LeadImportInput {
+  companyName: string;
+  contactName: string;
+  phone?: string;
+  email?: string;
+  location?: string;
+  title?: string;
+  pipelineType?: string;
+  status?: string;
+  source?: string;
+  nextStep?: string;
+  nextFollowUpDate?: string;
+  industry?: string;
+  linkedin?: string;
+  venueProperty?: string;
+  projectType?: string;
+  estimatedBudget?: number;
+  dealValueEstimate?: number;
+  proposalValue?: number;
+  closeProbability?: number;
+  notes?: string;
+  lastContactDate?: string;
+}
+
+export interface OutreachHistoryEntry {
+  id: number;
+  leadId: number;
+  actionType: string;
+  templateName?: string;
+  subject?: string;
+  body?: string;
+  assets?: string;
+  sender?: string;
+  sentAt: string;
+}
+
+export interface OutreachHistoryInput {
+  actionType: string;
+  templateName?: string;
+  subject?: string;
+  body?: string;
+  assets?: string;
+  sender?: string;
+}
+
 export interface Task {
   id: number;
   leadId?: number;
@@ -215,7 +260,7 @@ export type UpdateLeadStatusBody = {
 };
 
 export type ImportLeadsBody = {
-  leads: LeadInput[];
+  leads: LeadImportInput[];
 };
 
 export type ImportLeads200 = {

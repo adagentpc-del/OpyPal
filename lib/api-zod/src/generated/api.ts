@@ -241,27 +241,27 @@ export const UpdateLeadStatusResponse = zod.object({
 export const ImportLeadsBody = zod.object({
   leads: zod.array(
     zod.object({
-      pipelineType: zod.string(),
       companyName: zod.string(),
       contactName: zod.string(),
-      title: zod.string().optional(),
-      email: zod.string().optional(),
       phone: zod.string().optional(),
-      linkedin: zod.string().optional(),
+      email: zod.string().optional(),
       location: zod.string().optional(),
+      title: zod.string().optional(),
+      pipelineType: zod.string().optional(),
+      status: zod.string().optional(),
+      source: zod.string().optional(),
+      nextStep: zod.string().optional(),
+      nextFollowUpDate: zod.string().optional(),
       industry: zod.string().optional(),
+      linkedin: zod.string().optional(),
       venueProperty: zod.string().optional(),
       projectType: zod.string().optional(),
       estimatedBudget: zod.number().optional(),
-      status: zod.string(),
-      lastContactDate: zod.string().optional(),
-      nextStep: zod.string().optional(),
-      nextFollowUpDate: zod.string().optional(),
-      notes: zod.string().optional(),
       dealValueEstimate: zod.number().optional(),
       proposalValue: zod.number().optional(),
       closeProbability: zod.number().optional(),
-      source: zod.string().optional(),
+      notes: zod.string().optional(),
+      lastContactDate: zod.string().optional(),
     }),
   ),
 });
@@ -270,6 +270,42 @@ export const ImportLeadsResponse = zod.object({
   imported: zod.number(),
   skipped: zod.number(),
   total: zod.number(),
+});
+
+/**
+ * @summary Get outreach history for a lead
+ */
+export const GetLeadHistoryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetLeadHistoryResponseItem = zod.object({
+  id: zod.number(),
+  leadId: zod.number(),
+  actionType: zod.string(),
+  templateName: zod.string().optional(),
+  subject: zod.string().optional(),
+  body: zod.string().optional(),
+  assets: zod.string().optional(),
+  sender: zod.string().optional(),
+  sentAt: zod.string(),
+});
+export const GetLeadHistoryResponse = zod.array(GetLeadHistoryResponseItem);
+
+/**
+ * @summary Log an outreach action for a lead
+ */
+export const CreateLeadHistoryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CreateLeadHistoryBody = zod.object({
+  actionType: zod.string(),
+  templateName: zod.string().optional(),
+  subject: zod.string().optional(),
+  body: zod.string().optional(),
+  assets: zod.string().optional(),
+  sender: zod.string().optional(),
 });
 
 /**

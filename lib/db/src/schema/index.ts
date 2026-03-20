@@ -3,3 +3,4 @@ export * from "./tasks";
 export * from "./templates";
 export * from "./assets";
 export * from "./activity";
+export * from "./outreach-history";

@@ -1,18 +1,30 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { AppLayout } from "@/components/layout";
 import { useImportLeads, useGetLeads, useGetTasks } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UploadCloud, Download, FileSpreadsheet, AlertCircle, CheckCircle2, X } from "lucide-react";
+import { UploadCloud, Download, FileSpreadsheet, AlertCircle, CheckCircle2, X, Users, SkipForward, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
-const LEAD_FIELDS = [
-  "pipelineType", "companyName", "contactName", "title", "email", "phone", "linkedin",
-  "location", "industry", "venueProperty", "projectType", "estimatedBudget", "status",
-  "lastContactDate", "nextStep", "nextFollowUpDate", "notes", "dealValueEstimate",
-  "proposalValue", "closeProbability", "source",
+const IMPORT_FIELDS = [
+  { key: "companyName", label: "Company Name", required: true },
+  { key: "contactName", label: "Contact Name", required: true },
+  { key: "phone", label: "Phone", required: true },
+  { key: "email", label: "Email", required: true },
+  { key: "location", label: "Location", required: true },
+  { key: "title", label: "Title / Role", required: false },
+  { key: "industry", label: "Industry", required: false },
+  { key: "pipelineType", label: "Pipeline Type", required: false },
+  { key: "source", label: "Source", required: false },
+  { key: "notes", label: "Notes", required: false },
+  { key: "linkedin", label: "LinkedIn", required: false },
+  { key: "venueProperty", label: "Venue / Property", required: false },
+  { key: "projectType", label: "Project Type", required: false },
+  { key: "estimatedBudget", label: "Estimated Budget", required: false },
 ];
+
+const REQUIRED_KEYS = ["companyName", "contactName", "phone", "email", "location"];
 
 function parseCSV(text: string): string[][] {
   const lines: string[][] = [];
@@ -49,11 +61,35 @@ function toCSV(headers: string[], rows: Record<string, any>[]): string {
   return [headers.map(escape).join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))].join("\n");
 }
 
+function normalizeHeader(h: string): string {
+  return h.toLowerCase().replace(/[\s_\-/]+/g, "");
+}
+
+const HEADER_ALIASES: Record<string, string> = {
+  company: "companyName", companyname: "companyName", "company name": "companyName",
+  contact: "contactName", contactname: "contactName", "contact name": "contactName", name: "contactName",
+  phone: "phone", phonenumber: "phone", "phone number": "phone",
+  email: "email", emailaddress: "email", "email address": "email",
+  location: "location", city: "location", state: "location", address: "location",
+  title: "title", jobtitle: "title", role: "title", "title / role": "title", "title/role": "title",
+  industry: "industry",
+  pipeline: "pipelineType", pipelinetype: "pipelineType", type: "pipelineType",
+  source: "source", leadsource: "source",
+  linkedin: "linkedin",
+  notes: "notes",
+  venue: "venueProperty", property: "venueProperty", venueproperty: "venueProperty",
+  projecttype: "projectType", project: "projectType",
+  budget: "estimatedBudget", estimatedbudget: "estimatedBudget",
+  "first name": "contactName", firstname: "contactName",
+  "last name": "contactName",
+};
+
 export default function ImportExport() {
   const [csvData, setCsvData] = useState<string[][] | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<number, string>>({});
   const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; total: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const importMutation = useImportLeads();
   const { data: leads } = useGetLeads();
@@ -64,6 +100,7 @@ export default function ImportExport() {
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setImportResult(null);
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
@@ -76,24 +113,48 @@ export default function ImportExport() {
       setCsvHeaders(headers);
       setCsvData(parsed.slice(1));
       const autoMap: Record<number, string> = {};
+      const used = new Set<string>();
       headers.forEach((h, i) => {
-        const lower = h.toLowerCase().replace(/[\s_-]+/g, "");
-        const match = LEAD_FIELDS.find((f) => f.toLowerCase() === lower);
-        if (match) autoMap[i] = match;
+        const norm = normalizeHeader(h);
+        let match = IMPORT_FIELDS.find((f) => normalizeHeader(f.key) === norm && !used.has(f.key));
+        if (!match) {
+          const aliasKey = HEADER_ALIASES[norm];
+          if (aliasKey) match = IMPORT_FIELDS.find((f) => f.key === aliasKey && !used.has(f.key));
+        }
+        if (match) {
+          autoMap[i] = match.key;
+          used.add(match.key);
+        }
       });
       setMapping(autoMap);
     };
     reader.readAsText(file);
   };
 
+  const mappedValues = Object.values(mapping).filter(Boolean);
+  const requiredMapped = REQUIRED_KEYS.filter((k) => mappedValues.includes(k));
+  const requiredMissing = REQUIRED_KEYS.filter((k) => !mappedValues.includes(k));
+
+  const previewLeads = useMemo(() => {
+    if (!csvData) return [];
+    return csvData.slice(0, 5).map((row) => {
+      const lead: any = {};
+      Object.entries(mapping).forEach(([colIdx, field]) => {
+        const val = row[Number(colIdx)];
+        if (val && field) lead[field] = val;
+      });
+      return lead;
+    });
+  }, [csvData, mapping]);
+
   const handleImport = () => {
     if (!csvData) return;
     setImporting(true);
     const mappedLeads = csvData.map((row) => {
-      const lead: any = { pipelineType: "Event", status: "New Lead", companyName: "", contactName: "" };
+      const lead: any = {};
       Object.entries(mapping).forEach(([colIdx, field]) => {
         const val = row[Number(colIdx)];
-        if (val) {
+        if (val && field) {
           if (["estimatedBudget", "dealValueEstimate", "proposalValue", "closeProbability"].includes(field)) {
             lead[field] = parseFloat(val.replace(/[$,]/g, "")) || undefined;
           } else {
@@ -102,20 +163,18 @@ export default function ImportExport() {
         }
       });
       return lead;
-    }).filter((l) => l.companyName && l.contactName);
+    }).filter((l) => l.companyName && l.contactName && l.phone && l.email && l.location);
 
     if (mappedLeads.length === 0) {
-      toast({ title: "No valid leads", description: "Ensure companyName and contactName are mapped.", variant: "destructive" });
+      toast({ title: "No valid leads", description: "Each row needs Company Name, Contact Name, Phone, Email, and Location.", variant: "destructive" });
       setImporting(false);
       return;
     }
 
     importMutation.mutate({ data: { leads: mappedLeads } }, {
       onSuccess: (res) => {
-        toast({ title: "Import complete", description: `Imported ${res.imported}, skipped ${res.skipped} duplicates.` });
-        setCsvData(null);
-        setCsvHeaders([]);
-        setMapping({});
+        setImportResult(res);
+        toast({ title: "Import complete", description: `${res.imported} imported, ${res.skipped} duplicates skipped.` });
         queryClient.invalidateQueries();
         setImporting(false);
       },
@@ -126,9 +185,17 @@ export default function ImportExport() {
     });
   };
 
+  const clearImport = () => {
+    setCsvData(null);
+    setCsvHeaders([]);
+    setMapping({});
+    setImportResult(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
   const exportLeads = () => {
     if (!leads?.length) { toast({ title: "No leads to export" }); return; }
-    const headers = ["id", "pipelineType", "companyName", "contactName", "title", "email", "phone", "linkedin", "location", "industry", "venueProperty", "projectType", "estimatedBudget", "status", "lastContactDate", "nextStep", "nextFollowUpDate", "notes", "dealValueEstimate", "proposalValue", "closeProbability", "forecastValue", "source", "createdAt"];
+    const headers = ["id", "companyName", "contactName", "phone", "email", "location", "pipelineType", "status", "lastContactDate", "nextStep", "nextFollowUpDate", "source", "title", "industry", "venueProperty", "projectType", "estimatedBudget", "notes", "dealValueEstimate", "proposalValue", "closeProbability", "forecastValue", "linkedin", "createdAt"];
     downloadCSV(toCSV(headers, leads), "a3-leads-export.csv");
   };
 
@@ -161,15 +228,52 @@ export default function ImportExport() {
               <div className="p-3 rounded-xl bg-primary/10 text-primary"><UploadCloud className="h-6 w-6" /></div>
               <div>
                 <h2 className="text-lg font-bold">Import Leads</h2>
-                <p className="text-sm text-muted-foreground">Upload a CSV file with lead data</p>
+                <p className="text-sm text-muted-foreground">Upload a CSV with lead data</p>
               </div>
             </div>
 
-            {!csvData ? (
+            {importResult ? (
               <div className="flex-1 flex flex-col gap-4">
-                <div className="bg-blue-50 text-blue-800 p-3 rounded-xl flex items-start gap-3 text-sm">
-                  <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                  <p>Upload a CSV with headers. Required: <strong>companyName</strong>, <strong>contactName</strong>. Columns are auto-mapped when possible.</p>
+                <div className="bg-emerald-50 text-emerald-800 p-4 rounded-xl">
+                  <div className="flex items-center gap-2 mb-3">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span className="font-bold">Import Complete</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="text-center p-3 bg-white rounded-lg">
+                      <div className="text-2xl font-bold">{importResult.total}</div>
+                      <div className="text-xs text-muted-foreground">Rows Uploaded</div>
+                    </div>
+                    <div className="text-center p-3 bg-white rounded-lg">
+                      <div className="text-2xl font-bold text-emerald-600">{importResult.imported}</div>
+                      <div className="text-xs text-muted-foreground">Imported</div>
+                    </div>
+                    <div className="text-center p-3 bg-white rounded-lg">
+                      <div className="text-2xl font-bold text-amber-600">{importResult.skipped}</div>
+                      <div className="text-xs text-muted-foreground">Duplicates Skipped</div>
+                    </div>
+                  </div>
+                  <p className="text-xs mt-3 text-emerald-700">
+                    Auto-filled: Source = ZoomInfo, Status = New Lead, Next Step = Initial outreach, Follow-up = tomorrow. Pipeline inferred from company/title.
+                  </p>
+                </div>
+                <Button onClick={clearImport} variant="outline" className="w-full rounded-xl">
+                  Import More Leads
+                </Button>
+              </div>
+            ) : !csvData ? (
+              <div className="flex-1 flex flex-col gap-4">
+                <div className="bg-blue-50 text-blue-800 p-3 rounded-xl text-sm space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold mb-1">Required CSV columns:</p>
+                      <p>Company Name, Contact Name, Phone, Email, Location</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-blue-600 pl-7">
+                    All other fields auto-generated: Source = ZoomInfo, Status = New Lead, Pipeline = auto-inferred, Follow-up = tomorrow
+                  </p>
                 </div>
                 <input ref={fileRef} type="file" accept=".csv" onChange={handleFile} className="hidden" />
                 <Button onClick={() => fileRef.current?.click()} variant="outline" className="w-full h-32 border-dashed border-2 rounded-xl flex flex-col gap-2 hover:bg-primary/5 hover:border-primary">
@@ -184,12 +288,24 @@ export default function ImportExport() {
                     <CheckCircle2 className="h-4 w-4" />
                     {csvData.length} rows loaded, {csvHeaders.length} columns
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => { setCsvData(null); setCsvHeaders([]); setMapping({}); }}>
+                  <Button variant="ghost" size="sm" onClick={clearImport}>
                     <X className="h-4 w-4 mr-1" /> Clear
                   </Button>
                 </div>
 
-                <div className="border border-border rounded-xl overflow-hidden max-h-[300px] overflow-y-auto">
+                <div className="flex flex-wrap gap-1.5 mb-1">
+                  {REQUIRED_KEYS.map((k) => {
+                    const mapped = mappedValues.includes(k);
+                    const field = IMPORT_FIELDS.find((f) => f.key === k);
+                    return (
+                      <span key={k} className={`text-xs px-2 py-0.5 rounded-full font-medium ${mapped ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                        {mapped ? "✓" : "✗"} {field?.label}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                <div className="border border-border rounded-xl overflow-hidden max-h-[220px] overflow-y-auto">
                   <table className="w-full text-xs">
                     <thead className="bg-muted/50 sticky top-0">
                       <tr>
@@ -205,7 +321,9 @@ export default function ImportExport() {
                             <select value={mapping[i] || ""} onChange={(e) => setMapping({ ...mapping, [i]: e.target.value })}
                               className="w-full px-2 py-1 text-xs border border-border rounded-lg bg-background">
                               <option value="">— Skip —</option>
-                              {LEAD_FIELDS.map((f) => <option key={f} value={f}>{f}</option>)}
+                              {IMPORT_FIELDS.map((f) => (
+                                <option key={f.key} value={f.key}>{f.label}{f.required ? " *" : ""}</option>
+                              ))}
                             </select>
                           </td>
                         </tr>
@@ -214,34 +332,48 @@ export default function ImportExport() {
                   </table>
                 </div>
 
-                <div className="border border-border rounded-xl overflow-hidden">
-                  <p className="px-3 py-2 bg-muted/50 text-xs font-semibold">Preview (first 3 rows)</p>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted/30">
-                        <tr>
-                          {Object.entries(mapping).filter(([, v]) => v).map(([i, field]) => (
-                            <th key={i} className="px-3 py-1.5 font-medium text-left">{field}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/50">
-                        {csvData.slice(0, 3).map((row, ri) => (
-                          <tr key={ri}>
-                            {Object.entries(mapping).filter(([, v]) => v).map(([i]) => (
-                              <td key={i} className="px-3 py-1.5 truncate max-w-[150px]">{row[Number(i)] || ""}</td>
-                            ))}
+                {previewLeads.length > 0 && (
+                  <div className="border border-border rounded-xl overflow-hidden">
+                    <p className="px-3 py-2 bg-muted/50 text-xs font-semibold">Preview (first {Math.min(5, previewLeads.length)} rows)</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-muted/30">
+                          <tr>
+                            {Object.entries(mapping).filter(([, v]) => v).map(([i, field]) => {
+                              const f = IMPORT_FIELDS.find((x) => x.key === field);
+                              return <th key={i} className="px-3 py-1.5 font-medium text-left">{f?.label || field}</th>;
+                            })}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                          {previewLeads.map((lead, ri) => (
+                            <tr key={ri}>
+                              {Object.entries(mapping).filter(([, v]) => v).map(([, field]) => (
+                                <td key={field} className="px-3 py-1.5 truncate max-w-[150px]">{lead[field] || ""}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <Button onClick={handleImport} disabled={importing || Object.values(mapping).filter(Boolean).length < 2}
+                {requiredMissing.length > 0 && (
+                  <div className="bg-red-50 text-red-700 p-2 rounded-xl text-xs flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    Missing required: {requiredMissing.map((k) => IMPORT_FIELDS.find((f) => f.key === k)?.label).join(", ")}
+                  </div>
+                )}
+
+                <Button onClick={handleImport}
+                  disabled={importing || requiredMapped.length < 5}
                   className="w-full bg-primary hover:bg-primary/90 text-white rounded-xl py-5 shadow-md">
                   {importing ? "Importing..." : `Import ${csvData.length} Leads`}
                 </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Duplicates (matching email or company+contact) will be skipped automatically.
+                </p>
               </div>
             )}
           </Card>

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, leadsTable, activityTable } from "@workspace/db";
-import { eq, ilike, or, and, sql, lte, lt } from "drizzle-orm";
+import { db, leadsTable, activityTable, outreachHistoryTable } from "@workspace/db";
+import { eq, ilike, or, and, sql, lte, lt, desc } from "drizzle-orm";
 import {
   GetLeadsQueryParams,
   CreateLeadBody,
@@ -12,6 +12,9 @@ import {
   UpdateLeadStatusParams,
   UpdateLeadStatusBody,
   ImportLeadsBody,
+  GetLeadHistoryParams,
+  CreateLeadHistoryParams,
+  CreateLeadHistoryBody,
 } from "@workspace/api-zod";
 import { syncLeadToSheet, deleteLeadFromSheet, fullSyncToSheet } from "../lib/sheets-sync";
 
@@ -24,6 +27,25 @@ function calculateForecast(proposalValue: string | null, dealValueEstimate: stri
     return (value * prob / 100).toFixed(2);
   }
   return null;
+}
+
+const EVENT_KEYWORDS = [
+  "hotel", "venue", "convention", "hospitality", "resort", "casino", "event",
+  "events", "conference", "banquet", "catering", "meeting", "ballroom",
+  "programming", "entertainment",
+];
+const AGENCY_KEYWORDS = [
+  "agency", "experiential", "creative", "marketing", "advertising", "media",
+  "brand", "branding", "communications", "pr", "public relations", "design",
+  "strategy", "activation",
+];
+
+function inferPipeline(lead: { companyName?: string; title?: string; industry?: string }): string {
+  const text = `${lead.companyName || ""} ${lead.title || ""} ${lead.industry || ""}`.toLowerCase();
+  const agencyScore = AGENCY_KEYWORDS.filter(k => text.includes(k)).length;
+  const eventScore = EVENT_KEYWORDS.filter(k => text.includes(k)).length;
+  if (agencyScore > eventScore) return "Agency";
+  return "Event";
 }
 
 router.get("/leads", async (req, res) => {
@@ -230,20 +252,31 @@ router.post("/leads/import", async (req, res) => {
     let skipped = 0;
     const importedLeads: any[] = [];
 
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (tomorrow.getDay() === 0) tomorrow.setDate(tomorrow.getDate() + 1);
+    if (tomorrow.getDay() === 6) tomorrow.setDate(tomorrow.getDate() + 2);
+    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
     for (const leadData of leads) {
-      if (leadData.email && leadData.companyName) {
-        const existing = await db.select().from(leadsTable)
-          .where(
-            and(
-              eq(leadsTable.email, leadData.email),
-              eq(leadsTable.companyName, leadData.companyName)
-            )
-          );
-        if (existing.length > 0) {
-          skipped++;
-          continue;
-        }
+      const hasDupByEmail = leadData.email ? (await db.select().from(leadsTable)
+        .where(eq(leadsTable.email, leadData.email))).length > 0 : false;
+      const hasDupByName = (await db.select().from(leadsTable)
+        .where(and(
+          eq(leadsTable.companyName, leadData.companyName),
+          eq(leadsTable.contactName, leadData.contactName)
+        ))).length > 0;
+
+      if (hasDupByEmail || hasDupByName) {
+        skipped++;
+        continue;
       }
+
+      const pipelineType = leadData.pipelineType || inferPipeline(leadData);
+      const status = leadData.status || "New Lead";
+      const source = leadData.source || "ZoomInfo";
+      const nextStep = leadData.nextStep || "Initial outreach";
+      const nextFollowUpDate = leadData.nextFollowUpDate || tomorrowStr;
 
       const forecastValue = calculateForecast(
         leadData.proposalValue?.toString() ?? null,
@@ -252,11 +285,27 @@ router.post("/leads/import", async (req, res) => {
       );
 
       const [lead] = await db.insert(leadsTable).values({
-        ...leadData,
-        estimatedBudget: leadData.estimatedBudget?.toString(),
-        dealValueEstimate: leadData.dealValueEstimate?.toString(),
-        proposalValue: leadData.proposalValue?.toString(),
-        closeProbability: leadData.closeProbability?.toString(),
+        companyName: leadData.companyName,
+        contactName: leadData.contactName,
+        pipelineType,
+        status,
+        source,
+        nextStep,
+        nextFollowUpDate,
+        email: leadData.email || null,
+        phone: leadData.phone || null,
+        title: leadData.title || null,
+        location: leadData.location || null,
+        industry: leadData.industry || null,
+        linkedin: leadData.linkedin || null,
+        venueProperty: leadData.venueProperty || null,
+        projectType: leadData.projectType || null,
+        notes: leadData.notes || null,
+        lastContactDate: leadData.lastContactDate || null,
+        estimatedBudget: leadData.estimatedBudget?.toString() || null,
+        dealValueEstimate: leadData.dealValueEstimate?.toString() || null,
+        proposalValue: leadData.proposalValue?.toString() || null,
+        closeProbability: leadData.closeProbability?.toString() || null,
         forecastValue,
       }).returning();
       importedLeads.push(lead);
@@ -269,6 +318,34 @@ router.post("/leads/import", async (req, res) => {
     }
 
     res.json({ imported, skipped, total: leads.length });
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.get("/leads/:id/history", async (req, res) => {
+  try {
+    const { id } = GetLeadHistoryParams.parse({ id: req.params.id });
+    const history = await db.select().from(outreachHistoryTable)
+      .where(eq(outreachHistoryTable.leadId, id))
+      .orderBy(desc(outreachHistoryTable.sentAt));
+    res.json(history);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.post("/leads/:id/history", async (req, res) => {
+  try {
+    const { id } = CreateLeadHistoryParams.parse({ id: req.params.id });
+    const data = CreateLeadHistoryBody.parse(req.body);
+
+    const [entry] = await db.insert(outreachHistoryTable).values({
+      leadId: id,
+      ...data,
+    }).returning();
+
+    res.status(201).json(entry);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }
