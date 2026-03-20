@@ -336,7 +336,7 @@ export default function OutreachQueue() {
     if (!sendLead?.email) return;
     const subject = encodeURIComponent(sendSubject);
     const body = encodeURIComponent(sendBody.replace(/\r\n/g, "\n").replace(/\n/g, "\r\n"));
-    window.location.href = `mailto:${encodeURIComponent(sendLead.email)}?subject=${subject}&body=${body}`;
+    window.open(`mailto:${encodeURIComponent(sendLead.email)}?subject=${subject}&body=${body}`, "_blank");
     setSendModalOpen(false);
     setConfirmLeadId(sendLead.id);
     setConfirmLeadName(sendLead.companyName || sendLead.contactName || sendLead.email);

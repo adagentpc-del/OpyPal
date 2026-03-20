@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "@/components/layout";
 import { useGetLeads, useCreateLead, useUpdateLead, useDeleteLead, useDuplicateLead, useUpdateLeadStatus, useGetSyncStatus, useGetTemplates, useGetAssets, useGetLeadHistory, useCreateLeadHistory, getGetLeadsQueryKey, getGetDashboardQueryKey, getGetLeadHistoryQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -357,6 +357,14 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
   const [showAdditional, setShowAdditional] = useState(false);
   const [showHistory, setShowHistory] = useState(true);
 
+  useEffect(() => {
+    setSelectedTemplateId(null);
+    setEmailSubject("");
+    setEmailBody("");
+    setSelectedAssetIds([]);
+    setConfirmOpen(false);
+  }, [lead.id]);
+
   const currentTemplateLinkedIds = useMemo(() => {
     if (!selectedTemplateId) return [] as number[];
     const tpl = (allTemplates || []).find((t: any) => t.id === selectedTemplateId);
@@ -417,9 +425,9 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
     }
 
     const subject = encodeURIComponent(emailSubject);
-    const body = encodeURIComponent(bodyWithAssets.replace(/\r\n/g, "\n").replace(/\n/g, "\r\n"));
-    const mailto = `mailto:${encodeURIComponent(lead.email)}?subject=${subject}&body=${body}`;
-    window.location.href = mailto;
+    const bodyEncoded = encodeURIComponent(bodyWithAssets.replace(/\r\n/g, "\n").replace(/\n/g, "\r\n"));
+    const mailto = `mailto:${encodeURIComponent(lead.email)}?subject=${subject}&body=${bodyEncoded}`;
+    window.open(mailto, "_blank");
 
     setSentSubject(emailSubject);
     setSentBody(bodyWithAssets);
@@ -516,31 +524,31 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
 
                 <DrawerSection title="Outreach" icon={<Send className="h-4 w-4" />}>
                   <div className="space-y-3">
-                    {emailTemplates.length > 0 && (
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground block mb-1">Select Template</label>
-                        <select value={selectedTemplateId !== null ? String(selectedTemplateId) : ""} onChange={(e) => { const v = e.target.value; if (v) handleTemplateSelect(Number(v)); }}
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground block mb-1">Select Template</label>
+                      {emailTemplates.length > 0 ? (
+                        <select value={selectedTemplateId !== null ? String(selectedTemplateId) : ""} onChange={(e) => { const v = e.target.value; if (v) handleTemplateSelect(Number(v)); else { setSelectedTemplateId(null); } }}
                           className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none">
                           <option value="">Choose a template...</option>
                           {emailTemplates.map((t: any) => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
                         </select>
-                      </div>
-                    )}
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No email templates available. You can still write a custom email below.</p>
+                      )}
+                    </div>
 
-                    {selectedTemplateId && (
-                      <>
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground block mb-1">Subject</label>
-                          <input type="text" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)}
-                            className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none" />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground block mb-1">Body</label>
-                          <textarea value={emailBody} onChange={(e) => setEmailBody(e.target.value)}
-                            className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none min-h-[140px] resize-y whitespace-pre-wrap" />
-                        </div>
-                      </>
-                    )}
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground block mb-1">Subject</label>
+                      <input type="text" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)}
+                        placeholder="Enter subject or select a template above..."
+                        className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground block mb-1">Email Body</label>
+                      <textarea value={emailBody} onChange={(e) => setEmailBody(e.target.value)}
+                        placeholder="Write your email or select a template above to auto-fill..."
+                        className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none min-h-[140px] resize-y whitespace-pre-wrap" />
+                    </div>
 
                     {allAssets && allAssets.length > 0 && (
                       <div>
@@ -583,7 +591,7 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                       <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={handleCopyEmail} disabled={!emailSubject && !emailBody}>
                         <Copy className="h-3.5 w-3.5" /> Copy Email
                       </Button>
-                      <Button size="sm" className="rounded-xl bg-primary text-white gap-1.5" onClick={handleSendOutlook} disabled={!emailSubject && !emailBody}>
+                      <Button size="sm" className="rounded-xl bg-primary text-white gap-1.5" onClick={handleSendOutlook} disabled={!emailSubject || !emailBody}>
                         <Mail className="h-3.5 w-3.5" /> Send via Outlook
                       </Button>
                       <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={handleMarkContacted}>
