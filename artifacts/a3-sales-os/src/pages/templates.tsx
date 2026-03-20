@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout";
-import { useGetTemplates, useCreateTemplate, useUpdateTemplate, useDeleteTemplate, getGetTemplatesQueryKey, useGetLeads, useUpdateLead, getGetLeadsQueryKey, getGetDashboardQueryKey } from "@workspace/api-client-react";
+import { useGetTemplates, useCreateTemplate, useUpdateTemplate, useDeleteTemplate, getGetTemplatesQueryKey, useGetLeads, useUpdateLead, getGetLeadsQueryKey, getGetDashboardQueryKey, useGetAssets } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Copy, Plus, Edit2, Trash2, X, Mail, UserCheck, Check } from "lucide-react";
+import { Copy, Plus, Edit2, Trash2, X, Mail, UserCheck, Check, Paperclip, FileText, Link2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -35,10 +35,11 @@ export default function Templates() {
   const { toast } = useToast();
 
   const { data: leads } = useGetLeads();
+  const { data: allAssets } = useGetAssets();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", category: "Cold Email", subject: "", body: "" });
+  const [form, setForm] = useState({ name: "", category: "Cold Email", subject: "", body: "", linkedAssetIds: "" });
 
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [sendTemplate, setSendTemplate] = useState<any>(null);
@@ -146,14 +147,23 @@ export default function Templates() {
 
   const openNew = () => {
     setEditingTemplate(null);
-    setForm({ name: "", category: "Cold Email", subject: "", body: "" });
+    setForm({ name: "", category: "Cold Email", subject: "", body: "", linkedAssetIds: "" });
     setModalOpen(true);
   };
 
   const openEdit = (t: any) => {
     setEditingTemplate(t);
-    setForm({ name: t.name, category: t.category, subject: t.subject || "", body: t.body });
+    setForm({ name: t.name, category: t.category, subject: t.subject || "", body: t.body, linkedAssetIds: t.linkedAssetIds || "" });
     setModalOpen(true);
+  };
+
+  const formLinkedIds = useMemo(() => {
+    return form.linkedAssetIds ? form.linkedAssetIds.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n)) : [];
+  }, [form.linkedAssetIds]);
+
+  const toggleFormAsset = (assetId: number) => {
+    const ids = formLinkedIds.includes(assetId) ? formLinkedIds.filter(id => id !== assetId) : [...formLinkedIds, assetId];
+    setForm({ ...form, linkedAssetIds: ids.join(",") });
   };
 
   const handleSave = () => {
@@ -161,7 +171,7 @@ export default function Templates() {
       toast({ title: "Name and body are required", variant: "destructive" });
       return;
     }
-    const payload = { ...form, subject: form.subject || undefined };
+    const payload = { ...form, subject: form.subject || undefined, linkedAssetIds: form.linkedAssetIds || undefined };
     if (editingTemplate) {
       updateMutation.mutate({ id: editingTemplate.id, data: payload }, { onSuccess: () => { invalidate(); setModalOpen(false); toast({ title: "Template updated" }); } });
     } else {
@@ -221,6 +231,26 @@ export default function Templates() {
                 </div>
                 <div className="p-4 sm:p-5 flex-1 bg-muted/20">
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-6">{template.body}</p>
+                  {template.linkedAssetIds && allAssets && (() => {
+                    const ids = template.linkedAssetIds.split(",").map((s: string) => parseInt(s.trim())).filter((n: number) => !isNaN(n));
+                    const linked = (allAssets || []).filter((a: any) => ids.includes(a.id));
+                    if (linked.length === 0) return null;
+                    return (
+                      <div className="mt-3 pt-3 border-t border-border/30">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <Link2 className="h-3 w-3 text-primary" />
+                          <span className="text-xs font-semibold text-primary">Linked Assets</span>
+                        </div>
+                        {linked.map((a: any) => (
+                          <div key={a.id} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <FileText className="h-3 w-3" />
+                            <span>{a.title}</span>
+                            {a.url ? <span className="text-green-600 ml-auto">URL</span> : <span className="text-amber-500 ml-auto">No URL</span>}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="px-4 sm:px-5 py-3 border-t border-border/50 rounded-b-2xl flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" className="rounded-lg text-xs gap-1.5 flex-1 sm:flex-none" onClick={() => openSendModal(template)}>
@@ -270,6 +300,26 @@ export default function Templates() {
                 <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })}
                   className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none min-h-[150px] resize-y" />
               </div>
+              {allAssets && allAssets.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium block mb-1.5">
+                    <Paperclip className="h-3.5 w-3.5 inline mr-1" /> Linked Assets
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">Assets linked to this template will be auto-selected when used in outreach.</p>
+                  <div className="space-y-1 max-h-[140px] overflow-y-auto border border-border rounded-xl p-2">
+                    {allAssets.map((a: any) => (
+                      <label key={a.id} className={`flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/30 rounded-lg px-2 py-1 ${formLinkedIds.includes(a.id) ? "bg-primary/5" : ""}`}>
+                        <input type="checkbox" checked={formLinkedIds.includes(a.id)}
+                          onChange={() => toggleFormAsset(a.id)}
+                          className="rounded" />
+                        <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="truncate">{a.title}</span>
+                        {a.url ? <span className="text-xs text-green-600 ml-auto shrink-0">Has URL</span> : <span className="text-xs text-amber-500 ml-auto shrink-0">No URL</span>}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
               <Button variant="outline" onClick={() => setModalOpen(false)} className="rounded-xl">Cancel</Button>

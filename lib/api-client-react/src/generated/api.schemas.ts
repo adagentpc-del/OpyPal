@@ -137,6 +137,7 @@ export interface Template {
   category: string;
   subject?: string;
   body: string;
+  linkedAssetIds?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -146,6 +147,7 @@ export interface TemplateInput {
   category: string;
   subject?: string;
   body: string;
+  linkedAssetIds?: string | null;
 }
 
 export interface Asset {

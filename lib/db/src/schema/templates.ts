@@ -8,6 +8,7 @@ export const templatesTable = pgTable("templates", {
   category: text("category").notNull(),
   subject: text("subject"),
   body: text("body").notNull(),
+  linkedAssetIds: text("linked_asset_ids"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

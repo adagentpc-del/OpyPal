@@ -924,6 +924,9 @@ components:
           type: string
         body:
           type: string
+        linkedAssetIds:
+          type: string
+          nullable: true
         createdAt:
           type: string
         updatedAt:
@@ -947,6 +950,9 @@ components:
           type: string
         body:
           type: string
+        linkedAssetIds:
+          type: string
+          nullable: true
       required:
         - name
         - category

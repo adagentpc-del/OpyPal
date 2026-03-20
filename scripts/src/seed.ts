@@ -1,4 +1,5 @@
 import { db, leadsTable, tasksTable, templatesTable, activityTable, assetsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 async function seed() {
   console.log("Seeding database...");
@@ -293,6 +294,19 @@ async function seed() {
 
   console.log(`Seeded ${tasks.length} tasks`);
 
+  const seededAssets = await db.insert(assetsTable).values([
+    { title: "A3 Visual Capabilities Deck 2026", category: "Capabilities Deck", description: "Full capabilities overview including fabrication, large format, projection mapping, and immersive environments.", url: "https://example.com/a3-capabilities-2026.pdf" },
+    { title: "Hotel & Venue Portfolio", category: "Case Study", description: "Case studies from Fontainebleau, Ritz-Carlton, W Hotels, and other luxury properties.", url: "https://example.com/hotel-portfolio.pdf" },
+    { title: "Brand Activation Lookbook", category: "Brochure", description: "Visual showcase of recent brand activations for Nike, Toyota, Red Bull.", url: "https://example.com/activation-lookbook.pdf" },
+    { title: "Projection Mapping Reel", category: "Photos / Completed Work", description: "Video reel of projection mapping installations on hotels and event venues.", url: "https://example.com/projection-reel.mp4" },
+    { title: "A3 Visual Brand Guidelines", category: "Brand Assets", description: "Logo files, color palette, font guidelines, and brand usage rules.", url: "https://example.com/brand-guidelines.pdf" },
+    { title: "Standard Proposal Template", category: "Proposal Example", description: "Editable proposal template with pricing structure and scope framework.", url: "https://example.com/proposal-template.docx" },
+  ]).returning();
+
+  console.log("Seeded 6 assets");
+
+  const capsDeckId = seededAssets.find(a => a.category === "Capabilities Deck")?.id;
+
   await db.insert(templatesTable).values([
     {
       name: "Cold Email Intro",
@@ -362,20 +376,30 @@ Alyssa`,
 
 Curious—do you currently handle event production and installs internally, or work with external partners?`,
     },
+    {
+      name: "Initial Outreach + A3 Deck",
+      category: "Cold Email",
+      subject: "quick question",
+      body: `Hi [First Name],
+
+Quick question—who handles event production, printing, visual installations, or experiential builds for [Company Name]?
+
+I work with A3 Visual, and we support hotels, venues, agencies, and event teams with large format printing, fabrication, immersive environments, and projection mapping.
+
+We've been doing this for decades and help bring high-impact event and brand experiences to life.
+
+I've included our A3 capabilities deck here for a quick overview:
+[A3_CAPABILITIES_DECK_LINK]
+
+If that's you, I'd love to connect briefly. If not, would you mind pointing me in the right direction?
+
+Thanks so much,
+Alyssa`,
+      linkedAssetIds: capsDeckId ? String(capsDeckId) : undefined,
+    },
   ]).returning();
 
-  console.log("Seeded 6 templates");
-
-  await db.insert(assetsTable).values([
-    { title: "A3 Visual Capabilities Deck 2026", category: "Capabilities Deck", description: "Full capabilities overview including fabrication, large format, projection mapping, and immersive environments.", url: "https://example.com/a3-capabilities-2026.pdf" },
-    { title: "Hotel & Venue Portfolio", category: "Case Study", description: "Case studies from Fontainebleau, Ritz-Carlton, W Hotels, and other luxury properties.", url: "https://example.com/hotel-portfolio.pdf" },
-    { title: "Brand Activation Lookbook", category: "Brochure", description: "Visual showcase of recent brand activations for Nike, Toyota, Red Bull.", url: "https://example.com/activation-lookbook.pdf" },
-    { title: "Projection Mapping Reel", category: "Photos / Completed Work", description: "Video reel of projection mapping installations on hotels and event venues.", url: "https://example.com/projection-reel.mp4" },
-    { title: "A3 Visual Brand Guidelines", category: "Brand Assets", description: "Logo files, color palette, font guidelines, and brand usage rules.", url: "https://example.com/brand-guidelines.pdf" },
-    { title: "Standard Proposal Template", category: "Proposal Example", description: "Editable proposal template with pricing structure and scope framework.", url: "https://example.com/proposal-template.docx" },
-  ]).returning();
-
-  console.log("Seeded 6 assets");
+  console.log("Seeded 7 templates");
 
   await db.insert(activityTable).values([
     { type: "lead_created", description: "New lead created: Fontainebleau Miami Beach", leadId: leads[0].id },

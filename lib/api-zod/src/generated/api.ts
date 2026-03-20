@@ -414,6 +414,7 @@ export const GetTemplatesResponseItem = zod.object({
   category: zod.string(),
   subject: zod.string().optional(),
   body: zod.string(),
+  linkedAssetIds: zod.string().nullish(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -427,6 +428,7 @@ export const CreateTemplateBody = zod.object({
   category: zod.string(),
   subject: zod.string().optional(),
   body: zod.string(),
+  linkedAssetIds: zod.string().nullish(),
 });
 
 /**
@@ -441,6 +443,7 @@ export const UpdateTemplateBody = zod.object({
   category: zod.string(),
   subject: zod.string().optional(),
   body: zod.string(),
+  linkedAssetIds: zod.string().nullish(),
 });
 
 export const UpdateTemplateResponse = zod.object({
@@ -449,6 +452,7 @@ export const UpdateTemplateResponse = zod.object({
   category: zod.string(),
   subject: zod.string().optional(),
   body: zod.string(),
+  linkedAssetIds: zod.string().nullish(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });

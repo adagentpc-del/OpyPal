@@ -125,6 +125,11 @@ App ID | Pipeline Type | Company Name | Contact Name | Title | Email | Phone | L
 - Saved outreach templates library (stored locally, not in Google Sheets)
 - Categories: Cold Email, Follow-Up Email, LinkedIn Message, SMS, Referral / Partner Outreach
 - Copy-to-clipboard, create/edit/delete
+- Template-asset linking: templates can have linked default assets (linkedAssetIds column, comma-separated IDs)
+- "Initial Outreach + A3 Deck" template pre-built with A3 Visual Capabilities Deck linked
+- When template with linked assets is selected in lead drawer: assets auto-selected, [A3_CAPABILITIES_DECK_LINK] placeholder replaced with "View our capabilities deck: [URL]" (or fallback text if no URL)
+- Template cards show "Linked Assets" section with asset names and URL status
+- Template edit modal includes Linked Assets checkbox list
 
 ### Assets
 - Asset library (stored locally, not in Google Sheets)

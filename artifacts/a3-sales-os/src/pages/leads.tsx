@@ -357,12 +357,45 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
   const [showAdditional, setShowAdditional] = useState(false);
   const [showHistory, setShowHistory] = useState(true);
 
+  const currentTemplateLinkedIds = useMemo(() => {
+    if (!selectedTemplateId) return [] as number[];
+    const tpl = (allTemplates || []).find((t: any) => t.id === selectedTemplateId);
+    if (!tpl?.linkedAssetIds) return [] as number[];
+    return tpl.linkedAssetIds.split(",").map((s: string) => parseInt(s.trim())).filter((n: number) => !isNaN(n));
+  }, [selectedTemplateId, allTemplates]);
+
+  const resolveAssetPlaceholders = (body: string, assets: any[]) => {
+    let result = body;
+    assets.forEach((asset: any) => {
+      if (result.includes("[A3_CAPABILITIES_DECK_LINK]")) {
+        if (asset.url) {
+          result = result.replace("[A3_CAPABILITIES_DECK_LINK]", `View our capabilities deck: ${asset.url}`);
+        } else {
+          result = result.replace("[A3_CAPABILITIES_DECK_LINK]", "I'd be happy to send over our A3 capabilities deck.");
+        }
+      }
+    });
+    return result.replace(/\[A3_CAPABILITIES_DECK_LINK\]/g, "I'd be happy to send over our A3 capabilities deck.");
+  };
+
   const handleTemplateSelect = (id: number) => {
     setSelectedTemplateId(id);
     const tpl = (allTemplates || []).find((t: any) => t.id === id);
     if (tpl) {
       setEmailSubject(replacePlaceholders(tpl.subject || "", lead));
-      setEmailBody(replacePlaceholders(tpl.body || "", lead));
+      let body = replacePlaceholders(tpl.body || "", lead);
+
+      const linkedIds = (tpl.linkedAssetIds || "").split(",").map((s: string) => parseInt(s.trim())).filter((n: number) => !isNaN(n));
+      if (linkedIds.length > 0) {
+        setSelectedAssetIds(linkedIds);
+        const linkedAssets = (allAssets || []).filter((a: any) => linkedIds.includes(a.id));
+        body = resolveAssetPlaceholders(body, linkedAssets);
+      } else {
+        setSelectedAssetIds([]);
+        body = resolveAssetPlaceholders(body, []);
+      }
+
+      setEmailBody(body);
     }
   };
 
@@ -389,7 +422,7 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
     window.location.href = mailto;
 
     setSentSubject(emailSubject);
-    setSentBody(emailBody);
+    setSentBody(bodyWithAssets);
     const tpl = (allTemplates || []).find((t: any) => t.id === selectedTemplateId);
     setSentTemplateName(tpl?.name || "Custom");
     setSentAssetNames(selectedAssets.map((a: any) => a.title).join(", ") || "");
@@ -516,20 +549,32 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                         </label>
                         <div className="space-y-1 max-h-[120px] overflow-y-auto border border-border rounded-xl p-2">
                           {allAssets.map((a: any) => (
-                            <label key={a.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/30 rounded-lg px-2 py-1">
+                            <label key={a.id} className={`flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/30 rounded-lg px-2 py-1 ${currentTemplateLinkedIds.includes(a.id) ? "bg-primary/5" : ""}`}>
                               <input type="checkbox" checked={selectedAssetIds.includes(a.id)}
                                 onChange={(e) => setSelectedAssetIds(e.target.checked ? [...selectedAssetIds, a.id] : selectedAssetIds.filter((id: number) => id !== a.id))}
                                 className="rounded" />
                               <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                              {a.title}
-                              {a.category === "Capabilities Deck" && <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full ml-1">Deck</span>}
+                              <span className="truncate">{a.title}</span>
+                              {currentTemplateLinkedIds.includes(a.id) && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full ml-auto shrink-0">Linked</span>}
+                              {a.category === "Capabilities Deck" && !currentTemplateLinkedIds.includes(a.id) && <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full ml-auto shrink-0">Deck</span>}
+                              {a.url ? <span className="text-xs text-green-600 shrink-0" title="Has URL">🔗</span> : <span className="text-xs text-muted-foreground shrink-0" title="No URL">📎</span>}
                             </label>
                           ))}
                         </div>
                         {selectedAssetIds.length > 0 && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Selected: {(allAssets || []).filter((a: any) => selectedAssetIds.includes(a.id)).map((a: any) => a.title).join(", ")}
-                          </p>
+                          <div className="mt-1.5 space-y-1">
+                            {(allAssets || []).filter((a: any) => selectedAssetIds.includes(a.id)).map((a: any) => (
+                              <div key={a.id} className="flex items-center gap-2 text-xs">
+                                <FileText className="h-3 w-3 text-muted-foreground" />
+                                <span className="font-medium">{a.title}</span>
+                                {a.url ? (
+                                  <span className="text-green-600">URL included in email</span>
+                                ) : (
+                                  <span className="text-amber-600">Logged only (no URL)</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
                     )}

@@ -1,0 +1,150 @@
+Update A3 Sales OS so that templates can include linked assets directly in the email body, especially for the initial outreach template with the uploaded A3 capabilities deck.
+
+PRIMARY GOAL:
+Create a workflow where I can choose a template like:
+- Initial Outreach + A3 Deck
+
+And when selected, the generated email automatically includes the deck reference/link in the message and logs that the asset was included.
+
+========================================
+1. TEMPLATE + ASSET LINKING
+========================================
+
+Add support for templates to have one or more default linked assets.
+
+For each template, allow:
+- template name
+- subject
+- body
+- linked default asset(s)
+
+Use the existing uploaded asset library.
+
+Create or update a template called:
+- Initial Outreach + A3 Deck
+
+This template should automatically link the uploaded A3 capabilities deck asset.
+
+========================================
+2. DEFAULT TEMPLATE CONTENT
+========================================
+
+Create this template with:
+
+Template Name:
+Initial Outreach + A3 Deck
+
+Subject:
+quick question
+
+Body:
+Hi [First Name],
+
+Quick question—who handles event production, printing, visual installations, or experiential builds for [Company Name]?
+
+I work with A3 Visual, and we support hotels, venues, agencies, and event teams with large format printing, fabrication, immersive environments, and projection mapping.
+
+We’ve been doing this for decades and help bring high-impact event and brand experiences to life.
+
+I’ve included our A3 capabilities deck here for a quick overview:
+[A3_CAPABILITIES_DECK_LINK]
+
+If that’s you, I’d love to connect briefly. If not, would you mind pointing me in the right direction?
+
+Thanks so much,
+Alyssa
+
+========================================
+3. ASSET LINK INSERTION LOGIC
+========================================
+
+When this template is selected:
+- automatically insert the linked asset into the draft
+- replace [A3_CAPABILITIES_DECK_LINK] with the actual asset link if a URL exists
+- if the asset has no public URL, show the asset title in the email body and still log it as a selected asset
+- if possible, allow choosing whether the asset appears as:
+  - raw URL
+  - hyperlink text like “View our capabilities deck”
+  - plain text asset title
+
+Preferred display:
+View our capabilities deck: [asset link]
+
+If the asset has a local/internal file but not a public URL, show:
+I’d be happy to send over our A3 capabilities deck.
+
+But still keep the asset associated in the CRM log.
+
+========================================
+4. LEAD VIEW EMAIL WORKFLOW
+========================================
+
+In the lead detail Outreach section:
+- allow template selection
+- when “Initial Outreach + A3 Deck” is selected, preload that email draft
+- automatically include the linked A3 deck asset
+- allow the user to edit the email before sending
+- show selected linked asset clearly under the draft preview
+
+Buttons should remain:
+- Copy Email
+- Send via Outlook
+- Mark as Contacted
+
+========================================
+5. OUTREACH HISTORY LOGGING
+========================================
+
+When the user clicks Send via Outlook and confirms “Yes, I sent this email,” save in the lead’s Outreach History:
+- timestamp
+- template used = Initial Outreach + A3 Deck
+- final subject
+- final email body snapshot
+- linked asset included = A3 capabilities deck
+- action type = Email Sent
+
+If the user confirms “No,” do not log it as sent.
+
+========================================
+6. ASSET MATCHING
+========================================
+
+Use the uploaded A3 deck asset already in the app as the default linked asset for this template.
+
+Try to identify it by title similar to:
+- A3 Visual Capabilities
+- A3 Capabilities Deck
+- uploaded A3 PDF asset
+
+If multiple similar assets exist, use the most relevant uploaded capabilities deck PDF.
+
+========================================
+7. UI / UX
+========================================
+
+In the Templates section:
+- show linked asset(s) on each template
+- allow editing linked assets
+- make it easy to duplicate this template later for other outreach types
+
+In the Lead Outreach section:
+- make the asset reference obvious before sending
+- show whether the asset is linked by URL or logged only
+
+========================================
+8. FINAL QA
+========================================
+
+After updating:
+- test selecting Initial Outreach + A3 Deck from a lead
+- confirm the deck reference appears in the generated draft
+- confirm the asset is shown as selected
+- confirm Send via Outlook preserves the draft formatting
+- confirm Outreach History logs the template and asset used
+- confirm the workflow works on mobile and desktop
+
+Then output a short summary of:
+- what was added
+- how the asset link is inserted
+- how sent history is logged
+- any limitations if the asset does not have a public URL

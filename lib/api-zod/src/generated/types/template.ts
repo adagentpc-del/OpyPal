@@ -12,6 +12,7 @@ export interface Template {
   category: string;
   subject?: string;
   body: string;
+  linkedAssetIds?: string | null;
   createdAt: string;
   updatedAt: string;
 }
