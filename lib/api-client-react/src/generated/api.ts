@@ -20,6 +20,10 @@ import type {
   ActivityItem,
   Asset,
   AssetInput,
+  BulkClearPersonalization200,
+  BulkClearPersonalizationBody,
+  BulkGeneratePersonalizationBody,
+  BulkPersonalizationResult,
   CampaignInput,
   CampaignItem,
   Contact,
@@ -33,6 +37,7 @@ import type {
   EnrollResult,
   ForceSendStep200,
   FullSyncResult,
+  GeneratePersonalizationBody,
   GetAssetsParams,
   GetContactsParams,
   GetEmailEventsParams,
@@ -53,6 +58,8 @@ import type {
   OutboundAnalytics,
   OutreachHistoryEntry,
   OutreachHistoryInput,
+  PersonalizationAnalytics,
+  PersonalizationResult,
   ProcessSequenceQueue200,
   QueueItem,
   SeedResult,
@@ -73,6 +80,7 @@ import type {
   TemplateSetDetail,
   TemplateSetInput,
   TemplateSetItem,
+  UpdateContactCustomLineBody,
   UpdateLeadStatusBody,
   UpdateOutboundSettingsBody,
 } from "./api.schemas";
@@ -5763,6 +5771,442 @@ export const useRemoveFromSuppressionList = <
   TContext
 > => {
   return useMutation(getRemoveFromSuppressionListMutationOptions(options));
+};
+
+/**
+ * @summary Generate AI custom line for a single contact
+ */
+export const getGeneratePersonalizationUrl = (id: number) => {
+  return `/api/personalization/generate/${id}`;
+};
+
+export const generatePersonalization = async (
+  id: number,
+  generatePersonalizationBody: GeneratePersonalizationBody,
+  options?: RequestInit,
+): Promise<PersonalizationResult> => {
+  return customFetch<PersonalizationResult>(getGeneratePersonalizationUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(generatePersonalizationBody),
+  });
+};
+
+export const getGeneratePersonalizationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generatePersonalization>>,
+    TError,
+    { id: number; data: BodyType<GeneratePersonalizationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generatePersonalization>>,
+  TError,
+  { id: number; data: BodyType<GeneratePersonalizationBody> },
+  TContext
+> => {
+  const mutationKey = ["generatePersonalization"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generatePersonalization>>,
+    { id: number; data: BodyType<GeneratePersonalizationBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return generatePersonalization(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GeneratePersonalizationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generatePersonalization>>
+>;
+export type GeneratePersonalizationMutationBody =
+  BodyType<GeneratePersonalizationBody>;
+export type GeneratePersonalizationMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Generate AI custom line for a single contact
+ */
+export const useGeneratePersonalization = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generatePersonalization>>,
+    TError,
+    { id: number; data: BodyType<GeneratePersonalizationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generatePersonalization>>,
+  TError,
+  { id: number; data: BodyType<GeneratePersonalizationBody> },
+  TContext
+> => {
+  return useMutation(getGeneratePersonalizationMutationOptions(options));
+};
+
+/**
+ * @summary Generate AI custom lines for multiple contacts
+ */
+export const getBulkGeneratePersonalizationUrl = () => {
+  return `/api/personalization/bulk-generate`;
+};
+
+export const bulkGeneratePersonalization = async (
+  bulkGeneratePersonalizationBody: BulkGeneratePersonalizationBody,
+  options?: RequestInit,
+): Promise<BulkPersonalizationResult> => {
+  return customFetch<BulkPersonalizationResult>(
+    getBulkGeneratePersonalizationUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(bulkGeneratePersonalizationBody),
+    },
+  );
+};
+
+export const getBulkGeneratePersonalizationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkGeneratePersonalization>>,
+    TError,
+    { data: BodyType<BulkGeneratePersonalizationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkGeneratePersonalization>>,
+  TError,
+  { data: BodyType<BulkGeneratePersonalizationBody> },
+  TContext
+> => {
+  const mutationKey = ["bulkGeneratePersonalization"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkGeneratePersonalization>>,
+    { data: BodyType<BulkGeneratePersonalizationBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return bulkGeneratePersonalization(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkGeneratePersonalizationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkGeneratePersonalization>>
+>;
+export type BulkGeneratePersonalizationMutationBody =
+  BodyType<BulkGeneratePersonalizationBody>;
+export type BulkGeneratePersonalizationMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Generate AI custom lines for multiple contacts
+ */
+export const useBulkGeneratePersonalization = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkGeneratePersonalization>>,
+    TError,
+    { data: BodyType<BulkGeneratePersonalizationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkGeneratePersonalization>>,
+  TError,
+  { data: BodyType<BulkGeneratePersonalizationBody> },
+  TContext
+> => {
+  return useMutation(getBulkGeneratePersonalizationMutationOptions(options));
+};
+
+/**
+ * @summary Clear custom lines for multiple contacts
+ */
+export const getBulkClearPersonalizationUrl = () => {
+  return `/api/personalization/bulk-clear`;
+};
+
+export const bulkClearPersonalization = async (
+  bulkClearPersonalizationBody: BulkClearPersonalizationBody,
+  options?: RequestInit,
+): Promise<BulkClearPersonalization200> => {
+  return customFetch<BulkClearPersonalization200>(
+    getBulkClearPersonalizationUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(bulkClearPersonalizationBody),
+    },
+  );
+};
+
+export const getBulkClearPersonalizationMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkClearPersonalization>>,
+    TError,
+    { data: BodyType<BulkClearPersonalizationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkClearPersonalization>>,
+  TError,
+  { data: BodyType<BulkClearPersonalizationBody> },
+  TContext
+> => {
+  const mutationKey = ["bulkClearPersonalization"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkClearPersonalization>>,
+    { data: BodyType<BulkClearPersonalizationBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return bulkClearPersonalization(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkClearPersonalizationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkClearPersonalization>>
+>;
+export type BulkClearPersonalizationMutationBody =
+  BodyType<BulkClearPersonalizationBody>;
+export type BulkClearPersonalizationMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Clear custom lines for multiple contacts
+ */
+export const useBulkClearPersonalization = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkClearPersonalization>>,
+    TError,
+    { data: BodyType<BulkClearPersonalizationBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkClearPersonalization>>,
+  TError,
+  { data: BodyType<BulkClearPersonalizationBody> },
+  TContext
+> => {
+  return useMutation(getBulkClearPersonalizationMutationOptions(options));
+};
+
+/**
+ * @summary Get personalization analytics
+ */
+export const getGetPersonalizationAnalyticsUrl = () => {
+  return `/api/personalization/analytics`;
+};
+
+export const getPersonalizationAnalytics = async (
+  options?: RequestInit,
+): Promise<PersonalizationAnalytics> => {
+  return customFetch<PersonalizationAnalytics>(
+    getGetPersonalizationAnalyticsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPersonalizationAnalyticsQueryKey = () => {
+  return [`/api/personalization/analytics`] as const;
+};
+
+export const getGetPersonalizationAnalyticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPersonalizationAnalytics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPersonalizationAnalytics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPersonalizationAnalyticsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPersonalizationAnalytics>>
+  > = ({ signal }) =>
+    getPersonalizationAnalytics({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPersonalizationAnalytics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPersonalizationAnalyticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPersonalizationAnalytics>>
+>;
+export type GetPersonalizationAnalyticsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get personalization analytics
+ */
+
+export function useGetPersonalizationAnalytics<
+  TData = Awaited<ReturnType<typeof getPersonalizationAnalytics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPersonalizationAnalytics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPersonalizationAnalyticsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Manually update contact custom line
+ */
+export const getUpdateContactCustomLineUrl = (id: number) => {
+  return `/api/contacts/${id}/custom-line`;
+};
+
+export const updateContactCustomLine = async (
+  id: number,
+  updateContactCustomLineBody: UpdateContactCustomLineBody,
+  options?: RequestInit,
+): Promise<Contact> => {
+  return customFetch<Contact>(getUpdateContactCustomLineUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateContactCustomLineBody),
+  });
+};
+
+export const getUpdateContactCustomLineMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateContactCustomLine>>,
+    TError,
+    { id: number; data: BodyType<UpdateContactCustomLineBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateContactCustomLine>>,
+  TError,
+  { id: number; data: BodyType<UpdateContactCustomLineBody> },
+  TContext
+> => {
+  const mutationKey = ["updateContactCustomLine"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateContactCustomLine>>,
+    { id: number; data: BodyType<UpdateContactCustomLineBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateContactCustomLine(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateContactCustomLineMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateContactCustomLine>>
+>;
+export type UpdateContactCustomLineMutationBody =
+  BodyType<UpdateContactCustomLineBody>;
+export type UpdateContactCustomLineMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Manually update contact custom line
+ */
+export const useUpdateContactCustomLine = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateContactCustomLine>>,
+    TError,
+    { id: number; data: BodyType<UpdateContactCustomLineBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateContactCustomLine>>,
+  TError,
+  { id: number; data: BodyType<UpdateContactCustomLineBody> },
+  TContext
+> => {
+  return useMutation(getUpdateContactCustomLineMutationOptions(options));
 };
 
 /**

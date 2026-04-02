@@ -17,6 +17,7 @@ export const sendLogsTable = pgTable("send_logs", {
   status: text("status").notNull().default("sent"),
   bounceType: text("bounce_type"),
   smtpResponse: text("smtp_response"),
+  customLineSnapshot: text("custom_line_snapshot"),
   messageId: text("message_id"),
   errorMessage: text("error_message"),
   sentAt: timestamp("sent_at").defaultNow().notNull(),

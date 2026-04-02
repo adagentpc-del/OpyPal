@@ -15,3 +15,4 @@ export * from "./email-events";
 export * from "./imports";
 export * from "./settings";
 export * from "./suppression-list";
+export * from "./personalization-logs";

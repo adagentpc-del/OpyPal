@@ -4,6 +4,7 @@ import {
   useGetSendLogs,
   useGetOutboundSettings,
   useUpdateOutboundSettings,
+  useGetPersonalizationAnalytics,
   getGetOutboundSettingsQueryKey,
 } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import {
   MousePointerClick,
   Ban,
   MailX,
+  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +36,7 @@ export default function ObAnalytics() {
   const { data: analytics } = useGetOutboundAnalytics();
   const { data: sendLogs } = useGetSendLogs({ limit: 20 });
   const { data: settings } = useGetOutboundSettings();
+  const { data: pAnalytics } = useGetPersonalizationAnalytics();
   const updateSettings = useUpdateOutboundSettings();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -56,6 +59,12 @@ export default function ObAnalytics() {
       randomized_spacing: getVal("randomized_spacing", "true"),
       reply_detection_interval: getVal("reply_detection_interval", "60"),
       tracking_domain: getVal("tracking_domain", ""),
+      personalization_mode: getVal("personalization_mode", "safe"),
+      personalization_max_length: getVal("personalization_max_length", "200"),
+      personalization_regenerate_on_reenroll: getVal("personalization_regenerate_on_reenroll", "false"),
+      personalization_lock_manual_default: getVal("personalization_lock_manual_default", "false"),
+      personalization_step_scope: getVal("personalization_step_scope", "step_1_only"),
+      personalization_require_title_or_company: getVal("personalization_require_title_or_company", "false"),
     });
     setShowSettings(true);
   };
@@ -131,6 +140,67 @@ export default function ObAnalytics() {
             </Card>
           ))}
         </div>
+
+        {pAnalytics && (
+          <Card className="p-5 border-violet-200">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="h-5 w-5 text-violet-600" />
+              <h3 className="font-semibold text-violet-900">AI Personalization</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              <div className="text-center p-3 rounded-xl bg-violet-50">
+                <div className="text-2xl font-bold text-violet-700">{pAnalytics.withPersonalization || 0}</div>
+                <div className="text-xs text-violet-600">With Personalization</div>
+              </div>
+              <div className="text-center p-3 rounded-xl bg-gray-50">
+                <div className="text-2xl font-bold text-gray-600">{pAnalytics.withoutPersonalization || 0}</div>
+                <div className="text-xs text-gray-500">Without Personalization</div>
+              </div>
+              <div className="text-center p-3 rounded-xl bg-emerald-50">
+                <div className="text-2xl font-bold text-emerald-700">
+                  {pAnalytics.total && pAnalytics.total > 0
+                    ? Math.round((pAnalytics.withPersonalization / pAnalytics.total) * 100)
+                    : 0}%
+                </div>
+                <div className="text-xs text-emerald-600">Coverage Rate</div>
+              </div>
+            </div>
+            {pAnalytics.byStatus && Object.keys(pAnalytics.byStatus).length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">By Status</h4>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(pAnalytics.byStatus).map(([status, count]: [string, any]) => (
+                    <span key={status} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-muted">
+                      {status.replace(/_/g, " ")}: <span className="font-bold">{count}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {pAnalytics.bySegment && pAnalytics.bySegment.length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">By Segment</h4>
+                <div className="space-y-2">
+                  {pAnalytics.bySegment.map((s: any) => {
+                    const total = s.withPersonalization + s.withoutPersonalization;
+                    const pct = total > 0 ? Math.round((s.withPersonalization / total) * 100) : 0;
+                    return (
+                      <div key={s.segment} className="flex items-center justify-between text-sm">
+                        <span className="font-medium capitalize">{s.segment}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-violet-500 rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs text-muted-foreground w-16 text-right">{s.withPersonalization}/{total} ({pct}%)</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="p-5">
@@ -319,6 +389,62 @@ export default function ObAnalytics() {
                     className="rounded" />
                   Randomized spacing
                 </label>
+              </div>
+
+              <div className="border-t border-border pt-4 mt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="h-4 w-4 text-violet-600" />
+                  <h3 className="text-sm font-bold text-violet-900">AI Personalization Settings</h3>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium block mb-1">Default Personalization Mode</label>
+                    <select value={settingsForm.personalization_mode}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, personalization_mode: e.target.value })}
+                      className="w-full px-3 py-2 border border-violet-200 rounded-xl text-sm bg-background">
+                      <option value="off">Off</option>
+                      <option value="safe">Safe</option>
+                      <option value="enhanced">Enhanced</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium block mb-1">Max Length</label>
+                      <input type="number" value={settingsForm.personalization_max_length}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, personalization_max_length: e.target.value })}
+                        className="w-full px-3 py-2 border border-violet-200 rounded-xl text-sm bg-background" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium block mb-1">Step Scope</label>
+                      <select value={settingsForm.personalization_step_scope}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, personalization_step_scope: e.target.value })}
+                        className="w-full px-3 py-2 border border-violet-200 rounded-xl text-sm bg-background">
+                        <option value="step_1_only">Step 1 only</option>
+                        <option value="all_steps">All steps</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" checked={settingsForm.personalization_regenerate_on_reenroll === "true"}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, personalization_regenerate_on_reenroll: String(e.target.checked) })}
+                        className="rounded" />
+                      Regenerate on re-enrollment
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" checked={settingsForm.personalization_lock_manual_default === "true"}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, personalization_lock_manual_default: String(e.target.checked) })}
+                        className="rounded" />
+                      Lock manual edits by default
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" checked={settingsForm.personalization_require_title_or_company === "true"}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, personalization_require_title_or_company: String(e.target.checked) })}
+                        className="rounded" />
+                      Require title or company for personalization
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="px-6 py-4 border-t border-border flex justify-end gap-3">

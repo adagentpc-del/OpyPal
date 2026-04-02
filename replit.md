@@ -60,6 +60,15 @@ The A3 Sales OS is a pnpm workspace monorepo built with Node.js 24 and TypeScrip
     *   Calculates an engagement score based on email events (open, click, reply, bounce) and assigns contacts to tiers (cold, warm, hot).
     *   **Template Engine:** Supports variable substitution (`{{first_name}}`, `{{company}}`) and conditional helpers (`{{greeting}}`, `{{intent_line}}`) for personalized outreach.
 
+7.  **AI Personalization Layer:**
+    *   **OpenAI Integration:** Uses Replit AI Integrations proxy (`AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY`). Lazy-initialized, non-fatal if not configured — falls back to fallback pool.
+    *   **Personalization Service** (`artifacts/api-server/src/lib/personalization.ts`): 3 modes (off/safe/enhanced), segment-aware prompts, title hints, data quality assessment (high/medium/low), validation (max length, no em dashes, no placeholders), fallback pool of generalized lines.
+    *   **API Endpoints:** `POST /personalization/generate/:id`, `POST /personalization/bulk-generate`, `PUT /contacts/:id/custom-line`, `POST /personalization/bulk-clear`, `GET /personalization/analytics`.
+    *   **Frontend Controls:** Personalization mode + timing selector on CSV Upload, custom line column with filter on Contacts page, edit/regenerate/lock in contact detail panel, AI Personalization stats card + settings in Analytics.
+    *   **Admin Settings:** `personalization_mode`, `personalization_max_length`, `personalization_regenerate_on_reenroll`, `personalization_lock_manual_default`, `personalization_step_scope`, `personalization_require_title_or_company`.
+    *   **Contact Fields:** `customLine`, `customLineStatus` (not_generated/generated_safe/generated_enhanced/manual/failed), `customLineSource` (ai/fallback/manual), `customLineGeneratedAt`, `customLineLocked`.
+    *   **Personalization Logs Table:** Tracks every generation attempt with mode, input fields, output, status, and errors.
+
 **Database Schema (Drizzle ORM):**
 Key tables include:
 -   `leads`: CRM lead records.
@@ -69,6 +78,7 @@ Key tables include:
 -   `activity`: Dashboard activity log.
 -   `outreach_history`: Log of sent emails per lead.
 -   `contacts`, `campaigns`, `template_sets`, `sequence_enrollments`, `sequence_steps`, `send_logs`, `email_events`, `suppression_list`, `imports`, `settings`: Tables for the Outbound Sequence Engine and analytics.
+-   `personalization_logs`: Tracks AI personalization generation attempts with mode, input fields, output text, status, and errors.
 
 **TypeScript & Composite Projects:**
 The monorepo leverages TypeScript composite projects, with all packages extending `tsconfig.base.json`. Type checking is performed from the root, emitting only `.d.ts` files. Project references are configured for inter-package dependencies.

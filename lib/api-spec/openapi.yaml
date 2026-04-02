@@ -1396,6 +1396,139 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
 
+  /personalization/generate/{id}:
+    post:
+      operationId: generatePersonalization
+      tags: [personalization]
+      summary: Generate AI custom line for a single contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum: [safe, enhanced]
+                force:
+                  type: boolean
+      responses:
+        "200":
+          description: Generated custom line
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonalizationResult"
+
+  /personalization/bulk-generate:
+    post:
+      operationId: bulkGeneratePersonalization
+      tags: [personalization]
+      summary: Generate AI custom lines for multiple contacts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contactIds:
+                  type: array
+                  items:
+                    type: integer
+                mode:
+                  type: string
+                  enum: [safe, enhanced]
+                force:
+                  type: boolean
+              required:
+                - contactIds
+      responses:
+        "200":
+          description: Bulk generation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkPersonalizationResult"
+
+  /personalization/bulk-clear:
+    post:
+      operationId: bulkClearPersonalization
+      tags: [personalization]
+      summary: Clear custom lines for multiple contacts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contactIds:
+                  type: array
+                  items:
+                    type: integer
+              required:
+                - contactIds
+      responses:
+        "200":
+          description: Clear result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cleared:
+                    type: integer
+
+  /personalization/analytics:
+    get:
+      operationId: getPersonalizationAnalytics
+      tags: [personalization]
+      summary: Get personalization analytics
+      responses:
+        "200":
+          description: Personalization analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonalizationAnalytics"
+
+  /contacts/{id}/custom-line:
+    put:
+      operationId: updateContactCustomLine
+      tags: [personalization]
+      summary: Manually update contact custom line
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customLine:
+                  type: string
+                locked:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
   /email-events:
     get:
       operationId: getEmailEvents
@@ -2021,6 +2154,14 @@ components:
           type: string
         customLine:
           type: string
+        customLineStatus:
+          type: string
+        customLineSource:
+          type: string
+        customLineGeneratedAt:
+          type: string
+        customLineLocked:
+          type: boolean
         whySelected:
           type: string
         segmentType:
@@ -2433,6 +2574,10 @@ components:
           type: integer
         enrolled:
           type: integer
+        importedContactIds:
+          type: array
+          items:
+            type: integer
         message:
           type: string
 
@@ -2693,3 +2838,59 @@ components:
       required:
         - key
         - value
+
+    PersonalizationResult:
+      type: object
+      properties:
+        customLine:
+          type: string
+        status:
+          type: string
+        source:
+          type: string
+      required:
+        - customLine
+        - status
+        - source
+
+    BulkPersonalizationResult:
+      type: object
+      properties:
+        total:
+          type: integer
+        generated:
+          type: integer
+        failed:
+          type: integer
+        skipped:
+          type: integer
+      required:
+        - total
+        - generated
+        - failed
+        - skipped
+
+    PersonalizationAnalytics:
+      type: object
+      properties:
+        total:
+          type: integer
+        withPersonalization:
+          type: integer
+        withoutPersonalization:
+          type: integer
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+        bySegment:
+          type: array
+          items:
+            type: object
+            properties:
+              segment:
+                type: string
+              withPersonalization:
+                type: integer
+              withoutPersonalization:
+                type: integer

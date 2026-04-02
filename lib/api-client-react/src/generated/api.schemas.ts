@@ -259,6 +259,10 @@ export interface Contact {
   industry?: string;
   intentSignal?: string;
   customLine?: string;
+  customLineStatus?: string;
+  customLineSource?: string;
+  customLineGeneratedAt?: string;
+  customLineLocked?: boolean;
   whySelected?: string;
   segmentType?: string;
   campaignName?: string;
@@ -452,6 +456,7 @@ export interface ImportResult {
   duplicates?: number;
   invalid?: number;
   enrolled?: number;
+  importedContactIds?: number[];
   message?: string;
 }
 
@@ -587,6 +592,35 @@ export interface SettingInput {
   value: string;
 }
 
+export interface PersonalizationResult {
+  customLine: string;
+  status: string;
+  source: string;
+}
+
+export interface BulkPersonalizationResult {
+  total: number;
+  generated: number;
+  failed: number;
+  skipped: number;
+}
+
+export type PersonalizationAnalyticsByStatus = { [key: string]: number };
+
+export type PersonalizationAnalyticsBySegmentItem = {
+  segment?: string;
+  withPersonalization?: number;
+  withoutPersonalization?: number;
+};
+
+export interface PersonalizationAnalytics {
+  total?: number;
+  withPersonalization?: number;
+  withoutPersonalization?: number;
+  byStatus?: PersonalizationAnalyticsByStatus;
+  bySegment?: PersonalizationAnalyticsBySegmentItem[];
+}
+
 export type GetLeadsParams = {
   search?: string;
   pipelineType?: string;
@@ -675,6 +709,46 @@ export type ProcessSequenceQueue200 = {
 export type GetSendLogsParams = {
   contactId?: number;
   limit?: number;
+};
+
+export type GeneratePersonalizationBodyMode =
+  (typeof GeneratePersonalizationBodyMode)[keyof typeof GeneratePersonalizationBodyMode];
+
+export const GeneratePersonalizationBodyMode = {
+  safe: "safe",
+  enhanced: "enhanced",
+} as const;
+
+export type GeneratePersonalizationBody = {
+  mode?: GeneratePersonalizationBodyMode;
+  force?: boolean;
+};
+
+export type BulkGeneratePersonalizationBodyMode =
+  (typeof BulkGeneratePersonalizationBodyMode)[keyof typeof BulkGeneratePersonalizationBodyMode];
+
+export const BulkGeneratePersonalizationBodyMode = {
+  safe: "safe",
+  enhanced: "enhanced",
+} as const;
+
+export type BulkGeneratePersonalizationBody = {
+  contactIds: number[];
+  mode?: BulkGeneratePersonalizationBodyMode;
+  force?: boolean;
+};
+
+export type BulkClearPersonalizationBody = {
+  contactIds: number[];
+};
+
+export type BulkClearPersonalization200 = {
+  cleared?: number;
+};
+
+export type UpdateContactCustomLineBody = {
+  customLine?: string;
+  locked?: boolean;
 };
 
 export type GetEmailEventsParams = {

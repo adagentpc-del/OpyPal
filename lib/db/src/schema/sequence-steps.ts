@@ -20,6 +20,7 @@ export const sequenceStepsTable = pgTable("sequence_steps", {
   sentAt: timestamp("sent_at"),
   skippedAt: timestamp("skipped_at"),
   canceledAt: timestamp("canceled_at"),
+  customLineSnapshot: text("custom_line_snapshot"),
   messageId: text("message_id"),
   smtpResponse: text("smtp_response"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

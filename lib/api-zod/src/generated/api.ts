@@ -645,6 +645,10 @@ export const GetContactsResponseItem = zod.object({
   industry: zod.string().optional(),
   intentSignal: zod.string().optional(),
   customLine: zod.string().optional(),
+  customLineStatus: zod.string().optional(),
+  customLineSource: zod.string().optional(),
+  customLineGeneratedAt: zod.string().optional(),
+  customLineLocked: zod.boolean().optional(),
   whySelected: zod.string().optional(),
   segmentType: zod.string().optional(),
   campaignName: zod.string().optional(),
@@ -716,6 +720,10 @@ export const GetContactResponse = zod.object({
   industry: zod.string().optional(),
   intentSignal: zod.string().optional(),
   customLine: zod.string().optional(),
+  customLineStatus: zod.string().optional(),
+  customLineSource: zod.string().optional(),
+  customLineGeneratedAt: zod.string().optional(),
+  customLineLocked: zod.boolean().optional(),
   whySelected: zod.string().optional(),
   segmentType: zod.string().optional(),
   campaignName: zod.string().optional(),
@@ -783,6 +791,10 @@ export const UpdateContactResponse = zod.object({
   industry: zod.string().optional(),
   intentSignal: zod.string().optional(),
   customLine: zod.string().optional(),
+  customLineStatus: zod.string().optional(),
+  customLineSource: zod.string().optional(),
+  customLineGeneratedAt: zod.string().optional(),
+  customLineLocked: zod.boolean().optional(),
   whySelected: zod.string().optional(),
   segmentType: zod.string().optional(),
   campaignName: zod.string().optional(),
@@ -859,6 +871,10 @@ export const PauseContactResponse = zod.object({
   industry: zod.string().optional(),
   intentSignal: zod.string().optional(),
   customLine: zod.string().optional(),
+  customLineStatus: zod.string().optional(),
+  customLineSource: zod.string().optional(),
+  customLineGeneratedAt: zod.string().optional(),
+  customLineLocked: zod.boolean().optional(),
   whySelected: zod.string().optional(),
   segmentType: zod.string().optional(),
   campaignName: zod.string().optional(),
@@ -904,6 +920,10 @@ export const ResumeContactResponse = zod.object({
   industry: zod.string().optional(),
   intentSignal: zod.string().optional(),
   customLine: zod.string().optional(),
+  customLineStatus: zod.string().optional(),
+  customLineSource: zod.string().optional(),
+  customLineGeneratedAt: zod.string().optional(),
+  customLineLocked: zod.boolean().optional(),
   whySelected: zod.string().optional(),
   segmentType: zod.string().optional(),
   campaignName: zod.string().optional(),
@@ -949,6 +969,10 @@ export const SkipContactStepResponse = zod.object({
   industry: zod.string().optional(),
   intentSignal: zod.string().optional(),
   customLine: zod.string().optional(),
+  customLineStatus: zod.string().optional(),
+  customLineSource: zod.string().optional(),
+  customLineGeneratedAt: zod.string().optional(),
+  customLineLocked: zod.boolean().optional(),
   whySelected: zod.string().optional(),
   segmentType: zod.string().optional(),
   campaignName: zod.string().optional(),
@@ -1006,6 +1030,10 @@ export const MarkContactRepliedResponse = zod.object({
   industry: zod.string().optional(),
   intentSignal: zod.string().optional(),
   customLine: zod.string().optional(),
+  customLineStatus: zod.string().optional(),
+  customLineSource: zod.string().optional(),
+  customLineGeneratedAt: zod.string().optional(),
+  customLineLocked: zod.boolean().optional(),
   whySelected: zod.string().optional(),
   segmentType: zod.string().optional(),
   campaignName: zod.string().optional(),
@@ -1051,6 +1079,10 @@ export const MarkContactDncResponse = zod.object({
   industry: zod.string().optional(),
   intentSignal: zod.string().optional(),
   customLine: zod.string().optional(),
+  customLineStatus: zod.string().optional(),
+  customLineSource: zod.string().optional(),
+  customLineGeneratedAt: zod.string().optional(),
+  customLineLocked: zod.boolean().optional(),
   whySelected: zod.string().optional(),
   segmentType: zod.string().optional(),
   campaignName: zod.string().optional(),
@@ -1096,6 +1128,10 @@ export const MarkContactUnsubscribedResponse = zod.object({
   industry: zod.string().optional(),
   intentSignal: zod.string().optional(),
   customLine: zod.string().optional(),
+  customLineStatus: zod.string().optional(),
+  customLineSource: zod.string().optional(),
+  customLineGeneratedAt: zod.string().optional(),
+  customLineLocked: zod.boolean().optional(),
   whySelected: zod.string().optional(),
   segmentType: zod.string().optional(),
   campaignName: zod.string().optional(),
@@ -1416,6 +1452,7 @@ export const ImportContactsResponse = zod.object({
   duplicates: zod.number().optional(),
   invalid: zod.number().optional(),
   enrolled: zod.number().optional(),
+  importedContactIds: zod.array(zod.number()).optional(),
   message: zod.string().optional(),
 });
 
@@ -1641,6 +1678,124 @@ export const RemoveFromSuppressionListParams = zod.object({
 
 export const RemoveFromSuppressionListResponse = zod.object({
   success: zod.boolean().optional(),
+});
+
+/**
+ * @summary Generate AI custom line for a single contact
+ */
+export const GeneratePersonalizationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GeneratePersonalizationBody = zod.object({
+  mode: zod.enum(["safe", "enhanced"]).optional(),
+  force: zod.boolean().optional(),
+});
+
+export const GeneratePersonalizationResponse = zod.object({
+  customLine: zod.string(),
+  status: zod.string(),
+  source: zod.string(),
+});
+
+/**
+ * @summary Generate AI custom lines for multiple contacts
+ */
+export const BulkGeneratePersonalizationBody = zod.object({
+  contactIds: zod.array(zod.number()),
+  mode: zod.enum(["safe", "enhanced"]).optional(),
+  force: zod.boolean().optional(),
+});
+
+export const BulkGeneratePersonalizationResponse = zod.object({
+  total: zod.number(),
+  generated: zod.number(),
+  failed: zod.number(),
+  skipped: zod.number(),
+});
+
+/**
+ * @summary Clear custom lines for multiple contacts
+ */
+export const BulkClearPersonalizationBody = zod.object({
+  contactIds: zod.array(zod.number()),
+});
+
+export const BulkClearPersonalizationResponse = zod.object({
+  cleared: zod.number().optional(),
+});
+
+/**
+ * @summary Get personalization analytics
+ */
+export const GetPersonalizationAnalyticsResponse = zod.object({
+  total: zod.number().optional(),
+  withPersonalization: zod.number().optional(),
+  withoutPersonalization: zod.number().optional(),
+  byStatus: zod.record(zod.string(), zod.number()).optional(),
+  bySegment: zod
+    .array(
+      zod.object({
+        segment: zod.string().optional(),
+        withPersonalization: zod.number().optional(),
+        withoutPersonalization: zod.number().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Manually update contact custom line
+ */
+export const UpdateContactCustomLineParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateContactCustomLineBody = zod.object({
+  customLine: zod.string().optional(),
+  locked: zod.boolean().optional(),
+});
+
+export const UpdateContactCustomLineResponse = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  firstName: zod.string().optional(),
+  lastName: zod.string().optional(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  industry: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  customLine: zod.string().optional(),
+  customLineStatus: zod.string().optional(),
+  customLineSource: zod.string().optional(),
+  customLineGeneratedAt: zod.string().optional(),
+  customLineLocked: zod.boolean().optional(),
+  whySelected: zod.string().optional(),
+  segmentType: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  campaignId: zod.number().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  templateSetId: zod.number().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string(),
+  engagementScore: zod.number().optional(),
+  engagementTier: zod.string().optional(),
+  lastEmailSentAt: zod.string().optional(),
+  lastReplyAt: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  bounceStatus: zod.string().optional(),
+  sourceFileName: zod.string().optional(),
+  uploadedAt: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
 });
 
 /**

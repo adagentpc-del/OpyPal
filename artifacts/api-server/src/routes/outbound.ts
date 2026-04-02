@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { db, contactsTable, sequenceStepsTable, sendLogsTable, importsTable, settingsTable, sequenceTemplatesTable, templateSetsTable, sequenceEnrollmentsTable, emailEventsTable, suppressionListTable } from "@workspace/db";
+import { db, contactsTable, sequenceStepsTable, sendLogsTable, importsTable, settingsTable, sequenceTemplatesTable, templateSetsTable, sequenceEnrollmentsTable, emailEventsTable, suppressionListTable, personalizationLogsTable } from "@workspace/db";
 import { eq, and, or, sql, desc, ilike } from "drizzle-orm";
 import { renderTemplate, renderSubject, splitFullName, calculateEngagementScore, getEngagementTier, type TemplateContact } from "../lib/template-engine";
+import { generateCustomLine, generateBatch, type PersonalizationMode, type PersonalizationContact } from "../lib/personalization";
 
 const router: IRouter = Router();
 
@@ -268,6 +269,7 @@ router.post("/imports/upload", async (req, res) => {
       duplicates,
       invalid: invalidCount + inFileDupes,
       enrolled,
+      importedContactIds,
       message: `Imported ${imported} contacts${enrolled > 0 ? `, enrolled ${enrolled} in sequence` : ""}`,
     });
   } catch (err: any) {
@@ -547,6 +549,262 @@ router.get("/track/click", async (req, res) => {
     safeRedirect(redirectUrl);
   } catch (err) {
     safeRedirect(redirectUrl);
+  }
+});
+
+async function getPersonalizationSettings(): Promise<{
+  mode: PersonalizationMode;
+  maxLength: number;
+  regenerateOnReenroll: boolean;
+  lockManualByDefault: boolean;
+  stepScope: string;
+  requireTitleOrCompany: boolean;
+}> {
+  const settingsRows = await db.select().from(settingsTable);
+  const get = (key: string, def: string) => settingsRows.find(s => s.key === key)?.value || def;
+  return {
+    mode: (get("personalization_mode", "safe") as PersonalizationMode),
+    maxLength: parseInt(get("personalization_max_length", "200")),
+    regenerateOnReenroll: get("personalization_regenerate_on_reenroll", "false") === "true",
+    lockManualByDefault: get("personalization_lock_manual_default", "false") === "true",
+    stepScope: get("personalization_step_scope", "step_1_only"),
+    requireTitleOrCompany: get("personalization_require_title_or_company", "false") === "true",
+  };
+}
+
+function contactToPersonalization(c: any): PersonalizationContact {
+  return {
+    firstName: c.firstName,
+    lastName: c.lastName,
+    fullName: c.fullName,
+    company: c.company,
+    title: c.title,
+    location: c.location,
+    industry: c.industry,
+    intentSignal: c.intentSignal,
+    segmentType: c.segmentType,
+    campaignName: c.campaignName,
+    whySelected: c.whySelected,
+    customLine: c.customLine,
+    notes: c.notes,
+    sourceFileName: c.sourceFileName,
+  };
+}
+
+router.post("/personalization/generate/:id", async (req, res) => {
+  try {
+    const contactId = parseInt(req.params.id);
+    const modeOverride = req.body.mode as PersonalizationMode | undefined;
+
+    const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, contactId));
+    if (!contact) return res.status(404).json({ message: "Contact not found" });
+
+    if (contact.customLineLocked && !req.body.force) {
+      return res.status(400).json({ message: "Custom line is locked. Use force=true to override." });
+    }
+
+    const pSettings = await getPersonalizationSettings();
+    const mode = modeOverride || pSettings.mode;
+
+    if (mode === "off") {
+      return res.status(400).json({ message: "Personalization is disabled" });
+    }
+
+    if (pSettings.requireTitleOrCompany && !contact.title && !contact.company) {
+      const fallbackLine = "I thought it made sense to reach out given the type of work your team may be evaluating.";
+      await db.update(contactsTable).set({
+        customLine: fallbackLine,
+        customLineStatus: "generated_safe",
+        customLineSource: "fallback",
+        customLineGeneratedAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(contactsTable.id, contactId));
+      return res.json({ customLine: fallbackLine, status: "generated_safe", source: "fallback" });
+    }
+
+    const result = await generateCustomLine(contactToPersonalization(contact), mode, pSettings.maxLength);
+
+    await db.update(contactsTable).set({
+      customLine: result.customLine,
+      customLineStatus: result.status,
+      customLineSource: result.source,
+      customLineGeneratedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(contactsTable.id, contactId));
+
+    await db.insert(personalizationLogsTable).values({
+      contactId,
+      mode,
+      inputFieldsUsed: JSON.stringify(result.inputFieldsUsed),
+      outputText: result.customLine,
+      status: result.status,
+      errorMessage: result.error || null,
+    });
+
+    res.json({
+      customLine: result.customLine,
+      status: result.status,
+      source: result.source,
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message || "Failed to generate" });
+  }
+});
+
+router.post("/personalization/bulk-generate", async (req, res) => {
+  try {
+    const { contactIds, mode: modeOverride, force } = req.body;
+
+    const pSettings = await getPersonalizationSettings();
+    const mode = (modeOverride || pSettings.mode) as PersonalizationMode;
+
+    if (mode === "off") {
+      return res.status(400).json({ message: "Personalization is disabled" });
+    }
+
+    const ids = (contactIds || []).map((id: any) => parseInt(id));
+    if (ids.length === 0) return res.status(400).json({ message: "No contact IDs provided" });
+
+    const contacts = await db.select().from(contactsTable).where(
+      sql`${contactsTable.id} IN (${sql.join(ids.map((id: number) => sql`${id}`), sql`,`)})`
+    );
+
+    let toProcess = force
+      ? contacts
+      : contacts.filter(c => !c.customLineLocked);
+
+    if (pSettings.requireTitleOrCompany) {
+      toProcess = toProcess.filter(c => c.title || c.company);
+    }
+
+    const personalizationContacts = toProcess.map(contactToPersonalization);
+    const results = await generateBatch(personalizationContacts, mode, pSettings.maxLength);
+
+    let generated = 0;
+    let failed = 0;
+
+    for (let i = 0; i < toProcess.length; i++) {
+      const contact = toProcess[i];
+      const result = results[i];
+
+      await db.update(contactsTable).set({
+        customLine: result.customLine,
+        customLineStatus: result.status,
+        customLineSource: result.source,
+        customLineGeneratedAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(contactsTable.id, contact.id));
+
+      await db.insert(personalizationLogsTable).values({
+        contactId: contact.id,
+        mode,
+        inputFieldsUsed: JSON.stringify(result.inputFieldsUsed),
+        outputText: result.customLine,
+        status: result.status,
+        errorMessage: result.error || null,
+      });
+
+      if (result.status === "failed") failed++;
+      else generated++;
+    }
+
+    const skipped = contacts.length - toProcess.length;
+
+    res.json({ total: contacts.length, generated, failed, skipped });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message || "Bulk generation failed" });
+  }
+});
+
+router.put("/contacts/:id/custom-line", async (req, res) => {
+  try {
+    const contactId = parseInt(req.params.id);
+    const { customLine, locked } = req.body;
+
+    const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, contactId));
+    if (!contact) return res.status(404).json({ message: "Contact not found" });
+
+    const updates: any = { updatedAt: new Date() };
+    if (customLine !== undefined) {
+      updates.customLine = customLine;
+      updates.customLineStatus = "manual";
+      updates.customLineSource = "manual";
+      updates.customLineGeneratedAt = new Date();
+    }
+    if (locked !== undefined) {
+      updates.customLineLocked = locked;
+    }
+
+    await db.update(contactsTable).set(updates).where(eq(contactsTable.id, contactId));
+
+    const [updated] = await db.select().from(contactsTable).where(eq(contactsTable.id, contactId));
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message || "Failed to update custom line" });
+  }
+});
+
+router.post("/personalization/bulk-clear", async (req, res) => {
+  try {
+    const { contactIds } = req.body;
+    const ids = (contactIds || []).map((id: any) => parseInt(id));
+    if (ids.length === 0) return res.status(400).json({ message: "No contact IDs provided" });
+
+    await db.update(contactsTable).set({
+      customLine: null,
+      customLineStatus: "not_generated",
+      customLineSource: null,
+      customLineGeneratedAt: null,
+      updatedAt: new Date(),
+    }).where(sql`${contactsTable.id} IN (${sql.join(ids.map((id: number) => sql`${id}`), sql`,`)})`);
+
+    res.json({ cleared: ids.length });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message || "Failed to clear" });
+  }
+});
+
+router.get("/personalization/analytics", async (req, res) => {
+  try {
+    const allContacts = await db.select({
+      id: contactsTable.id,
+      customLineStatus: contactsTable.customLineStatus,
+      customLineSource: contactsTable.customLineSource,
+      segmentType: contactsTable.segmentType,
+      engagementTier: contactsTable.engagementTier,
+    }).from(contactsTable);
+
+    const withPersonalization = allContacts.filter(c => c.customLineStatus && c.customLineStatus !== "not_generated");
+    const withoutPersonalization = allContacts.filter(c => !c.customLineStatus || c.customLineStatus === "not_generated");
+
+    const byStatus: Record<string, number> = {};
+    for (const c of allContacts) {
+      const status = c.customLineStatus || "not_generated";
+      byStatus[status] = (byStatus[status] || 0) + 1;
+    }
+
+    const bySegment: Record<string, { with: number; without: number }> = {};
+    for (const c of allContacts) {
+      const seg = c.segmentType || "unknown";
+      if (!bySegment[seg]) bySegment[seg] = { with: 0, without: 0 };
+      const hasCustomLine = c.customLineStatus && c.customLineStatus !== "not_generated";
+      if (hasCustomLine) bySegment[seg].with++;
+      else bySegment[seg].without++;
+    }
+
+    res.json({
+      total: allContacts.length,
+      withPersonalization: withPersonalization.length,
+      withoutPersonalization: withoutPersonalization.length,
+      byStatus,
+      bySegment: Object.entries(bySegment).map(([segment, counts]) => ({
+        segment,
+        withPersonalization: counts.with,
+        withoutPersonalization: counts.without,
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message || "Analytics failed" });
   }
 });
 

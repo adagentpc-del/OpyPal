@@ -5,13 +5,14 @@ import {
   useGetCampaigns,
   useGetTemplateSets,
   useGetImports,
+  useBulkGeneratePersonalization,
   getGetContactsQueryKey,
   getGetOutboundAnalyticsQueryKey,
   getGetImportsQueryKey,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Upload, FileText, CheckCircle2, X } from "lucide-react";
+import { Upload, FileText, CheckCircle2, X, Sparkles, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -47,6 +48,11 @@ const HEADER_MAP: Record<string, string> = {
 };
 
 const SEGMENT_TYPES = ["general", "hotel", "agency", "developer", "venue"];
+const PERSONALIZATION_MODES = [
+  { value: "off", label: "Off", desc: "No AI personalization" },
+  { value: "safe", label: "Safe", desc: "Soft, generalized lines" },
+  { value: "enhanced", label: "Enhanced", desc: "Stronger personalization using all data" },
+];
 
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -87,12 +93,16 @@ export default function ObUpload() {
   const [segmentType, setSegmentType] = useState("");
   const [autoEnroll, setAutoEnroll] = useState(true);
   const [reEnrollExisting, setReEnrollExisting] = useState(false);
+  const [personalizationMode, setPersonalizationMode] = useState("safe");
+  const [generateTiming, setGenerateTiming] = useState<"at_import" | "before_send">("at_import");
   const [result, setResult] = useState<any>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const { data: campaigns } = useGetCampaigns();
   const { data: templateSets } = useGetTemplateSets();
   const { data: imports } = useGetImports();
   const importMut = useImportContacts();
+  const bulkGenMut = useBulkGeneratePersonalization();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -140,12 +150,33 @@ export default function ObUpload() {
         rows: parsedRows,
       },
     }, {
-      onSuccess: (data) => {
+      onSuccess: (data: any) => {
         setResult(data);
         setStep("result");
         queryClient.invalidateQueries({ queryKey: getGetContactsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetOutboundAnalyticsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetImportsQueryKey() });
+
+        if (personalizationMode !== "off" && generateTiming === "at_import" && data.importedContactIds?.length > 0) {
+          setIsGenerating(true);
+          bulkGenMut.mutate({
+            data: {
+              contactIds: data.importedContactIds,
+              mode: personalizationMode as any,
+            },
+          }, {
+            onSuccess: (genResult: any) => {
+              setIsGenerating(false);
+              toast({ title: `Personalization: ${genResult.generated} generated, ${genResult.failed} fallback` });
+              queryClient.invalidateQueries({ queryKey: getGetContactsQueryKey() });
+            },
+            onError: () => {
+              setIsGenerating(false);
+              toast({ title: "Personalization generation had some issues", variant: "destructive" });
+            },
+          });
+        }
+
         toast({ title: "Import complete" });
       },
       onError: (err: any) => toast({ title: "Import failed", description: err.message, variant: "destructive" }),
@@ -159,6 +190,7 @@ export default function ObUpload() {
     setParsedRows([]);
     setFileName("");
     setResult(null);
+    setIsGenerating(false);
   };
 
   return (
@@ -240,6 +272,38 @@ export default function ObUpload() {
                 </div>
               </div>
 
+              <Card className="p-4 border-violet-200 bg-violet-50/50 mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="h-4 w-4 text-violet-600" />
+                  <h3 className="text-sm font-semibold text-violet-900">AI Personalization</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-violet-700 block mb-1">Personalization Mode</label>
+                    <select value={personalizationMode} onChange={(e) => setPersonalizationMode(e.target.value)}
+                      className="w-full px-3 py-2 border border-violet-200 rounded-xl text-sm bg-white">
+                      {PERSONALIZATION_MODES.map(m => (
+                        <option key={m.value} value={m.value}>{m.label} - {m.desc}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-violet-700 block mb-1">Generate Timing</label>
+                    <select value={generateTiming} onChange={(e) => setGenerateTiming(e.target.value as any)}
+                      className="w-full px-3 py-2 border border-violet-200 rounded-xl text-sm bg-white"
+                      disabled={personalizationMode === "off"}>
+                      <option value="at_import">Generate at import</option>
+                      <option value="before_send">Generate before send</option>
+                    </select>
+                  </div>
+                </div>
+                {personalizationMode !== "off" && (
+                  <p className="text-xs text-violet-600 mt-2">
+                    AI will generate a custom first line for each contact using available data ({personalizationMode === "enhanced" ? "title, segment, intent signal, why selected" : "company, title, segment"}).
+                  </p>
+                )}
+              </Card>
+
               <div className="border border-border rounded-xl overflow-x-auto max-h-[300px] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-muted/50">
@@ -250,6 +314,7 @@ export default function ObUpload() {
                       <th className="text-left px-3 py-2 font-medium">Title</th>
                       <th className="text-left px-3 py-2 font-medium">Location</th>
                       <th className="text-left px-3 py-2 font-medium">Industry</th>
+                      {parsedRows.some(r => r.customLine) && <th className="text-left px-3 py-2 font-medium">Custom Line</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -261,6 +326,7 @@ export default function ObUpload() {
                         <td className="px-3 py-2 text-muted-foreground">{r.title || "-"}</td>
                         <td className="px-3 py-2 text-muted-foreground">{r.location || "-"}</td>
                         <td className="px-3 py-2 text-muted-foreground">{r.industry || "-"}</td>
+                        {parsedRows.some(r => r.customLine) && <td className="px-3 py-2 text-muted-foreground text-xs">{r.customLine || "-"}</td>}
                       </tr>
                     ))}
                   </tbody>
@@ -309,6 +375,12 @@ export default function ObUpload() {
                   <div className="text-xs text-muted-foreground">Enrolled</div>
                 </div>
               </div>
+              {isGenerating && (
+                <div className="flex items-center justify-center gap-2 text-violet-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm font-medium">Generating AI personalization...</span>
+                </div>
+              )}
               <Button onClick={resetUpload} className="rounded-xl">Upload Another File</Button>
             </div>
           </Card>

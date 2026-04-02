@@ -19,6 +19,10 @@ export interface Contact {
   industry?: string;
   intentSignal?: string;
   customLine?: string;
+  customLineStatus?: string;
+  customLineSource?: string;
+  customLineGeneratedAt?: string;
+  customLineLocked?: boolean;
   whySelected?: string;
   segmentType?: string;
   campaignName?: string;

@@ -15,5 +15,6 @@ export interface ImportResult {
   duplicates?: number;
   invalid?: number;
   enrolled?: number;
+  importedContactIds?: number[];
   message?: string;
 }
