@@ -1,5 +1,127 @@
-import { db, leadsTable, tasksTable, templatesTable, activityTable, assetsTable } from "@workspace/db";
+import { db, leadsTable, tasksTable, templatesTable, activityTable, assetsTable, templateSetsTable, sequenceTemplatesTable, campaignsTable, settingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+
+const A3_GENERAL_TEMPLATES = [
+  {
+    stepNumber: 1,
+    name: "Initial Email",
+    delayDays: 0,
+    subject: "Quick question on {{company}}",
+    body: `{{greeting}}
+
+{{intent_line}}
+
+Curious how you are handling visual execution across print, fabrication, or on site experience.
+
+We work with groups like Disney, NFL, and major venues on large scale installs, projection mapping, and branded environments.
+
+{{company_line}}
+
+Worth a quick conversation?`,
+  },
+  {
+    stepNumber: 2,
+    name: "Follow Up 1",
+    delayDays: 3,
+    subject: "Re: Quick question on {{company}}",
+    body: `{{greeting}}
+
+Wanted to circle back here.
+
+Most teams we speak with are either:
+1. Managing multiple vendors which creates inconsistency
+2. Underutilizing visual environments for revenue or brand impact
+
+If this is active on your end, there is usually an opportunity to improve both execution and ROI.
+
+Open to sharing a few examples if helpful.`,
+  },
+  {
+    stepNumber: 3,
+    name: "Follow Up 2",
+    delayDays: 7,
+    subject: "Re: Quick question on {{company}}",
+    body: `{{greeting}}
+
+Quick example for context.
+
+We recently supported projects involving large format installs and immersive visual builds for major brands and venues.
+
+In most cases, the goal was:
+1. Increase engagement
+2. Improve navigation and wayfinding
+3. Enhance overall experience
+
+If this is something your team is exploring, timing it correctly makes a big difference.
+
+Let me know if it makes sense to connect.`,
+  },
+  {
+    stepNumber: 4,
+    name: "Follow Up 3",
+    delayDays: 14,
+    subject: "Re: Quick question on {{company}}",
+    body: `{{greeting}}
+
+Not sure if this is currently a priority on your side.
+
+If it is not, no problem. I can reconnect at a better time.
+
+If it is, I can map out exactly what this could look like based on your current direction.
+
+Let me know either way.`,
+  },
+  {
+    stepNumber: 5,
+    name: "Follow Up 4",
+    delayDays: 30,
+    subject: "Re: Quick question on {{company}}",
+    body: `{{greeting}}
+
+Going to assume this is not a priority right now.
+
+If that changes, feel free to reach out and I will revisit with you.
+
+Otherwise, I will reconnect down the line as things evolve on your end.`,
+  },
+  {
+    stepNumber: 6,
+    name: "Reactivation 1",
+    delayDays: 120,
+    subject: "Checking in - {{company}}",
+    body: `{{greeting}}
+
+Reaching back out as priorities shift throughout the year.
+
+Are there any upcoming projects involving:
+1. signage
+2. fabrication
+3. immersive environments
+4. event installations
+
+If so, I can align a few ideas around timing and execution.`,
+  },
+  {
+    stepNumber: 7,
+    name: "Reactivation 2",
+    delayDays: 180,
+    subject: "One more check - {{company}}",
+    body: `{{greeting}}
+
+Wanted to check in one more time.
+
+If anything is coming up this quarter or next, I can be a resource on execution, vendors, and scaling visual impact.
+
+If not, I will close this out on my end.`,
+  },
+];
+
+function makeVariant(base: typeof A3_GENERAL_TEMPLATES, segmentLabel: string) {
+  return base.map(t => ({
+    ...t,
+    name: `${segmentLabel} - ${t.name}`,
+  }));
+}
 
 async function seed() {
   console.log("Seeding database...");
@@ -9,6 +131,9 @@ async function seed() {
   await db.delete(assetsTable);
   await db.delete(leadsTable);
   await db.delete(templatesTable);
+  await db.delete(sequenceTemplatesTable);
+  await db.delete(templateSetsTable);
+  await db.delete(campaignsTable);
 
   const leads = await db.insert(leadsTable).values([
     {
@@ -50,7 +175,7 @@ async function seed() {
       lastContactDate: "2026-03-12",
       nextStep: "Follow up on proposal",
       nextFollowUpDate: "2026-03-19",
-      notes: "Sent proposal for Nike activation at Art Basel. Decision expected end of month. They love our fabrication quality.",
+      notes: "Sent proposal for Nike activation at Art Basel. Decision expected end of month.",
       dealValueEstimate: "150000",
       proposalValue: "142000",
       closeProbability: "75",
@@ -74,7 +199,7 @@ async function seed() {
       lastContactDate: "2026-03-15",
       nextStep: "Send capabilities deck and case studies",
       nextFollowUpDate: "2026-03-21",
-      notes: "Interested in branded environment for annual luxury gala. Budget approved for Q2. Wants to see our hotel portfolio.",
+      notes: "Interested in branded environment for annual luxury gala.",
       dealValueEstimate: "85000",
       closeProbability: "60",
       forecastValue: "51000",
@@ -96,7 +221,7 @@ async function seed() {
       lastContactDate: "2026-03-18",
       nextStep: "Virtual meeting Thursday 2pm EST",
       nextFollowUpDate: "2026-03-22",
-      notes: "Massive convention center. Need large format printing and fabrication for annual medical conference. 4-day event, 3000 attendees.",
+      notes: "Massive convention center. Need large format printing and fabrication for annual medical conference.",
       dealValueEstimate: "220000",
       closeProbability: "45",
       forecastValue: "99000",
@@ -117,7 +242,7 @@ async function seed() {
       lastContactDate: "2026-03-17",
       nextStep: "Review revised scope and pricing for 3-city tour",
       nextFollowUpDate: "2026-03-20",
-      notes: "Multi-city activation for Toyota. Negotiating scope for LA, SF, Miami. They want immersive environments with projection mapping.",
+      notes: "Multi-city activation for Toyota. Negotiating scope for LA, SF, Miami.",
       dealValueEstimate: "320000",
       proposalValue: "298000",
       closeProbability: "80",
@@ -140,7 +265,7 @@ async function seed() {
       lastContactDate: "2026-03-16",
       nextStep: "Wait for response to intro email",
       nextFollowUpDate: "2026-03-18",
-      notes: "Sent cold email. They handle 50+ major events/year. Huge opportunity for ongoing large format partnership.",
+      notes: "Sent cold email. They handle 50+ major events/year.",
       dealValueEstimate: "95000",
       closeProbability: "25",
       forecastValue: "23750",
@@ -159,9 +284,9 @@ async function seed() {
       estimatedBudget: "130000",
       status: "Replied",
       lastContactDate: "2026-03-17",
-      nextStep: "Schedule intro call - they're interested",
+      nextStep: "Schedule intro call",
       nextFollowUpDate: "2026-03-20",
-      notes: "Replied to LinkedIn outreach. Interested in our fabrication capabilities for auto show season. High volume potential.",
+      notes: "Replied to LinkedIn outreach. Interested in fabrication capabilities.",
       dealValueEstimate: "130000",
       closeProbability: "35",
       forecastValue: "45500",
@@ -182,7 +307,7 @@ async function seed() {
       status: "New Lead",
       nextStep: "Send intro email with portfolio",
       nextFollowUpDate: "2026-03-20",
-      notes: "Ultra-luxury venue, Art Basel host. Found via ZoomInfo. Perfect fit for our immersive branded environments.",
+      notes: "Ultra-luxury venue, Art Basel host. Found via ZoomInfo.",
       dealValueEstimate: "110000",
       closeProbability: "20",
       forecastValue: "22000",
@@ -203,7 +328,7 @@ async function seed() {
       lastContactDate: "2026-03-18",
       nextStep: "Send partnership proposal",
       nextFollowUpDate: "2026-03-21",
-      notes: "Great meeting! They need a reliable large format and fabrication partner for their SF tech client events. 8-10 events/year.",
+      notes: "Great meeting! They need a reliable large format and fabrication partner.",
       dealValueEstimate: "200000",
       closeProbability: "55",
       forecastValue: "110000",
@@ -223,7 +348,7 @@ async function seed() {
       estimatedBudget: "65000",
       status: "Closed Lost",
       lastContactDate: "2026-03-05",
-      notes: "Lost to competitor on pricing. They went with a local LA shop. Keep in nurture - their contract renews in 6 months.",
+      notes: "Lost to competitor on pricing. Keep in nurture.",
       dealValueEstimate: "65000",
       closeProbability: "0",
       forecastValue: "0",
@@ -245,7 +370,7 @@ async function seed() {
       lastContactDate: "2026-03-14",
       nextStep: "Follow up on proposal for ICE! holiday experience",
       nextFollowUpDate: "2026-03-19",
-      notes: "Sent proposal for annual ICE! holiday experience fabrication. They need massive themed environments. Decision by April 1.",
+      notes: "Sent proposal for annual ICE! holiday experience fabrication.",
       dealValueEstimate: "180000",
       proposalValue: "168000",
       closeProbability: "65",
@@ -267,7 +392,7 @@ async function seed() {
       lastContactDate: "2026-03-16",
       nextStep: "Present case studies and capabilities",
       nextFollowUpDate: "2026-03-21",
-      notes: "Top LA experiential agency. They handle Red Bull, Netflix, major tech launches. Huge potential for ongoing partnership.",
+      notes: "Top LA experiential agency. Huge potential for ongoing partnership.",
       dealValueEstimate: "250000",
       closeProbability: "40",
       forecastValue: "100000",
@@ -312,57 +437,25 @@ async function seed() {
       name: "Cold Email Intro",
       category: "Cold Email",
       subject: "Quick Question",
-      body: `Hi [First Name],
-
-Quick question, who handles event production, printing, or visual installations for [Company Name]?
-
-I work with A3 Visual, and we support hotels, venues, and agencies with large format, fabrication, and immersive builds (projection mapping, branded environments, etc.).
-
-If that's you, happy to connect. If not, would you mind pointing me in the right direction?
-
-Thanks so much,
-Alyssa`,
+      body: `Hi [First Name],\n\nQuick question, who handles event production, printing, or visual installations for [Company Name]?\n\nI work with A3 Visual, and we support hotels, venues, and agencies with large format, fabrication, and immersive builds.\n\nIf that's you, happy to connect. If not, would you mind pointing me in the right direction?\n\nThanks so much,\nAlyssa`,
     },
     {
       name: "Follow-Up",
       category: "Follow-Up Email",
       subject: "Following Up",
-      body: `Hi [First Name],
-
-Just wanted to follow up here. Would love to connect briefly and see what you have coming up this season.
-
-We've been supporting a number of venues and agencies with fast-turn, high-impact installs, especially for events and activations.
-
-Open to a quick intro next week?
-
-Best,
-Alyssa`,
+      body: `Hi [First Name],\n\nJust wanted to follow up here. Would love to connect briefly and see what you have coming up this season.\n\nWe've been supporting a number of venues and agencies with fast-turn, high-impact installs.\n\nOpen to a quick intro next week?\n\nBest,\nAlyssa`,
     },
     {
       name: "Value Follow-Up",
       category: "Follow-Up Email",
       subject: "Quick Share",
-      body: `Hi [First Name],
-
-We recently helped a [venue / agency] elevate their event experience with custom fabrication + large format installs. Happy to share examples if helpful.
-
-Would it be worth a quick conversation?
-
-Best,
-Alyssa`,
+      body: `Hi [First Name],\n\nWe recently helped a [venue / agency] elevate their event experience with custom fabrication + large format installs. Happy to share examples if helpful.\n\nWould it be worth a quick conversation?\n\nBest,\nAlyssa`,
     },
     {
       name: "Soft Close",
       category: "Follow-Up Email",
       subject: "Keeping The Door Open",
-      body: `Hi [First Name],
-
-Totally understand if timing isn't right. Just wanted to keep the door open.
-
-If anything comes up where you need support on printing, fabrication, or immersive installs, I'd love to be a resource.
-
-Best,
-Alyssa`,
+      body: `Hi [First Name],\n\nTotally understand if timing isn't right. Just wanted to keep the door open.\n\nIf anything comes up where you need support on printing, fabrication, or immersive installs, I'd love to be a resource.\n\nBest,\nAlyssa`,
     },
     {
       name: "LinkedIn Connect",
@@ -372,34 +465,72 @@ Alyssa`,
     {
       name: "LinkedIn Follow-Up",
       category: "LinkedIn Message",
-      body: `Thanks for connecting!
-
-Curious, do you currently handle event production and installs internally, or work with external partners?`,
+      body: `Thanks for connecting!\n\nCurious, do you currently handle event production and installs internally, or work with external partners?`,
     },
     {
       name: "Initial Outreach + A3 Deck",
       category: "Cold Email",
       subject: "Quick Question",
-      body: `Hi [First Name],
-
-Quick question, who handles event production, printing, visual installations, or experiential builds for [Company Name]?
-
-I work with A3 Visual, and we support hotels, venues, agencies, and event teams with large format printing, fabrication, immersive environments, and projection mapping.
-
-We've been doing this for decades and help bring high-impact event and brand experiences to life.
-
-I've included our A3 capabilities deck here for a quick overview:
-[A3_CAPABILITIES_DECK_LINK]
-
-If that's you, I'd love to connect briefly. If not, would you mind pointing me in the right direction?
-
-Thanks so much,
-Alyssa`,
+      body: `Hi [First Name],\n\nQuick question, who handles event production, printing, visual installations, or experiential builds for [Company Name]?\n\nI've included our A3 capabilities deck here for a quick overview:\n[A3_CAPABILITIES_DECK_LINK]\n\nIf that's you, I'd love to connect briefly.\n\nThanks so much,\nAlyssa`,
       linkedAssetIds: capsDeckId ? String(capsDeckId) : undefined,
     },
   ]).returning();
 
   console.log("Seeded 7 templates");
+
+  const segmentSets: { name: string; segmentType: string; description: string }[] = [
+    { name: "A3 General Sequence", segmentType: "general", description: "Standard 7-step outbound sequence for general contacts" },
+    { name: "A3 Hotels Sequence", segmentType: "hotel", description: "7-step outbound sequence for hotel and hospitality contacts" },
+    { name: "A3 Agencies Sequence", segmentType: "agency", description: "7-step outbound sequence for agency contacts" },
+    { name: "A3 Developers Sequence", segmentType: "developer", description: "7-step outbound sequence for developer contacts" },
+    { name: "A3 Venues Sequence", segmentType: "venue", description: "7-step outbound sequence for venue contacts" },
+  ];
+
+  for (const setDef of segmentSets) {
+    const [set] = await db.insert(templateSetsTable).values({
+      name: setDef.name,
+      segmentType: setDef.segmentType,
+      description: setDef.description,
+      isActive: true,
+    }).returning();
+
+    const templates = setDef.segmentType === "general"
+      ? A3_GENERAL_TEMPLATES
+      : makeVariant(A3_GENERAL_TEMPLATES, setDef.name.replace("A3 ", "").replace(" Sequence", ""));
+
+    await db.insert(sequenceTemplatesTable).values(
+      templates.map(t => ({
+        templateSetId: set.id,
+        stepNumber: t.stepNumber,
+        name: t.name,
+        subject: t.subject,
+        body: t.body,
+        delayDays: t.delayDays,
+        isActive: true,
+      }))
+    );
+
+    console.log(`Seeded template set: ${setDef.name} with ${templates.length} templates`);
+  }
+
+  const [campaign] = await db.insert(campaignsTable).values({
+    name: "Q2 2026 General Outbound",
+    description: "Main outbound campaign for Q2 2026",
+    isActive: true,
+  }).returning();
+  console.log(`Seeded campaign: ${campaign.name}`);
+
+  await db.insert(settingsTable).values([
+    { key: "daily_send_cap", value: "50" },
+    { key: "per_inbox_send_cap", value: "50" },
+    { key: "send_window_start", value: "8" },
+    { key: "send_window_end", value: "18" },
+    { key: "business_days_only", value: "true" },
+    { key: "randomized_spacing", value: "true" },
+    { key: "reply_detection_interval", value: "30" },
+    { key: "tracking_domain", value: "" },
+  ]).onConflictDoNothing();
+  console.log("Seeded settings");
 
   await db.insert(activityTable).values([
     { type: "lead_created", description: "New lead created: Fontainebleau Miami Beach", leadId: leads[0].id },

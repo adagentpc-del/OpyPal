@@ -6,9 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface TemplateSetInput {
-  name: string;
-  segmentType?: string;
-  description?: string;
+export interface SequenceTemplateInput {
+  stepNumber: number;
+  name?: string;
+  subject?: string;
+  body: string;
+  delayDays: number;
   isActive?: boolean;
 }

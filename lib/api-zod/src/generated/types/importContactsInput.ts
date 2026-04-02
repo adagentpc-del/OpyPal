@@ -9,8 +9,12 @@ import type { ImportContactsInputRowsItem } from "./importContactsInputRowsItem"
 
 export interface ImportContactsInput {
   fileName: string;
+  campaignId?: string;
   campaignName?: string;
+  templateSetId?: string;
   templateSetName?: string;
+  segmentType?: string;
   autoEnroll?: boolean;
+  reEnrollExisting?: boolean;
   rows: ImportContactsInputRowsItem[];
 }

@@ -249,23 +249,33 @@ export interface SeedResult {
 export interface Contact {
   id: number;
   fullName: string;
+  firstName?: string;
+  lastName?: string;
   company: string;
   title?: string;
   email: string;
   phone?: string;
   location?: string;
+  industry?: string;
   intentSignal?: string;
+  customLine?: string;
   whySelected?: string;
+  segmentType?: string;
   campaignName?: string;
+  campaignId?: number;
   assignedTemplateSet?: string;
+  templateSetId?: number;
   currentStep?: number;
   sequenceStatus: string;
+  engagementScore?: number;
+  engagementTier?: string;
   lastEmailSentAt?: string;
   lastReplyAt?: string;
   nextSendAt?: string;
   doNotContact?: boolean;
   unsubscribed?: boolean;
   bounced?: boolean;
+  bounceStatus?: string;
   sourceFileName?: string;
   uploadedAt?: string;
   notes?: string;
@@ -297,7 +307,9 @@ export interface ContactInput {
 }
 
 export interface EnrollInput {
-  templateSetName: string;
+  templateSetId?: number;
+  templateSetName?: string;
+  campaignId?: number;
   campaignName?: string;
 }
 
@@ -344,7 +356,9 @@ export interface CampaignInput {
 export interface TemplateSetItem {
   id: number;
   name: string;
+  segmentType?: string;
   description?: string;
+  isActive?: boolean;
   stepCount?: number;
   createdAt: string;
   updatedAt: string;
@@ -352,7 +366,9 @@ export interface TemplateSetItem {
 
 export interface TemplateSetInput {
   name: string;
+  segmentType?: string;
   description?: string;
+  isActive?: boolean;
 }
 
 export interface QueueItem {
@@ -401,20 +417,29 @@ export interface ImportRecord {
 
 export type ImportContactsInputRowsItem = {
   fullName: string;
+  firstName?: string;
+  lastName?: string;
   company: string;
   title?: string;
   email: string;
   phone?: string;
   location?: string;
+  industry?: string;
   intentSignal?: string;
+  customLine?: string;
+  segmentType?: string;
   whySelected?: string;
 };
 
 export interface ImportContactsInput {
   fileName: string;
+  campaignId?: string;
   campaignName?: string;
+  templateSetId?: string;
   templateSetName?: string;
+  segmentType?: string;
   autoEnroll?: boolean;
+  reEnrollExisting?: boolean;
   rows: ImportContactsInputRowsItem[];
 }
 
@@ -435,9 +460,34 @@ export type OutboundAnalyticsByCampaignItem = {
   count?: number;
 };
 
+export type OutboundAnalyticsBySegmentItem = {
+  segment?: string;
+  count?: number;
+};
+
 export type OutboundAnalyticsByStepItem = {
   step?: number;
   count?: number;
+};
+
+export type OutboundAnalyticsByTierItem = {
+  tier?: string;
+  count?: number;
+};
+
+export type OutboundAnalyticsByStepPerformanceItem = {
+  stepNumber?: number;
+  sent?: number;
+};
+
+export type OutboundAnalyticsTopEngagedItem = {
+  id?: number;
+  fullName?: string;
+  company?: string;
+  email?: string;
+  engagementScore?: number;
+  engagementTier?: string;
+  sequenceStatus?: string;
 };
 
 export interface OutboundAnalytics {
@@ -451,9 +501,79 @@ export interface OutboundAnalytics {
   completed?: number;
   bouncedCount?: number;
   reactivationDue?: number;
+  dncCount?: number;
+  unsubscribedCount?: number;
+  totalSent?: number;
+  openRate?: string;
+  clickRate?: string;
+  replyRate?: string;
+  bounceRate?: string;
   byCampaign?: OutboundAnalyticsByCampaignItem[];
+  bySegment?: OutboundAnalyticsBySegmentItem[];
   byStep?: OutboundAnalyticsByStepItem[];
+  byTier?: OutboundAnalyticsByTierItem[];
+  byStepPerformance?: OutboundAnalyticsByStepPerformanceItem[];
+  topEngaged?: OutboundAnalyticsTopEngagedItem[];
   recentSends?: SendLogItem[];
+}
+
+export interface EmailEvent {
+  id: number;
+  contactId: number;
+  sendLogId?: number;
+  eventType: string;
+  metadataJson?: string;
+  timestamp?: string;
+  createdAt?: string;
+}
+
+export interface SequenceTemplate {
+  id: number;
+  templateSetId: number;
+  stepNumber: number;
+  name?: string;
+  subject?: string;
+  body: string;
+  delayDays: number;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SequenceTemplateInput {
+  stepNumber: number;
+  name?: string;
+  subject?: string;
+  body: string;
+  delayDays: number;
+  isActive?: boolean;
+}
+
+export interface TemplateSetDetail {
+  id: number;
+  name: string;
+  segmentType?: string;
+  description?: string;
+  isActive?: boolean;
+  templates?: SequenceTemplate[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SuppressionItem {
+  id: number;
+  email: string;
+  reason?: string;
+  createdAt?: string;
+}
+
+export interface SuppressionInput {
+  email: string;
+  reason?: string;
+}
+
+export interface SuccessResponse {
+  success?: boolean;
 }
 
 export interface SettingItem {
@@ -554,6 +674,12 @@ export type ProcessSequenceQueue200 = {
 
 export type GetSendLogsParams = {
   contactId?: number;
+  limit?: number;
+};
+
+export type GetEmailEventsParams = {
+  contactId?: number;
+  eventType?: string;
   limit?: number;
 };
 

@@ -1,0 +1,307 @@
+Enhance my existing A3 outbound email CRM with an AI personalization layer that generates a custom first line for each contact during CSV import or before email send.
+
+OBJECTIVE
+
+I want the system to automatically generate a short, relevant, professional personalized line for each contact so outreach feels more intentional and less mass sent.
+
+This personalization must be operationally efficient, safe, editable, and optional. It should improve reply rate without making the workflow complicated.
+
+PRIMARY USE CASE
+
+When I upload a CSV of leads, I want the system to be able to create a custom_line for each contact using the data already available in the CRM and CSV.
+
+The custom_line should be usable in templates as {{custom_line}}.
+
+EXAMPLE OUTPUT TYPES
+
+Examples of acceptable custom_line outputs:
+I noticed your team appears to be investing in experiential growth this year.
+It looks like there may be an opportunity to strengthen on site brand execution across upcoming initiatives.
+Given your role, I thought this might be relevant as visual execution often affects both experience and operational consistency.
+With the type of projects your team appears to be involved in, timing on signage and fabrication can make a meaningful difference.
+
+These must remain general enough to be safe, but personalized enough to feel thoughtful.
+
+DATA INPUTS AVAILABLE FOR PERSONALIZATION
+
+Use available contact and CSV fields when present:
+first_name
+last_name
+full_name
+company
+title
+location
+industry
+intent_signal
+segment_type
+campaign_name
+why_selected
+custom notes
+source file metadata
+
+If some fields are missing, the personalization engine should still work using what is available.
+
+AI PERSONALIZATION REQUIREMENTS
+
+1. Generate one short custom_line per contact
+2. Keep it concise, ideally 1 sentence
+3. Make it sound professional, commercially relevant, and natural
+4. Do not fabricate precise facts that are not in the data
+5. Do not invent recent news or specific company events unless explicitly provided in the source data
+6. If personalization confidence is low, generate a safe generic line instead
+7. Allow admin to review or regenerate custom_line before launch if desired
+8. Store the final custom_line on the contact record
+
+FALLBACK LOGIC
+
+If there is enough data:
+Generate a stronger personalized line
+
+If data is limited:
+Generate a softer generalized line relevant to the segment or title
+
+If almost no data exists:
+Generate a neutral fallback line such as:
+I thought it made sense to reach out given the type of work your team may be evaluating.
+or
+I wanted to reach out as this may be relevant to your team depending on current priorities.
+
+Do not leave custom_line blank unless admin disables personalization.
+
+PROMPT ENGINE LOGIC
+
+Create an internal prompt builder that uses available contact data to construct an LLM prompt for generating custom_line.
+
+Internal AI instructions should enforce:
+1. one sentence only
+2. no hype
+3. no fake specificity
+4. no awkward buzzwords
+5. no em dashes
+6. no mention of scraped data
+7. no mention of private research
+8. no excessive flattery
+9. no claims that cannot be supported by the provided contact data
+
+SEGMENT AWARE PERSONALIZATION
+
+Tailor personalization tone slightly by segment_type.
+
+hotel:
+focus on guest experience, wayfinding, signage, property presentation, brand experience
+
+agency:
+focus on campaign execution, experiential delivery, production coordination, brand consistency
+
+developer:
+focus on sales center experience, signage, fabrication, environmental branding, project presentation
+
+venue:
+focus on event execution, guest flow, sponsor visibility, branded installations
+
+general:
+focus on visual execution, fabrication, print, immersive environments, operational consistency
+
+TITLE AWARE PERSONALIZATION
+
+If title includes marketing:
+lean into brand impact, campaign execution, consistency, visibility
+
+If title includes events:
+lean into execution, logistics, on site experience, timing
+
+If title includes operations or facilities:
+lean into wayfinding, implementation, vendor coordination, consistency
+
+If title includes procurement:
+lean into vendor consolidation, execution quality, reliability
+
+If title is unknown:
+use neutral business relevance wording
+
+PERSONALIZATION MODES
+
+Create 3 selectable personalization modes in admin settings:
+
+1. Off
+No custom_line generated
+
+2. Safe
+Generate soft, generalized personalization using only obvious available fields
+
+3. Enhanced
+Generate stronger but still safe personalization using title, segment, intent_signal, why_selected, and company context from CSV
+
+DEFAULT MODE
+
+Set default personalization mode to Safe
+
+CSV IMPORT BEHAVIOR
+
+During CSV upload:
+1. parse and validate rows
+2. create or update contacts
+3. if personalization mode is On, generate a custom_line for each imported contact
+4. store custom_line on contact record
+5. show custom_line in preview table before final import confirmation if admin chooses preview mode
+6. allow bulk regenerate custom_line for selected contacts
+7. allow single regenerate custom_line on contact detail page
+
+PRE SEND PERSONALIZATION OPTION
+
+Add an optional toggle:
+Generate personalization at import
+Generate personalization right before send
+
+If generated before send:
+1. render latest contact data
+2. create or refresh custom_line
+3. save final output to sequence step record and send log
+
+TEMPLATE SYSTEM INTEGRATION
+
+Support {{custom_line}} in templates.
+
+Rendering rules:
+If custom_line exists:
+insert it as its own paragraph
+If custom_line does not exist:
+remove the line entirely and clean up spacing
+
+Also keep all existing conditional logic for:
+{{greeting}}
+{{intent_line}}
+{{company_line}}
+
+Update the default Step 1 template to support {{custom_line}} like this:
+
+{{greeting}}
+
+{{intent_line}}
+
+{{custom_line}}
+
+Curious how you are handling visual execution across print, fabrication, or on site experience.
+
+We work with groups like Disney, NFL, and major venues on large scale installs, projection mapping, and branded environments.
+
+{{company_line}}
+
+Worth a quick conversation?
+
+ADMIN UI REQUIREMENTS
+
+Add personalization controls to admin dashboard.
+
+CSV Upload Page:
+1. personalization mode selector
+2. generate at import or generate before send toggle
+3. preview custom_line column in import preview
+
+Contacts Page:
+1. show custom_line column
+2. filter contacts missing custom_line
+3. bulk regenerate custom_line
+4. bulk clear custom_line
+
+Contact Detail Page:
+1. show current custom_line
+2. edit manually
+3. regenerate with AI
+4. lock manual version so AI does not overwrite it
+
+Settings Page:
+1. default personalization mode
+2. max personalization length
+3. fallback behavior setting
+4. whether to regenerate on re enrollment
+5. whether manual custom_line is locked by default
+
+DATABASE CHANGES
+
+Add to contacts table:
+custom_line text
+custom_line_status
+custom_line_source
+custom_line_generated_at
+custom_line_locked boolean default false
+
+Suggested status values:
+not_generated
+generated_safe
+generated_enhanced
+manual
+failed
+
+Add to sequence_steps table:
+custom_line_snapshot text
+
+Add to send_logs table:
+custom_line_snapshot text
+
+LOGGING AND OBSERVABILITY
+
+Log personalization generation attempts with:
+contact_id
+mode
+input_fields_used
+output_text
+status
+error_message
+timestamp
+
+Create personalization_logs table if needed.
+
+QUALITY CONTROLS
+
+Before saving generated custom_line:
+1. trim whitespace
+2. ensure max length threshold
+3. reject outputs with unsupported claims or placeholders
+4. reject outputs that include em dashes
+5. reject outputs that are repetitive or obviously broken
+6. fallback to safe default line if validation fails
+
+OPTIONAL RULES
+
+Add admin option for:
+Do not generate personalization for contacts missing both title and company
+If enabled, use fallback only
+
+Add admin option for:
+Only personalize Step 1
+or
+Personalize all steps
+Default to Step 1 only
+
+ANALYTICS
+
+Track whether personalization is being used and whether it correlates with better outcomes.
+
+Add analytics showing:
+1. contacts with personalization vs without
+2. reply rate comparison
+3. click rate comparison
+4. open rate comparison
+5. top performing personalization patterns by segment
+
+BACKEND IMPLEMENTATION REQUIREMENTS
+
+Build:
+1. personalization generation service
+2. internal prompt builder
+3. validation and fallback logic
+4. admin controls
+5. database changes
+6. template integration
+7. logging
+8. analytics widgets
+
+IMPORTANT BUSINESS LOGIC
+
+This layer must improve reply rate without slowing down my workflow.
+The system should stay operationally simple.
+I should be able to upload a CSV, generate personalization safely, launch the sequence, and manage exceptions only when needed.
+
+Do not over engineer the UX.
+Make it clean, fast, and easy to control.

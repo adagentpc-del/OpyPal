@@ -5,10 +5,15 @@
  * A3 Sales OS API
  * OpenAPI spec version: 0.1.0
  */
+import type { SequenceTemplate } from "./sequenceTemplate";
 
-export interface TemplateSetInput {
+export interface TemplateSetDetail {
+  id: number;
   name: string;
   segmentType?: string;
   description?: string;
   isActive?: boolean;
+  templates?: SequenceTemplate[];
+  createdAt?: string;
+  updatedAt?: string;
 }

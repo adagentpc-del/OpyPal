@@ -1,0 +1,445 @@
+Enhance my existing A3 outbound email CRM with offer routing and conversion logic so that contacts are automatically classified and routed to the best next action based on behavior, engagement score, segment, and campaign context.
+
+OBJECTIVE
+
+I want the CRM to do more than send emails.
+I want it to function like a lightweight sales intelligence and routing engine.
+
+The system should:
+1. detect which leads are cold, warm, or hot
+2. route them to the correct next step
+3. surface high priority opportunities in the dashboard
+4. support different CTAs or next actions based on behavior
+5. help me focus manual time only where it has the highest ROI
+
+PRIMARY BUSINESS GOAL
+
+The routing logic should help me identify:
+1. leads that need continued nurture
+2. leads that are showing interest and should receive a stronger CTA
+3. leads that are hot enough for direct outreach, a meeting, or a higher value conversation
+
+CORE ROUTING PRINCIPLE
+
+Do not treat every lead the same.
+Use engagement behavior plus contact context to determine what should happen next.
+
+ROUTING INPUTS
+
+Use the following inputs when available:
+engagement_score
+engagement_tier
+segment_type
+campaign_name
+title
+industry
+intent_signal
+reply event
+click event
+multiple click behavior
+sequence completion with no engagement
+custom admin tags
+manual priority flags
+
+ENGAGEMENT TIERS
+
+Use these default tier ranges:
+cold = score 0 to 2
+warm = score 3 to 7
+hot = score 8+
+
+Also allow admin to edit tier thresholds later in settings.
+
+ROUTING STATES
+
+Create a routing_state field for each contact with values such as:
+standard_nurture
+reactivation_pool
+warm_followup
+hot_priority
+awaiting_manual_outreach
+meeting_candidate
+qualified_opportunity
+closed_won
+closed_lost
+disqualified
+
+This field should update automatically based on behavior but still be editable manually by admin.
+
+ROUTING RULES
+
+1. Cold leads
+If a lead has low engagement and no meaningful interaction:
+- keep in the normal sequence
+- if sequence completes without engagement, move to reactivation_pool
+- keep visible in analytics but do not over prioritize
+
+2. Warm leads
+If a lead opens and clicks, or otherwise reaches warm tier:
+- set routing_state = warm_followup
+- flag in dashboard
+- allow a stronger CTA to be used in later follow up steps
+- optionally move to a warm specific micro sequence
+- surface them in a “Needs Review” queue
+
+3. Hot leads
+If a lead replies, clicks multiple times, or reaches hot tier:
+- set routing_state = hot_priority
+- flag as high priority
+- pause automation if reply is detected
+- surface in a high priority queue
+- create a manual follow up recommendation
+- optionally show recommended next action such as direct outreach or meeting request
+
+4. Sequence completed with no engagement
+- set routing_state = reactivation_pool
+- preserve for long term follow up
+- include in reactivation dashboard views
+
+5. Bounce or unsubscribe
+- set routing_state = disqualified
+- suppress from future outreach
+
+6. Manual override
+Allow admin to manually change routing_state and lock it if desired
+
+OFFER AND CTA FRAMEWORK
+
+Build a flexible next action system instead of hard coding one path.
+
+Create a table for next_actions with configurable entries such as:
+book_call
+send_case_study
+send_capabilities_overview
+manual_followup
+reactivation_later
+mark_qualified
+move_to_pipeline
+archive
+
+Each next action should include:
+id
+name
+description
+recommended_for_tier
+recommended_for_segment
+is_active
+created_at
+updated_at
+
+Then create routing recommendations for each contact based on score and behavior.
+
+EXAMPLE ROUTING RECOMMENDATIONS
+
+Cold lead:
+- continue sequence
+- reactivation later
+
+Warm lead:
+- send stronger CTA
+- send capabilities overview
+- mark for manual review
+
+Hot lead:
+- direct manual outreach
+- request meeting
+- send tailored capabilities deck
+- mark as qualified opportunity candidate
+
+SEGMENT AWARE ROUTING
+
+Routing recommendations should be influenced by segment_type.
+
+hotel:
+prioritize guest experience and property execution framing
+
+agency:
+prioritize experiential support, production, and execution capacity framing
+
+developer:
+prioritize sales center, signage, fabrication, and presentation framing
+
+venue:
+prioritize event execution, sponsor visibility, guest flow, and branded environments
+
+general:
+use broader print, fabrication, immersive, and environmental branding framing
+
+CTA LIBRARY
+
+Create a CTA library that can be tied to routing states.
+
+Examples:
+1. Quick conversation
+2. Share examples
+3. Send capabilities overview
+4. Review upcoming project timing
+5. Discuss execution options
+6. Schedule a short call
+
+Each CTA entry should be editable in the admin UI.
+
+STRONGER CTA LOGIC FOR WARM LEADS
+
+When a lead becomes warm, optionally use stronger CTA language in later follow ups.
+
+Examples:
+- If helpful, I can send over a few relevant examples based on the type of work your team may be evaluating.
+- Happy to share a quick capabilities overview if that would be useful.
+- If timing is relevant, we could also set up a short conversation and see whether there is a fit.
+
+These should remain professional and low friction.
+
+HOT LEAD RECOMMENDATION ENGINE
+
+For hot leads, generate a recommended_next_step based on behavior.
+
+Examples:
+If replied:
+- Await manual response
+- Pause automation
+- Mark high priority
+
+If clicked multiple times but no reply:
+- Recommend direct outreach
+- Suggest sending capabilities overview
+- Suggest meeting ask
+
+If high score plus specific segment:
+- Recommend segment relevant talking points in dashboard
+
+This does not have to auto send a new email.
+It should guide me operationally and make high value leads obvious.
+
+DASHBOARD REQUIREMENTS
+
+Add routing and opportunity views to the admin dashboard.
+
+Create pages or sections for:
+1. Warm Leads Queue
+2. Hot Leads Queue
+3. Reactivation Pool
+4. Recommended Next Actions
+5. Qualified Opportunity Candidates
+
+Dashboard metrics should show:
+count of cold leads
+count of warm leads
+count of hot leads
+count awaiting manual outreach
+count in reactivation pool
+count qualified opportunity candidates
+
+For each contact shown in routing views, display:
+name
+company
+title
+segment
+engagement score
+engagement tier
+routing_state
+last engagement
+recommended_next_action
+current sequence status
+last email sent
+reply status
+
+CONTACT DETAIL PAGE ENHANCEMENTS
+
+Add a routing panel showing:
+engagement score
+engagement tier
+routing_state
+recommended next action
+why it was recommended
+manual override option
+lock routing state option
+
+Also show a timeline of:
+emails sent
+opens
+clicks
+replies
+score changes
+routing changes
+
+ROUTING EVENT LOGGING
+
+Create a routing_logs table to track logic decisions.
+
+Suggested fields:
+id
+contact_id
+previous_routing_state
+new_routing_state
+reason
+recommended_next_action
+created_at
+
+Examples of logged reasons:
+Reached warm tier after click
+Reached hot tier after multiple clicks
+Reply detected
+Sequence completed without engagement
+Bounce detected
+Manual override by admin
+
+ADMIN CONTROLS
+
+Allow admin to:
+1. manually set routing_state
+2. lock routing_state
+3. clear lock
+4. mark qualified opportunity
+5. mark closed won
+6. mark closed lost
+7. mark disqualified
+8. assign custom next action
+9. bulk change routing_state for selected contacts
+10. bulk assign next action
+
+DATABASE CHANGES
+
+Add to contacts table:
+routing_state
+routing_locked boolean default false
+recommended_next_action
+qualified_status
+manual_priority boolean default false
+
+Suggested qualified_status values:
+unreviewed
+candidate
+qualified
+closed_won
+closed_lost
+disqualified
+
+Add routing_logs table:
+id
+contact_id
+previous_routing_state
+new_routing_state
+reason
+recommended_next_action
+created_at
+
+Add next_actions table:
+id
+name
+description
+recommended_for_tier
+recommended_for_segment
+is_active
+created_at
+updated_at
+
+Add cta_library table:
+id
+name
+description
+text
+recommended_for_tier
+recommended_for_segment
+is_active
+created_at
+updated_at
+
+RULE ENGINE IMPLEMENTATION
+
+Build a modular routing rules engine.
+
+It should:
+1. evaluate contacts whenever a relevant event happens
+2. re evaluate when score changes
+3. re evaluate when reply occurs
+4. re evaluate when sequence completes
+5. re evaluate when admin changes critical contact fields
+
+Keep the rules modular so more can be added later.
+
+PSEUDO RULES TO IMPLEMENT
+
+If bounce or unsubscribe:
+routing_state = disqualified
+recommended_next_action = archive
+
+Else if reply detected:
+routing_state = awaiting_manual_outreach
+recommended_next_action = manual_followup
+
+Else if engagement_tier = hot:
+routing_state = hot_priority
+recommended_next_action = direct_manual_outreach
+
+Else if engagement_tier = warm:
+routing_state = warm_followup
+recommended_next_action = send_capabilities_overview or manual_review
+
+Else if sequence_status = completed and score <= 2:
+routing_state = reactivation_pool
+recommended_next_action = reactivation_later
+
+Else:
+routing_state = standard_nurture
+recommended_next_action = continue_sequence
+
+RECOMMENDATION EXPLANATIONS
+
+For each recommended_next_action, store or render a short explanation for why the system suggested it.
+
+Examples:
+Recommended because this contact clicked multiple times and is now in the hot tier.
+Recommended because sequence completed without engagement and the contact should move to long term nurture.
+Recommended because a reply was detected and automation has been paused.
+
+ANALYTICS
+
+Add routing analytics showing:
+1. contacts by routing_state
+2. reply rates by routing_state
+3. conversion trend by routing_state
+4. warm to hot movement over time
+5. counts of qualified opportunity candidates by segment
+6. top performing campaigns by qualified candidate count
+
+OPTIONAL ALERTING
+
+Add dashboard alert banners for:
+new hot leads today
+new replies today
+new qualified candidates today
+
+Keep alerts in app dashboard only unless email alerts are already supported.
+
+UX REQUIREMENTS
+
+Keep this layer simple and operational.
+Do not overcomplicate the interface.
+I need immediate visibility into who matters most and what action I should take next.
+
+The routing layer should feel like:
+1. automatic prioritization
+2. intelligent recommendations
+3. minimal manual sorting
+
+IMPORTANT BUSINESS LOGIC
+
+This routing system must save me time and direct my attention to the leads most likely to convert.
+It should not force excessive manual input.
+It should automatically classify and recommend, while still allowing full manual override.
+
+OUTPUT REQUIRED
+
+Build and implement:
+1. routing_state fields
+2. rule engine
+3. next action system
+4. CTA library
+5. dashboard routing views
+6. contact routing panel
+7. routing logs
+8. analytics widgets
+9. manual admin controls
+
+Make this production ready, modular, and easy to expand later.

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { db, contactsTable, sequenceStepsTable, sendLogsTable, templatesTable } from "@workspace/db";
-import { eq, and, or, ilike, sql } from "drizzle-orm";
+import { db, contactsTable, sequenceStepsTable, sendLogsTable, sequenceTemplatesTable, templateSetsTable, sequenceEnrollmentsTable, emailEventsTable, suppressionListTable } from "@workspace/db";
+import { eq, and, or, ilike, sql, desc } from "drizzle-orm";
+import { renderTemplate, renderSubject, splitFullName, calculateEngagementScore, getEngagementTier, type TemplateContact } from "../lib/template-engine";
 
 const SEQUENCE_DELAYS = [0, 3, 7, 14, 30, 120, 180];
 
@@ -14,53 +15,65 @@ function addBusinessDays(from: Date, days: number): Date {
   return d;
 }
 
-function getScheduleDate(enrollDate: Date, delayDays: number): Date {
-  if (delayDays === 0) return new Date(enrollDate);
-  return addBusinessDays(enrollDate, delayDays);
+function contactToTemplate(c: any): TemplateContact {
+  return {
+    firstName: c.firstName || (c.fullName || "").split(" ")[0] || "",
+    lastName: c.lastName || (c.fullName || "").split(" ").slice(1).join(" ") || "",
+    fullName: c.fullName || "",
+    company: c.company || "",
+    title: c.title || "",
+    location: c.location || "",
+    industry: c.industry || "",
+    intentSignal: c.intentSignal || "",
+    customLine: c.customLine || "",
+  };
 }
 
-function buildSequenceSteps(contactId: number, contact: any, coldTemplates: any[], followUpTemplates: any[], now: Date) {
-  return SEQUENCE_DELAYS.map((delay, idx) => {
-    const pool = idx === 0 ? coldTemplates : followUpTemplates;
-    const template = pool.length > 0 ? pool[idx % pool.length] : null;
+async function buildSequenceStepsFromTemplates(contactId: number, contact: any, templateSetId: number, enrollmentId: number, now: Date) {
+  const seqTemplates = await db.select().from(sequenceTemplatesTable)
+    .where(eq(sequenceTemplatesTable.templateSetId, templateSetId))
+    .orderBy(sequenceTemplatesTable.stepNumber);
 
-    const firstName = (contact.fullName || "").split(" ")[0] || "there";
-    let subjectText = template?.subject || "";
-    let bodyText = template?.body || "";
-    const replacements: Record<string, string> = {
-      "[First Name]": firstName,
-      "[Name]": contact.fullName || "",
-      "[Company Name]": contact.company || "",
-      "[Company]": contact.company || "",
-      "[company]": contact.company || "",
-      "[venue / agency]": contact.company || "",
-      "[venue]": contact.company || "",
-      "[Title]": contact.title || "",
-      "[Location]": contact.location || "",
-    };
-    for (const [key, val] of Object.entries(replacements)) {
-      subjectText = subjectText.split(key).join(val);
-      bodyText = bodyText.split(key).join(val);
-    }
+  const tc = contactToTemplate(contact);
 
-    return {
+  if (seqTemplates.length > 0) {
+    return seqTemplates.map((t) => ({
       contactId,
-      stepNumber: idx + 1,
-      templateId: template?.id || null,
-      delayDays: delay,
-      subject: subjectText,
-      body: bodyText,
+      enrollmentId,
+      stepNumber: t.stepNumber,
+      templateSetName: null as string | null,
+      templateId: t.id,
+      delayDays: t.delayDays,
+      subjectRendered: t.subject ? renderSubject(tc, t.subject) : null,
+      bodyRendered: renderTemplate(tc, t.body),
+      subject: t.subject,
+      body: t.body,
       status: "scheduled" as const,
-      scheduledFor: getScheduleDate(now, delay),
-    };
-  });
+      scheduledFor: t.delayDays === 0 ? now : addBusinessDays(now, t.delayDays),
+    }));
+  }
+
+  return SEQUENCE_DELAYS.map((delay, idx) => ({
+    contactId,
+    enrollmentId,
+    stepNumber: idx + 1,
+    templateSetName: null as string | null,
+    templateId: null as number | null,
+    delayDays: delay,
+    subjectRendered: null as string | null,
+    bodyRendered: null as string | null,
+    subject: null as string | null,
+    body: null as string | null,
+    status: "scheduled" as const,
+    scheduledFor: delay === 0 ? now : addBusinessDays(now, delay),
+  }));
 }
 
 const router: IRouter = Router();
 
 router.get("/contacts", async (req, res) => {
   try {
-    const { search, sequenceStatus, campaignName, doNotContact } = req.query as any;
+    const { search, sequenceStatus, campaignName, segmentType, engagementTier, doNotContact } = req.query as any;
     const conditions: any[] = [];
 
     if (search) {
@@ -72,12 +85,14 @@ router.get("/contacts", async (req, res) => {
     }
     if (sequenceStatus) conditions.push(eq(contactsTable.sequenceStatus, sequenceStatus));
     if (campaignName) conditions.push(eq(contactsTable.campaignName, campaignName));
+    if (segmentType) conditions.push(eq(contactsTable.segmentType, segmentType));
+    if (engagementTier) conditions.push(eq(contactsTable.engagementTier, engagementTier));
     if (doNotContact !== undefined) conditions.push(eq(contactsTable.doNotContact, doNotContact === "true"));
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
     const contacts = where
-      ? await db.select().from(contactsTable).where(where).orderBy(contactsTable.id)
-      : await db.select().from(contactsTable).orderBy(contactsTable.id);
+      ? await db.select().from(contactsTable).where(where).orderBy(desc(contactsTable.id))
+      : await db.select().from(contactsTable).orderBy(desc(contactsTable.id));
 
     res.json(contacts);
   } catch (err: any) {
@@ -90,7 +105,24 @@ router.get("/contacts/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, id));
     if (!contact) return res.status(404).json({ message: "Contact not found" });
-    res.json(contact);
+
+    const steps = await db.select().from(sequenceStepsTable)
+      .where(eq(sequenceStepsTable.contactId, id))
+      .orderBy(sequenceStepsTable.stepNumber);
+
+    const sendLogs = await db.select().from(sendLogsTable)
+      .where(eq(sendLogsTable.contactId, id))
+      .orderBy(desc(sendLogsTable.sentAt));
+
+    const events = await db.select().from(emailEventsTable)
+      .where(eq(emailEventsTable.contactId, id))
+      .orderBy(desc(emailEventsTable.timestamp));
+
+    const enrollments = await db.select().from(sequenceEnrollmentsTable)
+      .where(eq(sequenceEnrollmentsTable.contactId, id))
+      .orderBy(desc(sequenceEnrollmentsTable.enrolledAt));
+
+    res.json({ ...contact, steps, sendLogs, events, enrollments });
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }
@@ -98,7 +130,13 @@ router.get("/contacts/:id", async (req, res) => {
 
 router.post("/contacts", async (req, res) => {
   try {
-    const [contact] = await db.insert(contactsTable).values(req.body).returning();
+    const data = req.body;
+    if (data.fullName && (!data.firstName || !data.lastName)) {
+      const { firstName, lastName } = splitFullName(data.fullName);
+      if (!data.firstName) data.firstName = firstName;
+      if (!data.lastName) data.lastName = lastName;
+    }
+    const [contact] = await db.insert(contactsTable).values(data).returning();
     res.status(201).json(contact);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
@@ -132,7 +170,7 @@ router.delete("/contacts/:id", async (req, res) => {
 router.post("/contacts/:id/enroll", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { templateSetName, campaignName } = req.body;
+    const { templateSetId, campaignId, campaignName, templateSetName } = req.body;
 
     const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, id));
     if (!contact) return res.status(404).json({ message: "Contact not found" });
@@ -141,27 +179,57 @@ router.post("/contacts/:id/enroll", async (req, res) => {
       return res.json({ success: false, message: "Contact is already in an active sequence", stepsCreated: 0 });
     }
 
-    const allTemplates = await db.select().from(templatesTable)
-      .where(or(eq(templatesTable.category, "Cold Email"), eq(templatesTable.category, "Follow-Up Email")));
-
-    const coldTemplates = allTemplates.filter(t => t.category === "Cold Email");
-    const followUpTemplates = allTemplates.filter(t => t.category === "Follow-Up Email");
+    const suppressed = await db.select().from(suppressionListTable).where(eq(suppressionListTable.email, contact.email.toLowerCase()));
+    if (suppressed.length > 0) {
+      return res.json({ success: false, message: "Contact email is on suppression list", stepsCreated: 0 });
+    }
 
     const now = new Date();
-    const steps = buildSequenceSteps(id, contact, coldTemplates, followUpTemplates, now);
+
+    const [enrollment] = await db.insert(sequenceEnrollmentsTable).values({
+      contactId: id,
+      campaignId: campaignId || null,
+      templateSetId: templateSetId || null,
+      currentStep: 1,
+      sequenceStatus: "active",
+      enrolledAt: now,
+      nextSendAt: now,
+    }).returning();
+
+    let steps: any[];
+    if (templateSetId) {
+      steps = await buildSequenceStepsFromTemplates(id, contact, templateSetId, enrollment.id, now);
+    } else {
+      steps = SEQUENCE_DELAYS.map((delay, idx) => ({
+        contactId: id,
+        enrollmentId: enrollment.id,
+        stepNumber: idx + 1,
+        templateSetName: templateSetName || null,
+        templateId: null,
+        delayDays: delay,
+        subjectRendered: null,
+        bodyRendered: null,
+        subject: null,
+        body: null,
+        status: "scheduled" as const,
+        scheduledFor: delay === 0 ? now : addBusinessDays(now, delay),
+      }));
+    }
 
     await db.insert(sequenceStepsTable).values(steps);
 
     await db.update(contactsTable).set({
       sequenceStatus: "active",
       currentStep: 1,
-      assignedTemplateSet: templateSetName,
+      templateSetId: templateSetId || contact.templateSetId,
+      campaignId: campaignId || contact.campaignId,
+      assignedTemplateSet: templateSetName || contact.assignedTemplateSet,
       campaignName: campaignName || contact.campaignName,
-      nextSendAt: steps[0].scheduledFor,
-      updatedAt: new Date(),
+      nextSendAt: steps[0]?.scheduledFor || now,
+      updatedAt: now,
     }).where(eq(contactsTable.id, id));
 
-    res.json({ success: true, message: `Enrolled with ${steps.length} steps`, stepsCreated: steps.length });
+    res.json({ success: true, message: `Enrolled with ${steps.length} steps`, stepsCreated: steps.length, enrollmentId: enrollment.id });
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }
@@ -170,8 +238,9 @@ router.post("/contacts/:id/enroll", async (req, res) => {
 router.post("/contacts/:id/pause", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const reason = req.body.reason || "manual";
     const [contact] = await db.update(contactsTable)
-      .set({ sequenceStatus: "paused", updatedAt: new Date() })
+      .set({ sequenceStatus: "paused_manual", updatedAt: new Date() })
       .where(eq(contactsTable.id, id))
       .returning();
     if (!contact) return res.status(404).json({ message: "Contact not found" });
@@ -179,6 +248,10 @@ router.post("/contacts/:id/pause", async (req, res) => {
     await db.update(sequenceStepsTable)
       .set({ status: "paused" })
       .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")));
+
+    await db.update(sequenceEnrollmentsTable)
+      .set({ sequenceStatus: "paused_manual", pausedReason: reason, updatedAt: new Date() })
+      .where(and(eq(sequenceEnrollmentsTable.contactId, id), eq(sequenceEnrollmentsTable.sequenceStatus, "active")));
 
     res.json(contact);
   } catch (err: any) {
@@ -189,18 +262,43 @@ router.post("/contacts/:id/pause", async (req, res) => {
 router.post("/contacts/:id/resume", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-
     const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, id));
     if (!contact) return res.status(404).json({ message: "Contact not found" });
 
-    if (contact.sequenceStatus === "paused_replied" || contact.sequenceStatus === "completed" || contact.sequenceStatus === "dnc") {
+    if (["paused_replied", "completed", "dnc", "do_not_contact"].includes(contact.sequenceStatus)) {
       await db.delete(sequenceStepsTable).where(eq(sequenceStepsTable.contactId, id));
-      const allTemplates = await db.select().from(templatesTable)
-        .where(or(eq(templatesTable.category, "Cold Email"), eq(templatesTable.category, "Follow-Up Email")));
-      const coldTemplates = allTemplates.filter(t => t.category === "Cold Email");
-      const followUpTemplates = allTemplates.filter(t => t.category === "Follow-Up Email");
       const now = new Date();
-      const steps = buildSequenceSteps(id, contact, coldTemplates, followUpTemplates, now);
+      const tsId = contact.templateSetId || req.body.templateSetId;
+
+      const [enrollment] = await db.insert(sequenceEnrollmentsTable).values({
+        contactId: id,
+        campaignId: contact.campaignId || req.body.campaignId || null,
+        templateSetId: tsId || null,
+        currentStep: 1,
+        sequenceStatus: "active",
+        enrolledAt: now,
+        nextSendAt: now,
+      }).returning();
+
+      let steps: any[];
+      if (tsId) {
+        steps = await buildSequenceStepsFromTemplates(id, contact, tsId, enrollment.id, now);
+      } else {
+        steps = SEQUENCE_DELAYS.map((delay, idx) => ({
+          contactId: id,
+          enrollmentId: enrollment.id,
+          stepNumber: idx + 1,
+          templateSetName: null,
+          templateId: null,
+          delayDays: delay,
+          subjectRendered: null,
+          bodyRendered: null,
+          subject: null,
+          body: null,
+          status: "scheduled" as const,
+          scheduledFor: delay === 0 ? now : addBusinessDays(now, delay),
+        }));
+      }
       await db.insert(sequenceStepsTable).values(steps);
       const [updated] = await db.update(contactsTable)
         .set({ sequenceStatus: "active", currentStep: 1, nextSendAt: now, lastReplyAt: null, doNotContact: false, updatedAt: now })
@@ -226,6 +324,10 @@ router.post("/contacts/:id/resume", async (req, res) => {
         .where(eq(sequenceStepsTable.id, step.id));
     }
 
+    await db.update(sequenceEnrollmentsTable)
+      .set({ sequenceStatus: "active", pausedReason: null, updatedAt: new Date() })
+      .where(and(eq(sequenceEnrollmentsTable.contactId, id), or(eq(sequenceEnrollmentsTable.sequenceStatus, "paused_manual"), eq(sequenceEnrollmentsTable.sequenceStatus, "paused_replied"))));
+
     const [updated] = await db.update(contactsTable)
       .set({ sequenceStatus: "active", nextSendAt: now, updatedAt: new Date() })
       .where(eq(contactsTable.id, id))
@@ -240,6 +342,7 @@ router.post("/contacts/:id/resume", async (req, res) => {
 router.post("/contacts/:id/skip-step", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const now = new Date();
 
     const [nextStep] = await db.select().from(sequenceStepsTable)
       .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")))
@@ -248,7 +351,7 @@ router.post("/contacts/:id/skip-step", async (req, res) => {
 
     if (nextStep) {
       await db.update(sequenceStepsTable)
-        .set({ status: "skipped" })
+        .set({ status: "skipped", skippedAt: now })
         .where(eq(sequenceStepsTable.id, nextStep.id));
     }
 
@@ -262,7 +365,7 @@ router.post("/contacts/:id/skip-step", async (req, res) => {
         currentStep: nextNext ? nextNext.stepNumber : (nextStep ? nextStep.stepNumber + 1 : 1),
         nextSendAt: nextNext?.scheduledFor || null,
         sequenceStatus: nextNext ? "active" : "completed",
-        updatedAt: new Date(),
+        updatedAt: now,
       })
       .where(eq(contactsTable.id, id))
       .returning();
@@ -296,12 +399,23 @@ router.post("/contacts/:id/force-send", async (req, res) => {
 
     await db.insert(sendLogsTable).values({
       contactId: id,
+      enrollmentId: nextStep.enrollmentId,
       sequenceStepId: nextStep.id,
+      templateId: nextStep.templateId,
       stepNumber: nextStep.stepNumber,
+      subjectRendered: nextStep.subjectRendered,
+      bodyRendered: nextStep.bodyRendered,
       subject: nextStep.subject,
       body: nextStep.body,
       status: "sent",
       sentAt: now,
+      createdAt: now,
+    });
+
+    await db.insert(emailEventsTable).values({
+      contactId: id,
+      eventType: "sent",
+      timestamp: now,
     });
 
     const [nextNext] = await db.select().from(sequenceStepsTable)
@@ -329,11 +443,25 @@ router.post("/contacts/:id/mark-replied", async (req, res) => {
     const now = new Date();
 
     await db.update(sequenceStepsTable)
-      .set({ status: "cancelled" })
+      .set({ status: "canceled", canceledAt: now })
       .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")));
 
+    await db.insert(emailEventsTable).values({
+      contactId: id,
+      eventType: "reply",
+      timestamp: now,
+    });
+
+    await db.update(sequenceEnrollmentsTable)
+      .set({ sequenceStatus: "paused_replied", pausedReason: "reply_detected", updatedAt: now })
+      .where(and(eq(sequenceEnrollmentsTable.contactId, id), eq(sequenceEnrollmentsTable.sequenceStatus, "active")));
+
+    const events = await db.select().from(emailEventsTable).where(eq(emailEventsTable.contactId, id));
+    const score = calculateEngagementScore(events);
+    const tier = getEngagementTier(score);
+
     const [contact] = await db.update(contactsTable)
-      .set({ sequenceStatus: "paused_replied", lastReplyAt: now, nextSendAt: null, updatedAt: now })
+      .set({ sequenceStatus: "paused_replied", lastReplyAt: now, nextSendAt: null, engagementScore: score, engagementTier: tier, updatedAt: now })
       .where(eq(contactsTable.id, id))
       .returning();
 
@@ -347,17 +475,55 @@ router.post("/contacts/:id/mark-replied", async (req, res) => {
 router.post("/contacts/:id/mark-dnc", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const now = new Date();
 
     await db.update(sequenceStepsTable)
-      .set({ status: "cancelled" })
+      .set({ status: "canceled", canceledAt: now })
       .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")));
 
+    await db.update(sequenceEnrollmentsTable)
+      .set({ sequenceStatus: "do_not_contact", updatedAt: now })
+      .where(and(eq(sequenceEnrollmentsTable.contactId, id), eq(sequenceEnrollmentsTable.sequenceStatus, "active")));
+
     const [contact] = await db.update(contactsTable)
-      .set({ doNotContact: true, sequenceStatus: "dnc", nextSendAt: null, updatedAt: new Date() })
+      .set({ doNotContact: true, sequenceStatus: "do_not_contact", nextSendAt: null, updatedAt: now })
       .where(eq(contactsTable.id, id))
       .returning();
 
     if (!contact) return res.status(404).json({ message: "Contact not found" });
+
+    await db.insert(suppressionListTable).values({
+      email: contact.email.toLowerCase(),
+      reason: "marked_dnc",
+    }).onConflictDoNothing();
+
+    res.json(contact);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.post("/contacts/:id/mark-unsubscribed", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const now = new Date();
+
+    await db.update(sequenceStepsTable)
+      .set({ status: "canceled", canceledAt: now })
+      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")));
+
+    const [contact] = await db.update(contactsTable)
+      .set({ unsubscribed: true, sequenceStatus: "unsubscribed", nextSendAt: null, updatedAt: now })
+      .where(eq(contactsTable.id, id))
+      .returning();
+
+    if (!contact) return res.status(404).json({ message: "Contact not found" });
+
+    await db.insert(suppressionListTable).values({
+      email: contact.email.toLowerCase(),
+      reason: "unsubscribed",
+    }).onConflictDoNothing();
+
     res.json(contact);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
@@ -371,6 +537,18 @@ router.get("/contacts/:id/steps", async (req, res) => {
       .where(eq(sequenceStepsTable.contactId, id))
       .orderBy(sequenceStepsTable.stepNumber);
     res.json(steps);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.get("/contacts/:id/events", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const events = await db.select().from(emailEventsTable)
+      .where(eq(emailEventsTable.contactId, id))
+      .orderBy(desc(emailEventsTable.timestamp));
+    res.json(events);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }

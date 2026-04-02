@@ -6,9 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface TemplateSetInput {
-  name: string;
-  segmentType?: string;
-  description?: string;
-  isActive?: boolean;
+export interface SuccessResponse {
+  success?: boolean;
 }

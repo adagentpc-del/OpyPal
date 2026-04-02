@@ -6,7 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { OutboundAnalyticsByCampaignItem } from "./outboundAnalyticsByCampaignItem";
+import type { OutboundAnalyticsBySegmentItem } from "./outboundAnalyticsBySegmentItem";
 import type { OutboundAnalyticsByStepItem } from "./outboundAnalyticsByStepItem";
+import type { OutboundAnalyticsByStepPerformanceItem } from "./outboundAnalyticsByStepPerformanceItem";
+import type { OutboundAnalyticsByTierItem } from "./outboundAnalyticsByTierItem";
+import type { OutboundAnalyticsTopEngagedItem } from "./outboundAnalyticsTopEngagedItem";
 import type { SendLogItem } from "./sendLogItem";
 
 export interface OutboundAnalytics {
@@ -20,7 +24,18 @@ export interface OutboundAnalytics {
   completed?: number;
   bouncedCount?: number;
   reactivationDue?: number;
+  dncCount?: number;
+  unsubscribedCount?: number;
+  totalSent?: number;
+  openRate?: string;
+  clickRate?: string;
+  replyRate?: string;
+  bounceRate?: string;
   byCampaign?: OutboundAnalyticsByCampaignItem[];
+  bySegment?: OutboundAnalyticsBySegmentItem[];
   byStep?: OutboundAnalyticsByStepItem[];
+  byTier?: OutboundAnalyticsByTierItem[];
+  byStepPerformance?: OutboundAnalyticsByStepPerformanceItem[];
+  topEngaged?: OutboundAnalyticsTopEngagedItem[];
   recentSends?: SendLogItem[];
 }

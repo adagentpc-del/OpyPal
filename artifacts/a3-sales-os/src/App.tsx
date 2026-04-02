@@ -19,6 +19,7 @@ import ObSequences from "./pages/ob-sequences";
 import ObQueue from "./pages/ob-queue";
 import ObReplies from "./pages/ob-replies";
 import ObAnalytics from "./pages/ob-analytics";
+import ObSuppression from "./pages/ob-suppression";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +48,7 @@ function Router() {
       <Route path="/ob/queue" component={ObQueue} />
       <Route path="/ob/replies" component={ObReplies} />
       <Route path="/ob/analytics" component={ObAnalytics} />
+      <Route path="/ob/suppression" component={ObSuppression} />
       <Route component={NotFound} />
     </Switch>
   );

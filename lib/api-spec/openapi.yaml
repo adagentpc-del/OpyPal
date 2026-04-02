@@ -910,6 +910,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/Contact"
 
+  /contacts/{id}/mark-unsubscribed:
+    post:
+      operationId: markContactUnsubscribed
+      tags: [sequence]
+      summary: Mark contact as unsubscribed
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
   /contacts/{id}/steps:
     get:
       operationId: getContactSteps
@@ -1041,6 +1060,23 @@ paths:
                 $ref: "#/components/schemas/TemplateSetItem"
 
   /template-sets/{id}:
+    get:
+      operationId: getTemplateSetDetail
+      tags: [template-sets]
+      summary: Get template set with templates
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Template set with templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateSetDetail"
     put:
       operationId: updateTemplateSet
       tags: [template-sets]
@@ -1201,6 +1237,192 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OutboundAnalytics"
+
+  /contacts/{id}/events:
+    get:
+      operationId: getContactEvents
+      tags: [sequence]
+      summary: Get email events for a contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Email events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmailEvent"
+
+  /template-sets/{id}/templates:
+    get:
+      operationId: getSequenceTemplates
+      tags: [template-sets]
+      summary: Get sequence templates for a set
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sequence templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SequenceTemplate"
+    post:
+      operationId: createSequenceTemplate
+      tags: [template-sets]
+      summary: Create sequence template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SequenceTemplateInput"
+      responses:
+        "201":
+          description: Created template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SequenceTemplate"
+
+  /sequence-templates/{id}:
+    put:
+      operationId: updateSequenceTemplate
+      tags: [template-sets]
+      summary: Update sequence template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SequenceTemplateInput"
+      responses:
+        "200":
+          description: Updated template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SequenceTemplate"
+    delete:
+      operationId: deleteSequenceTemplate
+      tags: [template-sets]
+      summary: Delete sequence template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /suppression-list:
+    get:
+      operationId: getSuppressionList
+      tags: [outbound-settings]
+      summary: Get suppression list
+      responses:
+        "200":
+          description: Suppression list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SuppressionItem"
+    post:
+      operationId: addToSuppressionList
+      tags: [outbound-settings]
+      summary: Add email to suppression list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SuppressionInput"
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuppressionItem"
+
+  /suppression-list/{id}:
+    delete:
+      operationId: removeFromSuppressionList
+      tags: [outbound-settings]
+      summary: Remove from suppression list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /email-events:
+    get:
+      operationId: getEmailEvents
+      tags: [outbound-analytics]
+      summary: Get email events
+      parameters:
+        - name: contactId
+          in: query
+          schema:
+            type: integer
+        - name: eventType
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmailEvent"
 
   /outbound-settings:
     get:
@@ -1779,6 +2001,10 @@ components:
           type: integer
         fullName:
           type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
         company:
           type: string
         title:
@@ -1789,17 +2015,31 @@ components:
           type: string
         location:
           type: string
+        industry:
+          type: string
         intentSignal:
+          type: string
+        customLine:
           type: string
         whySelected:
           type: string
+        segmentType:
+          type: string
         campaignName:
           type: string
+        campaignId:
+          type: integer
         assignedTemplateSet:
           type: string
+        templateSetId:
+          type: integer
         currentStep:
           type: integer
         sequenceStatus:
+          type: string
+        engagementScore:
+          type: integer
+        engagementTier:
           type: string
         lastEmailSentAt:
           type: string
@@ -1813,6 +2053,8 @@ components:
           type: boolean
         bounced:
           type: boolean
+        bounceStatus:
+          type: string
         sourceFileName:
           type: string
         uploadedAt:
@@ -1883,12 +2125,14 @@ components:
     EnrollInput:
       type: object
       properties:
+        templateSetId:
+          type: integer
         templateSetName:
           type: string
+        campaignId:
+          type: integer
         campaignName:
           type: string
-      required:
-        - templateSetName
 
     EnrollResult:
       type: object
@@ -1983,8 +2227,12 @@ components:
           type: integer
         name:
           type: string
+        segmentType:
+          type: string
         description:
           type: string
+        isActive:
+          type: boolean
         stepCount:
           type: integer
         createdAt:
@@ -2002,8 +2250,12 @@ components:
       properties:
         name:
           type: string
+        segmentType:
+          type: string
         description:
           type: string
+        isActive:
+          type: boolean
       required:
         - name
 
@@ -2109,11 +2361,19 @@ components:
       properties:
         fileName:
           type: string
+        campaignId:
+          type: string
         campaignName:
+          type: string
+        templateSetId:
           type: string
         templateSetName:
           type: string
+        segmentType:
+          type: string
         autoEnroll:
+          type: boolean
+        reEnrollExisting:
           type: boolean
         rows:
           type: array
@@ -2121,6 +2381,10 @@ components:
             type: object
             properties:
               fullName:
+                type: string
+              firstName:
+                type: string
+              lastName:
                 type: string
               company:
                 type: string
@@ -2132,7 +2396,13 @@ components:
                 type: string
               location:
                 type: string
+              industry:
+                type: string
               intentSignal:
+                type: string
+              customLine:
+                type: string
+              segmentType:
                 type: string
               whySelected:
                 type: string
@@ -2189,12 +2459,35 @@ components:
           type: integer
         reactivationDue:
           type: integer
+        dncCount:
+          type: integer
+        unsubscribedCount:
+          type: integer
+        totalSent:
+          type: integer
+        openRate:
+          type: string
+        clickRate:
+          type: string
+        replyRate:
+          type: string
+        bounceRate:
+          type: string
         byCampaign:
           type: array
           items:
             type: object
             properties:
               campaign:
+                type: string
+              count:
+                type: integer
+        bySegment:
+          type: array
+          items:
+            type: object
+            properties:
+              segment:
                 type: string
               count:
                 type: integer
@@ -2207,10 +2500,175 @@ components:
                 type: integer
               count:
                 type: integer
+        byTier:
+          type: array
+          items:
+            type: object
+            properties:
+              tier:
+                type: string
+              count:
+                type: integer
+        byStepPerformance:
+          type: array
+          items:
+            type: object
+            properties:
+              stepNumber:
+                type: integer
+              sent:
+                type: integer
+        topEngaged:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              fullName:
+                type: string
+              company:
+                type: string
+              email:
+                type: string
+              engagementScore:
+                type: integer
+              engagementTier:
+                type: string
+              sequenceStatus:
+                type: string
         recentSends:
           type: array
           items:
             $ref: "#/components/schemas/SendLogItem"
+
+    EmailEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        contactId:
+          type: integer
+        sendLogId:
+          type: integer
+        eventType:
+          type: string
+        metadataJson:
+          type: string
+        timestamp:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - contactId
+        - eventType
+
+    SequenceTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        templateSetId:
+          type: integer
+        stepNumber:
+          type: integer
+        name:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+        delayDays:
+          type: integer
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - templateSetId
+        - stepNumber
+        - body
+        - delayDays
+
+    SequenceTemplateInput:
+      type: object
+      properties:
+        stepNumber:
+          type: integer
+        name:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+        delayDays:
+          type: integer
+        isActive:
+          type: boolean
+      required:
+        - stepNumber
+        - body
+        - delayDays
+
+    TemplateSetDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        segmentType:
+          type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/SequenceTemplate"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+
+    SuppressionItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        reason:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - email
+
+    SuppressionInput:
+      type: object
+      properties:
+        email:
+          type: string
+        reason:
+          type: string
+      required:
+        - email
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
 
     SettingItem:
       type: object

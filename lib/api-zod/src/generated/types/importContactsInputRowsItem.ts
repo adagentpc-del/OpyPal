@@ -8,11 +8,16 @@
 
 export type ImportContactsInputRowsItem = {
   fullName: string;
+  firstName?: string;
+  lastName?: string;
   company: string;
   title?: string;
   email: string;
   phone?: string;
   location?: string;
+  industry?: string;
   intentSignal?: string;
+  customLine?: string;
+  segmentType?: string;
   whySelected?: string;
 };

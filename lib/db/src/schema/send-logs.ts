@@ -6,14 +6,21 @@ import { z } from "zod/v4";
 export const sendLogsTable = pgTable("send_logs", {
   id: serial("id").primaryKey(),
   contactId: integer("contact_id").notNull().references(() => contactsTable.id, { onDelete: "cascade" }),
+  enrollmentId: integer("enrollment_id"),
   sequenceStepId: integer("sequence_step_id"),
+  templateId: integer("template_id"),
   stepNumber: integer("step_number"),
+  subjectRendered: text("subject_rendered"),
+  bodyRendered: text("body_rendered"),
   subject: text("subject"),
   body: text("body"),
   status: text("status").notNull().default("sent"),
+  bounceType: text("bounce_type"),
+  smtpResponse: text("smtp_response"),
   messageId: text("message_id"),
   errorMessage: text("error_message"),
   sentAt: timestamp("sent_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const insertSendLogSchema = createInsertSchema(sendLogsTable).omit({ id: true });

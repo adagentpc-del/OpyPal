@@ -7,6 +7,8 @@
  */
 
 export interface EnrollInput {
-  templateSetName: string;
+  templateSetId?: number;
+  templateSetName?: string;
+  campaignId?: number;
   campaignName?: string;
 }

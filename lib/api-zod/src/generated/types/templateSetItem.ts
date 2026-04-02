@@ -9,7 +9,9 @@
 export interface TemplateSetItem {
   id: number;
   name: string;
+  segmentType?: string;
   description?: string;
+  isActive?: boolean;
   stepCount?: number;
   createdAt: string;
   updatedAt: string;

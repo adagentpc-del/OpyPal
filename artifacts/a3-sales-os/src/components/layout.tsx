@@ -19,6 +19,7 @@ import {
   MessageCircle,
   BarChart3,
   Contact,
+  ShieldX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -41,6 +42,7 @@ const OUTBOUND_ITEMS = [
   { name: "Queue", href: "/ob/queue", icon: Clock },
   { name: "Replies", href: "/ob/replies", icon: MessageCircle },
   { name: "Analytics", href: "/ob/analytics", icon: BarChart3 },
+  { name: "Suppression", href: "/ob/suppression", icon: ShieldX },
 ];
 
 function SidebarContent({ location, onNavigate }: { location: string; onNavigate?: () => void }) {

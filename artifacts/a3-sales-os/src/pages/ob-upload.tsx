@@ -11,39 +11,42 @@ import {
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  Upload,
-  FileText,
-  CheckCircle2,
-  AlertCircle,
-  X,
-  Eye,
-} from "lucide-react";
+import { Upload, FileText, CheckCircle2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 
 type ParsedRow = {
   fullName: string;
+  firstName?: string;
+  lastName?: string;
   company: string;
   email: string;
   title?: string;
   phone?: string;
   location?: string;
+  industry?: string;
   intentSignal?: string;
-  whySelected?: string;
+  customLine?: string;
+  segmentType?: string;
 };
 
 const HEADER_MAP: Record<string, string> = {
   "full_name": "fullName", "full name": "fullName", "name": "fullName", "contact name": "fullName", "contact": "fullName",
+  "first_name": "firstName", "first name": "firstName", "firstname": "firstName",
+  "last_name": "lastName", "last name": "lastName", "lastname": "lastName",
   "company": "company", "company name": "company", "organization": "company",
   "email": "email", "email address": "email", "e-mail": "email",
   "title": "title", "job title": "title", "role": "title", "position": "title",
   "phone": "phone", "phone number": "phone", "mobile": "phone", "telephone": "phone",
   "location": "location", "city": "location", "state": "location", "region": "location",
+  "industry": "industry",
   "intent": "intentSignal", "intent signal": "intentSignal", "intent_signal": "intentSignal",
-  "why": "whySelected", "why selected": "whySelected", "why_selected": "whySelected", "reason": "whySelected",
+  "custom_line": "customLine", "custom line": "customLine", "custom": "customLine",
+  "segment": "segmentType", "segment_type": "segmentType", "segment type": "segmentType", "type": "segmentType",
 };
+
+const SEGMENT_TYPES = ["general", "hotel", "agency", "developer", "venue"];
 
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -79,9 +82,11 @@ export default function ObUpload() {
   const [rawRows, setRawRows] = useState<string[][]>([]);
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [fileName, setFileName] = useState("");
-  const [campaignName, setCampaignName] = useState("");
-  const [templateSetName, setTemplateSetName] = useState("");
+  const [campaignId, setCampaignId] = useState("");
+  const [templateSetId, setTemplateSetId] = useState("");
+  const [segmentType, setSegmentType] = useState("");
   const [autoEnroll, setAutoEnroll] = useState(true);
+  const [reEnrollExisting, setReEnrollExisting] = useState(false);
   const [result, setResult] = useState<any>(null);
 
   const { data: campaigns } = useGetCampaigns();
@@ -94,7 +99,6 @@ export default function ObUpload() {
   const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -102,29 +106,37 @@ export default function ObUpload() {
       const { headers, rows } = parseCSV(text);
       setRawHeaders(headers);
       setRawRows(rows);
-
       const headerMap = mapHeaders(headers);
       const mapped: ParsedRow[] = rows.map(row => {
         const obj: any = {};
         Object.entries(headerMap).forEach(([idx, key]) => {
           obj[key] = row[parseInt(idx)] || "";
         });
+        if (!obj.fullName && obj.firstName) {
+          obj.fullName = [obj.firstName, obj.lastName].filter(Boolean).join(" ");
+        }
         return obj as ParsedRow;
-      }).filter(r => r.fullName && r.company && r.email);
-
+      }).filter(r => (r.fullName || (r.firstName && r.lastName)) && r.company && r.email);
       setParsedRows(mapped);
       setStep("preview");
     };
     reader.readAsText(file);
   }, []);
 
+  const selectedCampaign = (campaigns || []).find((c: any) => String(c.id) === campaignId);
+  const selectedSet = (templateSets || []).find((s: any) => String(s.id) === templateSetId);
+
   const handleImport = () => {
     importMut.mutate({
       data: {
         fileName,
-        campaignName: campaignName || undefined,
-        templateSetName: templateSetName || undefined,
+        campaignId: campaignId || undefined,
+        campaignName: selectedCampaign?.name || undefined,
+        templateSetId: templateSetId || undefined,
+        templateSetName: selectedSet?.name || undefined,
+        segmentType: segmentType || undefined,
         autoEnroll,
+        reEnrollExisting,
         rows: parsedRows,
       },
     }, {
@@ -166,7 +178,7 @@ export default function ObUpload() {
               <div>
                 <h2 className="text-lg font-semibold">Upload CSV File</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Required columns: Full Name, Company, Email. Optional: Title, Phone, Location, Intent Signal, Why Selected
+                  Required: Full Name (or First + Last), Company, Email. Optional: Title, Phone, Location, Industry, Intent Signal, Custom Line, Segment Type
                 </p>
               </div>
               <label className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl cursor-pointer hover:bg-primary/90 transition">
@@ -189,27 +201,41 @@ export default function ObUpload() {
                 <Button variant="ghost" size="sm" onClick={resetUpload}><X className="h-4 w-4 mr-1" /> Cancel</Button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground block mb-1">Campaign</label>
-                  <select value={campaignName} onChange={(e) => setCampaignName(e.target.value)}
+                  <select value={campaignId} onChange={(e) => setCampaignId(e.target.value)}
                     className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-background">
                     <option value="">No campaign</option>
-                    {(campaigns || []).map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    {(campaigns || []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground block mb-1">Sequence</label>
-                  <select value={templateSetName} onChange={(e) => setTemplateSetName(e.target.value)}
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">Template Sequence</label>
+                  <select value={templateSetId} onChange={(e) => setTemplateSetId(e.target.value)}
                     className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-background">
                     <option value="">No sequence</option>
-                    {(templateSets || []).map((s: any) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                    {(templateSets || []).map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.name} {s.segmentType ? `(${s.segmentType})` : ""}</option>
+                    ))}
                   </select>
                 </div>
-                <div className="flex items-end">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">Segment Type</label>
+                  <select value={segmentType} onChange={(e) => setSegmentType(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-background">
+                    <option value="">Auto / None</option>
+                    {SEGMENT_TYPES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2 flex flex-col justify-end">
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input type="checkbox" checked={autoEnroll} onChange={(e) => setAutoEnroll(e.target.checked)} className="rounded" />
                     Auto-enroll in sequence
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={reEnrollExisting} onChange={(e) => setReEnrollExisting(e.target.checked)} className="rounded" />
+                    Re-enroll paused/completed
                   </label>
                 </div>
               </div>
@@ -222,8 +248,8 @@ export default function ObUpload() {
                       <th className="text-left px-3 py-2 font-medium">Company</th>
                       <th className="text-left px-3 py-2 font-medium">Email</th>
                       <th className="text-left px-3 py-2 font-medium">Title</th>
-                      <th className="text-left px-3 py-2 font-medium">Phone</th>
                       <th className="text-left px-3 py-2 font-medium">Location</th>
+                      <th className="text-left px-3 py-2 font-medium">Industry</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -233,8 +259,8 @@ export default function ObUpload() {
                         <td className="px-3 py-2">{r.company}</td>
                         <td className="px-3 py-2 text-muted-foreground">{r.email}</td>
                         <td className="px-3 py-2 text-muted-foreground">{r.title || "-"}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{r.phone || "-"}</td>
                         <td className="px-3 py-2 text-muted-foreground">{r.location || "-"}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{r.industry || "-"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -261,7 +287,11 @@ export default function ObUpload() {
                 <CheckCircle2 className="h-8 w-8 text-emerald-600" />
               </div>
               <h2 className="text-lg font-semibold">Import Complete</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-md mx-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 max-w-lg mx-auto">
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{result.totalRows}</div>
+                  <div className="text-xs text-muted-foreground">Total</div>
+                </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-primary">{result.imported}</div>
                   <div className="text-xs text-muted-foreground">Imported</div>
@@ -294,8 +324,9 @@ export default function ObUpload() {
                     <th className="text-left px-4 py-2 font-medium">File</th>
                     <th className="text-left px-4 py-2 font-medium">Total</th>
                     <th className="text-left px-4 py-2 font-medium">Imported</th>
+                    <th className="text-left px-4 py-2 font-medium">Enrolled</th>
                     <th className="text-left px-4 py-2 font-medium">Skipped</th>
-                    <th className="text-left px-4 py-2 font-medium">Campaign</th>
+                    <th className="text-left px-4 py-2 font-medium">Sequence</th>
                     <th className="text-left px-4 py-2 font-medium">Date</th>
                   </tr>
                 </thead>
@@ -305,8 +336,9 @@ export default function ObUpload() {
                       <td className="px-4 py-2 font-medium">{imp.fileName}</td>
                       <td className="px-4 py-2">{imp.totalRows}</td>
                       <td className="px-4 py-2 text-emerald-600">{imp.importedRows}</td>
+                      <td className="px-4 py-2 text-blue-600">{imp.enrolledRows || 0}</td>
                       <td className="px-4 py-2 text-amber-600">{imp.skippedRows}</td>
-                      <td className="px-4 py-2 text-muted-foreground">{imp.campaignName || "-"}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{imp.templateSetName || "-"}</td>
                       <td className="px-4 py-2 text-muted-foreground">{format(new Date(imp.importedAt), "MMM d, h:mm a")}</td>
                     </tr>
                   ))}

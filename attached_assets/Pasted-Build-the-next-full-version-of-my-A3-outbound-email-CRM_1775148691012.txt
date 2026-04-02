@@ -1,0 +1,692 @@
+Build the next full version of my A3 outbound email CRM inside the existing Replit app.
+
+OBJECTIVE
+
+Turn the current template plus CSV upload CRM into a daily operating outbound sequence engine.
+
+I want to be able to upload a CSV every day and have the system automatically:
+1. validate and import leads
+2. assign them to the correct campaign and template drip
+3. send the first email automatically
+4. schedule all follow ups automatically
+5. track engagement
+6. score each lead based on behavior
+7. pause sequences when replies happen
+8. support long term reactivation
+9. let me manage everything from a clean admin dashboard
+
+This system should be simple to use, operationally clean, and optimized for real business outreach.
+
+TECH STACK
+
+Use the existing Replit app.
+Use Supabase for database and storage.
+Use Outlook / Microsoft Graph for sending and inbox reply monitoring.
+Use scheduled jobs or cron logic inside Replit for sequence sending and inbox checks.
+
+CORE DAILY WORKFLOW
+
+1. I upload a CSV file
+2. The system maps headers and validates rows
+3. The system removes bad rows and duplicates
+4. The system checks whether each contact already exists
+5. If the contact is not already active in a sequence, enroll them
+6. Assign the correct campaign and template set
+7. Automatically send the first email
+8. Automatically create and schedule all future follow ups
+9. Scheduler runs daily and sends all due sequence steps
+10. If a contact replies, pause all future emails for that contact
+11. If a contact does not engage, send long term reactivation emails later
+
+SEQUENCE CADENCE
+
+Build this exact sequence structure:
+
+Step 1: Initial email on Day 0
+Step 2: Follow up on Day 3
+Step 3: Follow up on Day 7
+Step 4: Follow up on Day 14
+Step 5: Follow up on Day 30
+Step 6: Reactivation on Day 120
+Step 7: Reactivation on Day 180
+
+SEQUENCE RULES
+
+1. No duplicate active sequence enrollment for the same email
+2. Only send on business days
+3. Only send during a configurable send window
+4. Respect daily send caps
+5. Slightly randomize send timing so all emails do not go out at once
+6. Stop future emails if contact replies
+7. Skip contacts marked do_not_contact, unsubscribed, bounced, or paused
+8. Allow optional re enrollment of old completed or paused contacts during import
+
+DATABASE STRUCTURE
+
+Create or update these core tables in Supabase.
+
+1. contacts
+Fields:
+id
+full_name
+first_name
+last_name
+company
+title
+email
+phone
+location
+industry
+intent_signal
+custom_line
+segment_type
+campaign_name
+assigned_template_set
+current_step
+sequence_status
+engagement_score
+engagement_tier
+last_email_sent_at
+last_reply_at
+next_send_at
+do_not_contact
+unsubscribe
+bounce_status
+source_file_name
+uploaded_at
+notes
+created_at
+updated_at
+
+2. campaigns
+Fields:
+id
+name
+description
+is_active
+created_at
+updated_at
+
+3. template_sets
+Fields:
+id
+name
+segment_type
+description
+is_active
+created_at
+updated_at
+
+4. templates
+Fields:
+id
+template_set_id
+step_number
+name
+subject
+body
+delay_days
+is_active
+created_at
+updated_at
+
+5. sequence_enrollments
+Fields:
+id
+contact_id
+campaign_id
+template_set_id
+current_step
+sequence_status
+enrolled_at
+next_send_at
+completed_at
+paused_reason
+created_at
+updated_at
+
+6. sequence_steps
+Fields:
+id
+contact_id
+enrollment_id
+template_id
+step_number
+subject_rendered
+body_rendered
+status
+scheduled_for
+sent_at
+skipped_at
+canceled_at
+message_id
+smtp_response
+created_at
+updated_at
+
+7. send_logs
+Fields:
+id
+contact_id
+enrollment_id
+sequence_step_id
+template_id
+subject_rendered
+body_rendered
+sent_at
+status
+bounce_type
+smtp_response
+message_id
+created_at
+
+8. email_events
+Fields:
+id
+contact_id
+send_log_id
+event_type
+timestamp
+metadata_json
+created_at
+
+9. imports
+Fields:
+id
+file_name
+campaign_id
+template_set_id
+segment_type
+total_rows
+valid_rows
+invalid_rows
+duplicate_rows
+enrolled_rows
+skipped_rows
+created_at
+
+10. suppression_list
+Fields:
+id
+email
+reason
+created_at
+
+STATUS VALUES
+
+Use these sequence statuses:
+drafted
+active
+paused_replied
+paused_manual
+completed
+reactivation_scheduled
+do_not_contact
+bounce
+unsubscribed
+
+Use these step statuses:
+scheduled
+sent
+skipped
+canceled
+failed
+bounced
+
+CSV IMPORT WORKFLOW
+
+Build a CSV upload flow with preview and import.
+
+On upload:
+1. parse CSV
+2. normalize headers
+3. map headers automatically when possible
+4. validate email addresses
+5. split full name into first_name and last_name when possible
+6. remove blank rows
+7. remove duplicate emails inside the file
+8. deduplicate against existing database contacts
+9. if email already exists and sequence is active, skip re enrollment
+10. if email exists and sequence is paused or completed, allow optional re enrollment toggle
+11. assign selected campaign
+12. assign selected template set
+13. assign selected segment_type
+14. create contact record if new
+15. create enrollment
+16. create all sequence step records
+17. queue step 1 for sending
+18. log the import summary
+
+During upload, admin must be able to choose:
+1. campaign
+2. template set
+3. segment type
+4. sending inbox
+5. daily send cap
+6. optional re enroll existing paused/completed contacts toggle
+
+SEGMENTATION SYSTEM
+
+Build template segmentation so I can choose which group gets which drip.
+
+Supported segment_type values:
+hotel
+agency
+developer
+venue
+general
+
+Supported initial template sets:
+A3 Hotels Sequence
+A3 Agencies Sequence
+A3 Developers Sequence
+A3 Venues Sequence
+A3 General Sequence
+
+During CSV upload, I should be able to assign the entire file to a template set, or later support assigning rows by segment_type if that field exists in the CSV.
+
+TEMPLATE SYSTEM
+
+Build a reusable template engine with variables and conditional rendering.
+
+Supported variables:
+{{first_name}}
+{{last_name}}
+{{full_name}}
+{{company}}
+{{title}}
+{{location}}
+{{industry}}
+{{intent_signal}}
+{{custom_line}}
+{{greeting}}
+{{intent_line}}
+{{company_line}}
+
+CRITICAL CONDITIONAL RENDERING LOGIC
+
+1. Greeting logic
+If first_name exists and is not blank:
+Hi {first_name},
+Else:
+Hi there,
+
+2. Intent line logic
+If intent_signal exists and is not blank:
+Saw {company or fallback} is currently {intent_signal}.
+Else:
+Remove the entire intent line.
+
+3. Company fallback logic
+If company exists and is not blank:
+use company name
+Else:
+use "your team"
+
+4. Company line logic
+If company exists:
+I can put together a few relevant ideas specific to {company}.
+Else:
+I can put together a few relevant ideas based on what you are working on.
+
+5. Remove empty lines after rendering so emails do not look broken.
+
+Create helper functions for:
+getGreeting(first_name)
+getIntentLine(company, intent_signal)
+getCompanyLine(company)
+renderTemplate(contact, template)
+
+The final rendered email must never show broken placeholders, blank first names, or awkward missing variable text.
+
+EMAIL TEMPLATES
+
+Preload these core templates.
+
+A3 GENERAL SEQUENCE
+
+Step 1 Subject Options:
+Quick question on {{company}}
+{{company}} visual updates
+Timing on {{intent_signal}}
+
+Step 1 Body:
+{{greeting}}
+
+{{intent_line}}
+
+Curious how you are handling visual execution across print, fabrication, or on site experience.
+
+We work with groups like Disney, NFL, and major venues on large scale installs, projection mapping, and branded environments.
+
+{{company_line}}
+
+Worth a quick conversation?
+
+Step 2 Body:
+{{greeting}}
+
+Wanted to circle back here.
+
+Most teams we speak with are either:
+1. Managing multiple vendors which creates inconsistency
+2. Underutilizing visual environments for revenue or brand impact
+
+If this is active on your end, there is usually an opportunity to improve both execution and ROI.
+
+Open to sharing a few examples if helpful.
+
+Step 3 Body:
+{{greeting}}
+
+Quick example for context.
+
+We recently supported projects involving large format installs and immersive visual builds for major brands and venues.
+
+In most cases, the goal was:
+1. Increase engagement
+2. Improve navigation and wayfinding
+3. Enhance overall experience
+
+If this is something your team is exploring, timing it correctly makes a big difference.
+
+Let me know if it makes sense to connect.
+
+Step 4 Body:
+{{greeting}}
+
+Not sure if this is currently a priority on your side.
+
+If it is not, no problem. I can reconnect at a better time.
+
+If it is, I can map out exactly what this could look like based on your current direction.
+
+Let me know either way.
+
+Step 5 Body:
+{{greeting}}
+
+Going to assume this is not a priority right now.
+
+If that changes, feel free to reach out and I will revisit with you.
+
+Otherwise, I will reconnect down the line as things evolve on your end.
+
+Step 6 Body:
+{{greeting}}
+
+Reaching back out as priorities shift throughout the year.
+
+Are there any upcoming projects involving:
+1. signage
+2. fabrication
+3. immersive environments
+4. event installations
+
+If so, I can align a few ideas around timing and execution.
+
+Step 7 Body:
+{{greeting}}
+
+Wanted to check in one more time.
+
+If anything is coming up this quarter or next, I can be a resource on execution, vendors, and scaling visual impact.
+
+If not, I will close this out on my end.
+
+Also create placeholder versions of this sequence for:
+A3 Hotels Sequence
+A3 Agencies Sequence
+A3 Developers Sequence
+A3 Venues Sequence
+
+These should use the same structure but remain editable in the admin UI.
+
+OUTLOOK / MICROSOFT GRAPH INTEGRATION
+
+Integrate sending through Outlook / Microsoft Graph so emails send from my real outreach inbox.
+
+Email sending requirements:
+1. send from connected mailbox
+2. preserve message_id if available
+3. log send status
+4. store smtp_response if available
+5. store rendered subject and rendered body
+6. connect replies back to the original contact when possible
+
+SCHEDULER
+
+Create an automated scheduler job that runs daily and also can run on shorter intervals if needed.
+
+Scheduler responsibilities:
+1. find all due sequence steps
+2. only send steps that are scheduled and eligible
+3. only send on business days
+4. only send during configured sending hours
+5. respect daily send cap per inbox
+6. add slight randomized delays between sends
+7. render templates before sending
+8. log send results
+9. update enrollment current_step
+10. update last_email_sent_at
+11. update next_send_at
+12. handle failures and bounce states
+
+REPLY DETECTION
+
+Create inbox monitoring through Outlook / Microsoft Graph.
+
+When a reply is detected:
+1. match by sender email and thread/message context when possible
+2. log email_event with event_type = reply
+3. update contact last_reply_at
+4. set sequence_status = paused_replied
+5. cancel all future scheduled sequence steps for that contact
+6. surface replied contacts in a dashboard queue
+
+DELIVERABILITY AND ENGAGEMENT TRACKING
+
+Add deliverability, open tracking, click tracking, and reply tracking.
+
+IMPORTANT:
+Open rate is directional only.
+Clicks and replies are more important.
+Replies are the highest value engagement signal.
+
+OPEN TRACKING
+1. create tracking endpoint GET /track/open
+2. endpoint accepts contact_id and send_log_id
+3. log event_type = open with timestamp
+4. automatically inject tracking pixel into HTML emails
+
+CLICK TRACKING
+1. create tracking endpoint GET /track/click
+2. endpoint accepts contact_id, send_log_id, redirect_url
+3. log event_type = click with timestamp and clicked URL
+4. redirect user to actual destination
+5. automatically wrap email links with tracking redirect links
+
+DELIVERABILITY TRACKING
+1. log sends
+2. log failures
+3. log bounce status if available
+4. store bounce_type hard or soft
+5. store smtp_response
+6. surface bounce rate in analytics
+
+SCORING SYSTEM
+
+Build a lead scoring engine based on behavior.
+
+Scoring rules:
+open = +1
+click = +3
+reply = +10
+multiple clicks = +5 additional
+no engagement after 3 emails = -3
+bounce = -10
+
+Store engagement_score on each contact.
+
+ENGAGEMENT TIERS
+
+Automatically classify contacts into:
+cold = score 0 to 2
+warm = score 3 to 7
+hot = score 8+
+
+ROUTING LOGIC
+
+Build routing logic based on score and behavior.
+
+If contact becomes warm:
+1. flag them in dashboard
+2. allow stronger CTA follow up options
+3. show them as higher priority
+
+If contact becomes hot:
+1. flag high priority
+2. notify admin in dashboard
+3. show that they may be a stronger candidate for direct outreach or higher ticket conversation
+
+If contact finishes sequence without engagement:
+1. move to reactivation sequence timing
+2. keep visible for future nurturing
+
+ADMIN DASHBOARD
+
+Build these pages:
+
+1. CSV Upload
+2. Contacts
+3. Campaigns
+4. Template Sets
+5. Templates
+6. Sequence Queue
+7. Replies
+8. Analytics
+9. Imports
+10. Suppression List
+
+DASHBOARD METRICS
+
+Show:
+imported today
+sent today
+scheduled today
+scheduled tomorrow
+paused due to reply
+completed
+bounced
+reactivation due
+contacts by campaign
+contacts by segment
+contacts by current step
+contacts by score tier
+top engaged leads
+reply rate
+click rate
+open rate
+bounce rate
+
+SEQUENCE PERFORMANCE VIEW
+
+Create reporting by:
+campaign
+template set
+template
+step number
+
+Metrics:
+sent
+opens
+clicks
+replies
+bounces
+
+MANUAL ADMIN CONTROLS
+
+Allow admin to:
+pause contact
+resume contact
+skip next step
+force send next step
+mark replied
+mark do not contact
+mark unsubscribed
+re enroll completed contacts
+edit next_send_at manually
+edit segment assignment
+edit assigned template set
+
+SETTINGS PANEL
+
+Create settings for:
+daily send cap
+per inbox send cap
+business day only toggle
+send window start time
+send window end time
+randomized spacing toggle
+reply detection polling frequency
+tracking domain base URL
+
+UX REQUIREMENTS
+
+The system should feel clean, fast, and easy.
+
+CSV flow should be:
+1. upload file
+2. preview rows
+3. map fields if needed
+4. choose campaign
+5. choose template set
+6. choose segment type
+7. choose sending inbox
+8. import and launch
+
+Each contact should have a detail view that shows:
+1. contact info
+2. engagement score
+3. engagement tier
+4. sequence status
+5. all sent emails
+6. all opens, clicks, replies
+7. current step
+8. next scheduled send
+9. manual override controls
+
+BACKEND LOGIC REQUIREMENTS
+
+Create all required frontend pages, backend logic, Supabase schema, API routes, scheduler logic, email rendering helpers, tracking endpoints, and admin controls.
+
+Build this as a production ready operational CRM for outbound sequencing.
+
+IMPORTANT BUSINESS LOGIC
+
+This must function as a real daily operating system.
+I should be able to upload a CSV every day and have the system automatically:
+1. enroll leads
+2. send the first email
+3. schedule all follow ups
+4. track engagement
+5. score leads
+6. stop sequences when people reply
+7. manage reactivation
+8. keep the admin side simple and operationally efficient
+
+OUTPUT REQUIRED
+
+Return and implement:
+1. all frontend pages
+2. all backend routes and logic
+3. Supabase SQL schema
+4. Outlook integration setup instructions
+5. scheduler logic
+6. template engine with conditional rendering
+7. tracking endpoints
+8. analytics views
+9. scoring engine
+10. admin controls
+
+Make the implementation modular, maintainable, and easy to expand later.
