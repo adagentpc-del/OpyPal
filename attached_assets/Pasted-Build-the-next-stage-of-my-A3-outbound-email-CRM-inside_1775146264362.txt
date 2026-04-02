@@ -1,0 +1,185 @@
+Build the next stage of my A3 outbound email CRM inside the existing Replit app.
+
+Objective:
+Turn the current template plus CSV upload CRM into an automated outbound sequence engine.
+
+Core behavior:
+1. I upload a CSV file daily
+2. The system validates and imports each row as a contact
+3. If the contact does not already exist in an active sequence, enroll them automatically
+4. Automatically send the first email in the selected sequence
+5. Automatically schedule all future follow ups
+6. Pause the sequence immediately if a reply is detected
+7. Prevent duplicate active enrollments for the same email
+8. Allow long term reactivation touches at 4 months and 6 months
+9. Show all activity in an admin dashboard
+
+Build requirements:
+
+A. Contact model
+Create or update contact records with:
+full_name
+company
+title
+email
+phone
+location
+intent_signal
+why_selected
+campaign_name
+assigned_template_set
+current_step
+sequence_status
+last_email_sent_at
+last_reply_at
+next_send_at
+do_not_contact
+source_file_name
+uploaded_at
+notes
+
+B. Sequence engine
+Create a sequence engine that supports:
+step 1 initial email on Day 0
+step 2 follow up on Day 3
+step 3 follow up on Day 7
+step 4 follow up on Day 14
+step 5 follow up on Day 30
+step 6 reactivation on Day 120
+step 7 reactivation on Day 180
+
+Each step should store:
+step_number
+template_id
+delay_days
+subject
+body
+status
+scheduled_for
+sent_at
+
+C. CSV upload workflow
+When CSV is uploaded:
+1. map headers automatically
+2. validate email addresses
+3. remove invalid rows
+4. deduplicate within the file
+5. deduplicate against existing contacts in database
+6. if email exists and sequence_status is active, skip re enrollment
+7. if email exists and is completed or paused, allow optional re enrollment toggle
+8. assign selected campaign and selected template sequence
+9. queue the first email
+10. create future scheduled sequence records
+
+D. Email sending
+Integrate with Outlook / Microsoft Graph for sending from my working outreach inbox.
+Each outbound email should:
+1. send from the connected mailbox
+2. log sent status
+3. store message id if available
+4. update contact current_step
+5. update last_email_sent_at
+
+E. Scheduler
+Create a scheduler job that runs automatically every day and:
+1. finds all due sequence steps
+2. only sends on business days
+3. only sends during a defined send window
+4. respects daily send caps
+5. adds slight randomized spacing between sends
+6. skips contacts marked do_not_contact, replied, bounced, or unsubscribed
+7. sends the next due step and updates logs
+
+F. Reply detection
+Create reply detection logic using the connected Outlook inbox.
+If a reply is detected from a contact email:
+1. set sequence_status to paused_replied
+2. cancel all future scheduled steps
+3. show the contact in a replied queue on dashboard
+
+G. Admin dashboard
+Build pages for:
+1. CSV Upload
+2. Contacts
+3. Campaigns
+4. Templates
+5. Sequence Queue
+6. Replies
+7. Analytics
+
+Dashboard should show:
+imported today
+sent today
+scheduled today
+scheduled tomorrow
+paused due to reply
+completed
+bounced
+reactivation due
+contacts by campaign
+contacts by sequence step
+
+H. Manual controls
+Allow admin to:
+pause contact
+resume contact
+skip next step
+force send next step
+mark replied
+mark do not contact
+re enroll completed contacts
+edit next_send_at manually
+
+I. Template mapping
+Support reusable sequences such as:
+A3 Default Sequence
+Hotels Sequence
+Agencies Sequence
+Developers Sequence
+Experiential Sequence
+
+J. Safety and deliverability
+Add:
+daily send cap setting
+per inbox send cap setting
+unsubscribe flag
+bounce flag
+do_not_contact flag
+duplicate prevention
+send window control
+business day only control
+
+K. UX
+Make the system clean and fast.
+CSV upload should feel simple:
+upload file
+preview rows
+select sequence
+import and launch
+
+L. Database
+Use Supabase for all data storage.
+Create necessary tables and relationships for:
+contacts
+campaigns
+template_sets
+sequence_steps
+send_logs
+replies
+suppression_list
+imports
+
+M. Output
+Return:
+1. all frontend pages
+2. backend sequence logic
+3. scheduler logic
+4. Supabase schema and SQL
+5. Outlook integration setup instructions
+6. admin controls
+7. import preview flow
+8. send logs and analytics views
+
+Important business logic:
+This must function as a daily operating system.
+I should be able to upload a CSV every day and have the system automatically enroll, send, schedule, track, pause on replies, and manage long tail follow up without manual intervention.

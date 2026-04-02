@@ -1,0 +1,321 @@
+import { useState, useCallback } from "react";
+import { AppLayout } from "@/components/layout";
+import {
+  useImportContacts,
+  useGetCampaigns,
+  useGetTemplateSets,
+  useGetImports,
+  getGetContactsQueryKey,
+  getGetOutboundAnalyticsQueryKey,
+  getGetImportsQueryKey,
+} from "@workspace/api-client-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Upload,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  Eye,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+
+type ParsedRow = {
+  fullName: string;
+  company: string;
+  email: string;
+  title?: string;
+  phone?: string;
+  location?: string;
+  intentSignal?: string;
+  whySelected?: string;
+};
+
+const HEADER_MAP: Record<string, string> = {
+  "full_name": "fullName", "full name": "fullName", "name": "fullName", "contact name": "fullName", "contact": "fullName",
+  "company": "company", "company name": "company", "organization": "company",
+  "email": "email", "email address": "email", "e-mail": "email",
+  "title": "title", "job title": "title", "role": "title", "position": "title",
+  "phone": "phone", "phone number": "phone", "mobile": "phone", "telephone": "phone",
+  "location": "location", "city": "location", "state": "location", "region": "location",
+  "intent": "intentSignal", "intent signal": "intentSignal", "intent_signal": "intentSignal",
+  "why": "whySelected", "why selected": "whySelected", "why_selected": "whySelected", "reason": "whySelected",
+};
+
+function parseCSV(text: string): { headers: string[]; rows: string[][] } {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length === 0) return { headers: [], rows: [] };
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^"(.*)"$/, "$1"));
+  const rows = lines.slice(1).map(line => {
+    const result: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    for (const ch of line) {
+      if (ch === '"') { inQuotes = !inQuotes; }
+      else if (ch === "," && !inQuotes) { result.push(current.trim()); current = ""; }
+      else { current += ch; }
+    }
+    result.push(current.trim());
+    return result;
+  });
+  return { headers, rows };
+}
+
+function mapHeaders(headers: string[]): Record<number, string> {
+  const map: Record<number, string> = {};
+  headers.forEach((h, i) => {
+    const key = HEADER_MAP[h.toLowerCase()];
+    if (key) map[i] = key;
+  });
+  return map;
+}
+
+export default function ObUpload() {
+  const [step, setStep] = useState<"upload" | "preview" | "result">("upload");
+  const [rawHeaders, setRawHeaders] = useState<string[]>([]);
+  const [rawRows, setRawRows] = useState<string[][]>([]);
+  const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [campaignName, setCampaignName] = useState("");
+  const [templateSetName, setTemplateSetName] = useState("");
+  const [autoEnroll, setAutoEnroll] = useState(true);
+  const [result, setResult] = useState<any>(null);
+
+  const { data: campaigns } = useGetCampaigns();
+  const { data: templateSets } = useGetTemplateSets();
+  const { data: imports } = useGetImports();
+  const importMut = useImportContacts();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const { headers, rows } = parseCSV(text);
+      setRawHeaders(headers);
+      setRawRows(rows);
+
+      const headerMap = mapHeaders(headers);
+      const mapped: ParsedRow[] = rows.map(row => {
+        const obj: any = {};
+        Object.entries(headerMap).forEach(([idx, key]) => {
+          obj[key] = row[parseInt(idx)] || "";
+        });
+        return obj as ParsedRow;
+      }).filter(r => r.fullName && r.company && r.email);
+
+      setParsedRows(mapped);
+      setStep("preview");
+    };
+    reader.readAsText(file);
+  }, []);
+
+  const handleImport = () => {
+    importMut.mutate({
+      data: {
+        fileName,
+        campaignName: campaignName || undefined,
+        templateSetName: templateSetName || undefined,
+        autoEnroll,
+        rows: parsedRows,
+      },
+    }, {
+      onSuccess: (data) => {
+        setResult(data);
+        setStep("result");
+        queryClient.invalidateQueries({ queryKey: getGetContactsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetOutboundAnalyticsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetImportsQueryKey() });
+        toast({ title: "Import complete" });
+      },
+      onError: (err: any) => toast({ title: "Import failed", description: err.message, variant: "destructive" }),
+    });
+  };
+
+  const resetUpload = () => {
+    setStep("upload");
+    setRawHeaders([]);
+    setRawRows([]);
+    setParsedRows([]);
+    setFileName("");
+    setResult(null);
+  };
+
+  return (
+    <AppLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">CSV Upload</h1>
+          <p className="text-muted-foreground mt-1">Import contacts and auto-enroll in sequences.</p>
+        </div>
+
+        {step === "upload" && (
+          <Card className="p-8">
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Upload className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Upload CSV File</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Required columns: Full Name, Company, Email. Optional: Title, Phone, Location, Intent Signal, Why Selected
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl cursor-pointer hover:bg-primary/90 transition">
+                <FileText className="h-4 w-4" />
+                <span className="font-medium">Choose File</span>
+                <input type="file" accept=".csv" onChange={handleFile} className="hidden" />
+              </label>
+            </div>
+          </Card>
+        )}
+
+        {step === "preview" && (
+          <div className="space-y-4">
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Preview Import</h2>
+                  <p className="text-sm text-muted-foreground">{fileName} - {parsedRows.length} valid contacts found</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={resetUpload}><X className="h-4 w-4 mr-1" /> Cancel</Button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">Campaign</label>
+                  <select value={campaignName} onChange={(e) => setCampaignName(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-background">
+                    <option value="">No campaign</option>
+                    {(campaigns || []).map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">Sequence</label>
+                  <select value={templateSetName} onChange={(e) => setTemplateSetName(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-background">
+                    <option value="">No sequence</option>
+                    {(templateSets || []).map((s: any) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={autoEnroll} onChange={(e) => setAutoEnroll(e.target.checked)} className="rounded" />
+                    Auto-enroll in sequence
+                  </label>
+                </div>
+              </div>
+
+              <div className="border border-border rounded-xl overflow-x-auto max-h-[300px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-muted/50">
+                    <tr className="border-b border-border">
+                      <th className="text-left px-3 py-2 font-medium">Name</th>
+                      <th className="text-left px-3 py-2 font-medium">Company</th>
+                      <th className="text-left px-3 py-2 font-medium">Email</th>
+                      <th className="text-left px-3 py-2 font-medium">Title</th>
+                      <th className="text-left px-3 py-2 font-medium">Phone</th>
+                      <th className="text-left px-3 py-2 font-medium">Location</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedRows.slice(0, 50).map((r, i) => (
+                      <tr key={i} className="border-b border-border/30">
+                        <td className="px-3 py-2">{r.fullName}</td>
+                        <td className="px-3 py-2">{r.company}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{r.email}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{r.title || "-"}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{r.phone || "-"}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{r.location || "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {parsedRows.length > 50 && <p className="text-xs text-center py-2 text-muted-foreground">Showing first 50 of {parsedRows.length}</p>}
+              </div>
+            </Card>
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={resetUpload} className="rounded-xl">Cancel</Button>
+              <Button onClick={handleImport} disabled={parsedRows.length === 0 || importMut.isPending}
+                className="rounded-xl bg-primary text-white gap-2">
+                <Upload className="h-4 w-4" />
+                {importMut.isPending ? "Importing..." : `Import ${parsedRows.length} Contacts`}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "result" && result && (
+          <Card className="p-6">
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center">
+                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+              </div>
+              <h2 className="text-lg font-semibold">Import Complete</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-md mx-auto">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">{result.imported}</div>
+                  <div className="text-xs text-muted-foreground">Imported</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-amber-600">{result.duplicates}</div>
+                  <div className="text-xs text-muted-foreground">Duplicates</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">{result.invalid}</div>
+                  <div className="text-xs text-muted-foreground">Invalid</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-emerald-600">{result.enrolled}</div>
+                  <div className="text-xs text-muted-foreground">Enrolled</div>
+                </div>
+              </div>
+              <Button onClick={resetUpload} className="rounded-xl">Upload Another File</Button>
+            </div>
+          </Card>
+        )}
+
+        {imports && imports.length > 0 && (
+          <div>
+            <h2 className="text-lg font-semibold mb-3">Import History</h2>
+            <div className="border border-border rounded-xl overflow-hidden bg-card">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="text-left px-4 py-2 font-medium">File</th>
+                    <th className="text-left px-4 py-2 font-medium">Total</th>
+                    <th className="text-left px-4 py-2 font-medium">Imported</th>
+                    <th className="text-left px-4 py-2 font-medium">Skipped</th>
+                    <th className="text-left px-4 py-2 font-medium">Campaign</th>
+                    <th className="text-left px-4 py-2 font-medium">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {imports.map((imp: any) => (
+                    <tr key={imp.id} className="border-b border-border/30">
+                      <td className="px-4 py-2 font-medium">{imp.fileName}</td>
+                      <td className="px-4 py-2">{imp.totalRows}</td>
+                      <td className="px-4 py-2 text-emerald-600">{imp.importedRows}</td>
+                      <td className="px-4 py-2 text-amber-600">{imp.skippedRows}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{imp.campaignName || "-"}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{format(new Date(imp.importedAt), "MMM d, h:mm a")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </AppLayout>
+  );
+}

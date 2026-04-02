@@ -12,6 +12,13 @@ import Tasks from "./pages/tasks";
 import Templates from "./pages/templates";
 import Assets from "./pages/assets";
 import ImportExport from "./pages/import-export";
+import ObContacts from "./pages/ob-contacts";
+import ObUpload from "./pages/ob-upload";
+import ObCampaigns from "./pages/ob-campaigns";
+import ObSequences from "./pages/ob-sequences";
+import ObQueue from "./pages/ob-queue";
+import ObReplies from "./pages/ob-replies";
+import ObAnalytics from "./pages/ob-analytics";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +40,13 @@ function Router() {
       <Route path="/templates" component={Templates} />
       <Route path="/assets" component={Assets} />
       <Route path="/data" component={ImportExport} />
+      <Route path="/ob/contacts" component={ObContacts} />
+      <Route path="/ob/upload" component={ObUpload} />
+      <Route path="/ob/campaigns" component={ObCampaigns} />
+      <Route path="/ob/sequences" component={ObSequences} />
+      <Route path="/ob/queue" component={ObQueue} />
+      <Route path="/ob/replies" component={ObReplies} />
+      <Route path="/ob/analytics" component={ObAnalytics} />
       <Route component={NotFound} />
     </Switch>
   );

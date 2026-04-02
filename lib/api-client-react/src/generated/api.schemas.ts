@@ -246,6 +246,227 @@ export interface SeedResult {
   seeded: number;
 }
 
+export interface Contact {
+  id: number;
+  fullName: string;
+  company: string;
+  title?: string;
+  email: string;
+  phone?: string;
+  location?: string;
+  intentSignal?: string;
+  whySelected?: string;
+  campaignName?: string;
+  assignedTemplateSet?: string;
+  currentStep?: number;
+  sequenceStatus: string;
+  lastEmailSentAt?: string;
+  lastReplyAt?: string;
+  nextSendAt?: string;
+  doNotContact?: boolean;
+  unsubscribed?: boolean;
+  bounced?: boolean;
+  sourceFileName?: string;
+  uploadedAt?: string;
+  notes?: string;
+  importId?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContactInput {
+  fullName: string;
+  company: string;
+  title?: string;
+  email: string;
+  phone?: string;
+  location?: string;
+  intentSignal?: string;
+  whySelected?: string;
+  campaignName?: string;
+  assignedTemplateSet?: string;
+  currentStep?: number;
+  sequenceStatus?: string;
+  nextSendAt?: string;
+  doNotContact?: boolean;
+  unsubscribed?: boolean;
+  bounced?: boolean;
+  sourceFileName?: string;
+  notes?: string;
+  importId?: number;
+}
+
+export interface EnrollInput {
+  templateSetName: string;
+  campaignName?: string;
+}
+
+export interface EnrollResult {
+  success?: boolean;
+  message?: string;
+  stepsCreated?: number;
+}
+
+export interface SequenceStep {
+  id: number;
+  contactId: number;
+  stepNumber: number;
+  templateSetName?: string;
+  templateId?: number;
+  delayDays: number;
+  subject?: string;
+  body?: string;
+  status: string;
+  scheduledFor?: string;
+  sentAt?: string;
+  messageId?: string;
+  createdAt: string;
+}
+
+export interface CampaignItem {
+  id: number;
+  name: string;
+  description?: string;
+  templateSetId?: string;
+  isActive?: boolean;
+  contactCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CampaignInput {
+  name: string;
+  description?: string;
+  templateSetId?: string;
+  isActive?: boolean;
+}
+
+export interface TemplateSetItem {
+  id: number;
+  name: string;
+  description?: string;
+  stepCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TemplateSetInput {
+  name: string;
+  description?: string;
+}
+
+export interface QueueItem {
+  id: number;
+  contactId: number;
+  contactName?: string;
+  contactEmail?: string;
+  company?: string;
+  stepNumber: number;
+  subject?: string;
+  status: string;
+  scheduledFor?: string;
+  templateSetName?: string;
+  campaignName?: string;
+}
+
+export interface SendLogItem {
+  id: number;
+  contactId: number;
+  contactName?: string;
+  contactEmail?: string;
+  company?: string;
+  sequenceStepId?: number;
+  stepNumber?: number;
+  subject?: string;
+  body?: string;
+  status: string;
+  messageId?: string;
+  errorMessage?: string;
+  sentAt: string;
+}
+
+export interface ImportRecord {
+  id: number;
+  fileName: string;
+  totalRows?: number;
+  importedRows?: number;
+  skippedRows?: number;
+  duplicateRows?: number;
+  invalidRows?: number;
+  campaignName?: string;
+  templateSetName?: string;
+  status: string;
+  importedAt: string;
+}
+
+export type ImportContactsInputRowsItem = {
+  fullName: string;
+  company: string;
+  title?: string;
+  email: string;
+  phone?: string;
+  location?: string;
+  intentSignal?: string;
+  whySelected?: string;
+};
+
+export interface ImportContactsInput {
+  fileName: string;
+  campaignName?: string;
+  templateSetName?: string;
+  autoEnroll?: boolean;
+  rows: ImportContactsInputRowsItem[];
+}
+
+export interface ImportResult {
+  success?: boolean;
+  importId?: number;
+  totalRows?: number;
+  imported?: number;
+  skipped?: number;
+  duplicates?: number;
+  invalid?: number;
+  enrolled?: number;
+  message?: string;
+}
+
+export type OutboundAnalyticsByCampaignItem = {
+  campaign?: string;
+  count?: number;
+};
+
+export type OutboundAnalyticsByStepItem = {
+  step?: number;
+  count?: number;
+};
+
+export interface OutboundAnalytics {
+  totalContacts?: number;
+  activeSequences?: number;
+  importedToday?: number;
+  sentToday?: number;
+  scheduledToday?: number;
+  scheduledTomorrow?: number;
+  pausedReplied?: number;
+  completed?: number;
+  bouncedCount?: number;
+  reactivationDue?: number;
+  byCampaign?: OutboundAnalyticsByCampaignItem[];
+  byStep?: OutboundAnalyticsByStepItem[];
+  recentSends?: SendLogItem[];
+}
+
+export interface SettingItem {
+  id?: number;
+  key: string;
+  value: string;
+}
+
+export interface SettingInput {
+  key: string;
+  value: string;
+}
+
 export type GetLeadsParams = {
   search?: string;
   pipelineType?: string;
@@ -293,4 +514,49 @@ export type GetTemplatesParams = {
 export type GetAssetsParams = {
   category?: string;
   search?: string;
+};
+
+export type GetContactsParams = {
+  search?: string;
+  sequenceStatus?: string;
+  campaignName?: string;
+  doNotContact?: boolean;
+};
+
+export type DeleteContact200 = {
+  success?: boolean;
+};
+
+export type ForceSendStep200 = {
+  success?: boolean;
+  message?: string;
+};
+
+export type DeleteCampaign200 = {
+  success?: boolean;
+};
+
+export type DeleteTemplateSet200 = {
+  success?: boolean;
+};
+
+export type GetSequenceQueueParams = {
+  status?: string;
+  dueToday?: boolean;
+};
+
+export type ProcessSequenceQueue200 = {
+  processed?: number;
+  skipped?: number;
+  errors?: number;
+  message?: string;
+};
+
+export type GetSendLogsParams = {
+  contactId?: number;
+  limit?: number;
+};
+
+export type UpdateOutboundSettingsBody = {
+  settings: SettingInput[];
 };

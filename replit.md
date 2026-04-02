@@ -148,6 +148,47 @@ App ID | Pipeline Type | Company Name | Contact Name | Title | Email | Phone | L
 - Export leads and tasks to CSV
 - Imported leads are synced to Google Sheets
 
+## Outbound Sequence Engine (Phase 2)
+
+### Architecture
+- 7-step automated email sequence: Day 0 (cold), Day 3, 7, 14, 30 (follow-ups), Day 120, 180 (reactivation)
+- Business day calculation for scheduling
+- Daily send cap, send window (8am-6pm default), business days only
+- Placeholder replacement: [First Name], [Company Name], [Company], [Title], [Location]
+- Template-based step content from Cold Email and Follow-Up Email template categories
+
+### Contact Lifecycle
+- Statuses: pending → active → completed, paused, paused_replied, dnc
+- Enroll: creates 7 sequence steps with personalized content from templates
+- Pause: suspends scheduled steps
+- Resume (from paused): reschedules paused steps
+- Resume (from replied/completed/dnc): full re-enrollment with new steps
+- Skip step: advances to next step
+- Force send: immediately "sends" current step
+- Mark replied: pauses sequence, records reply
+- Mark DNC: cancels all steps, flags contact
+
+### CSV Upload Flow
+1. Upload CSV → auto-map headers → preview
+2. Select campaign, sequence, auto-enroll option
+3. Import: validates emails, deduplicates, creates contacts
+4. Auto-enroll: creates 7 template-based steps per contact with personalized content
+
+### Frontend Pages
+- `/ob/upload` - CSV Upload with preview, campaign/sequence selection
+- `/ob/contacts` - Contact table with search, filters, inline actions (pause/resume/skip/force/reply/dnc)
+- `/ob/campaigns` - Campaign CRUD cards
+- `/ob/sequences` - Sequence definition cards showing 7-step structure
+- `/ob/queue` - Sequence queue with scheduled/sent/error filters + Process Queue button
+- `/ob/replies` - Replied contacts with re-enroll option
+- `/ob/analytics` - 10 KPI cards, campaign/step breakdowns, recent send log, settings modal
+
+### Settings (configurable via Analytics page)
+- `daily_send_cap` (default 50)
+- `send_window_start` (default 8)
+- `send_window_end` (default 18)
+- `business_days_only` (default true)
+
 ## Database Schema
 
 Tables in `lib/db/src/schema/`:
@@ -157,17 +198,26 @@ Tables in `lib/db/src/schema/`:
 - `assets` - Sales assets/resources (local only)
 - `activity` - Activity log for dashboard feed (local only)
 - `outreach_history` - Logged sent emails per lead (leadId, actionType, templateName, subject, body, assets, sender, sentAt)
+- `contacts` - Outbound contacts with sequence tracking (fullName, company, email, sequenceStatus, currentStep, etc.)
+- `campaigns` - Campaign definitions (name, description, isActive)
+- `template_sets` - Named sequence configurations
+- `sequence_steps` - Individual steps per contact (stepNumber, delayDays, subject, body, status, scheduledFor)
+- `send_logs` - Email send history (contactId, stepNumber, subject, status, sentAt)
+- `imports` - Import history (fileName, totalRows, importedRows, skippedRows)
+- `settings` - Key-value settings (daily_send_cap, send_window_start, etc.)
 
 ## API Routes
 
 All routes are in `artifacts/api-server/src/routes/`:
+
+### Phase 1 (CRM)
 - `GET/POST /api/leads` - List/create leads
 - `GET/PUT/DELETE /api/leads/:id` - CRUD individual leads
 - `POST /api/leads/:id/duplicate` - Duplicate a lead
 - `PATCH /api/leads/:id/status` - Quick status update
-- `POST /api/leads/import` - Bulk CSV import (5 required fields, auto-defaults, pipeline inference, dedup by email OR name)
-- `GET /api/leads/:id/history` - Get outreach history for a lead
-- `POST /api/leads/:id/history` - Log outreach action (Email Sent, etc.)
+- `POST /api/leads/import` - Bulk CSV import
+- `GET /api/leads/:id/history` - Get outreach history
+- `POST /api/leads/:id/history` - Log outreach action
 - `GET/POST /api/tasks` - List/create tasks
 - `PUT/DELETE /api/tasks/:id` - Update/delete tasks
 - `PATCH /api/tasks/:id/complete` - Mark task complete
@@ -181,6 +231,29 @@ All routes are in `artifacts/api-server/src/routes/`:
 - `POST /api/sync/test` - Test Google Sheets connection
 - `POST /api/sync/full` - Full sync all leads to sheet
 - `POST /api/sync/seed` - Seed DB from sheet (if empty)
+
+### Phase 2 (Outbound Engine)
+- `GET/POST /api/contacts` - List/create contacts
+- `GET/PUT/DELETE /api/contacts/:id` - CRUD contacts
+- `POST /api/contacts/:id/enroll` - Enroll contact in 7-step sequence
+- `POST /api/contacts/:id/pause` - Pause sequence
+- `POST /api/contacts/:id/resume` - Resume paused / re-enroll replied/completed
+- `POST /api/contacts/:id/skip-step` - Skip current step
+- `POST /api/contacts/:id/force-send` - Force send current step
+- `POST /api/contacts/:id/mark-replied` - Mark as replied (pauses sequence)
+- `POST /api/contacts/:id/mark-dnc` - Mark do not contact
+- `GET /api/contacts/:id/steps` - Get sequence steps for contact
+- `GET/POST /api/campaigns` - List/create campaigns
+- `PUT/DELETE /api/campaigns/:id` - Update/delete campaigns
+- `GET/POST /api/template-sets` - List/create sequence definitions
+- `PUT/DELETE /api/template-sets/:id` - Update/delete sequences
+- `GET /api/sequence/queue` - Get sequence queue (filterable)
+- `POST /api/sequence/process` - Process due sequence steps (scheduler)
+- `GET /api/send-logs` - Get send history
+- `GET /api/imports` - Get import history
+- `POST /api/imports/upload` - Import contacts from CSV
+- `GET /api/outbound-analytics` - Outbound analytics dashboard data
+- `GET/PUT /api/outbound-settings` - Get/update outbound settings
 
 ## Dropdown Values (Customizable)
 

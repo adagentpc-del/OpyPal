@@ -6,6 +6,11 @@ import templatesRouter from "./templates";
 import assetsRouter from "./assets";
 import dashboardRouter from "./dashboard";
 import syncRouter from "./sync";
+import contactsRouter from "./contacts";
+import campaignsRouter from "./campaigns";
+import templateSetsRouter from "./template-sets";
+import sequenceRouter from "./sequence";
+import outboundRouter from "./outbound";
 
 const router: IRouter = Router();
 
@@ -16,5 +21,10 @@ router.use(templatesRouter);
 router.use(assetsRouter);
 router.use(dashboardRouter);
 router.use(syncRouter);
+router.use(contactsRouter);
+router.use(campaignsRouter);
+router.use(templateSetsRouter);
+router.use(sequenceRouter);
+router.use(outboundRouter);
 
 export default router;

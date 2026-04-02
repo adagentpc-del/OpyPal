@@ -621,3 +621,707 @@ export const SeedFromSheetResponse = zod.object({
   message: zod.string(),
   seeded: zod.number(),
 });
+
+/**
+ * @summary Get all outbound contacts
+ */
+export const GetContactsQueryParams = zod.object({
+  search: zod.coerce.string().optional(),
+  sequenceStatus: zod.coerce.string().optional(),
+  campaignName: zod.coerce.string().optional(),
+  doNotContact: zod.coerce.boolean().optional(),
+});
+
+export const GetContactsResponseItem = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  whySelected: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string(),
+  lastEmailSentAt: zod.string().optional(),
+  lastReplyAt: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  sourceFileName: zod.string().optional(),
+  uploadedAt: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const GetContactsResponse = zod.array(GetContactsResponseItem);
+
+/**
+ * @summary Create a contact
+ */
+export const CreateContactBody = zod.object({
+  fullName: zod.string(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  whySelected: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  sourceFileName: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+});
+
+/**
+ * @summary Get a single contact
+ */
+export const GetContactParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetContactResponse = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  whySelected: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string(),
+  lastEmailSentAt: zod.string().optional(),
+  lastReplyAt: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  sourceFileName: zod.string().optional(),
+  uploadedAt: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Update a contact
+ */
+export const UpdateContactParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateContactBody = zod.object({
+  fullName: zod.string(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  whySelected: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  sourceFileName: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+});
+
+export const UpdateContactResponse = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  whySelected: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string(),
+  lastEmailSentAt: zod.string().optional(),
+  lastReplyAt: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  sourceFileName: zod.string().optional(),
+  uploadedAt: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Delete a contact
+ */
+export const DeleteContactParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteContactResponse = zod.object({
+  success: zod.boolean().optional(),
+});
+
+/**
+ * @summary Enroll a contact in a sequence
+ */
+export const EnrollContactParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const EnrollContactBody = zod.object({
+  templateSetName: zod.string(),
+  campaignName: zod.string().optional(),
+});
+
+export const EnrollContactResponse = zod.object({
+  success: zod.boolean().optional(),
+  message: zod.string().optional(),
+  stepsCreated: zod.number().optional(),
+});
+
+/**
+ * @summary Pause a contact sequence
+ */
+export const PauseContactParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const PauseContactResponse = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  whySelected: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string(),
+  lastEmailSentAt: zod.string().optional(),
+  lastReplyAt: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  sourceFileName: zod.string().optional(),
+  uploadedAt: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Resume a paused contact sequence
+ */
+export const ResumeContactParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ResumeContactResponse = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  whySelected: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string(),
+  lastEmailSentAt: zod.string().optional(),
+  lastReplyAt: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  sourceFileName: zod.string().optional(),
+  uploadedAt: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Skip the next step for a contact
+ */
+export const SkipContactStepParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SkipContactStepResponse = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  whySelected: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string(),
+  lastEmailSentAt: zod.string().optional(),
+  lastReplyAt: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  sourceFileName: zod.string().optional(),
+  uploadedAt: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Force send the next step immediately
+ */
+export const ForceSendStepParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ForceSendStepResponse = zod.object({
+  success: zod.boolean().optional(),
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Mark contact as replied
+ */
+export const MarkContactRepliedParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const MarkContactRepliedResponse = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  whySelected: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string(),
+  lastEmailSentAt: zod.string().optional(),
+  lastReplyAt: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  sourceFileName: zod.string().optional(),
+  uploadedAt: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Mark contact as do not contact
+ */
+export const MarkContactDncParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const MarkContactDncResponse = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  whySelected: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string(),
+  lastEmailSentAt: zod.string().optional(),
+  lastReplyAt: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  sourceFileName: zod.string().optional(),
+  uploadedAt: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Get sequence steps for a contact
+ */
+export const GetContactStepsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetContactStepsResponseItem = zod.object({
+  id: zod.number(),
+  contactId: zod.number(),
+  stepNumber: zod.number(),
+  templateSetName: zod.string().optional(),
+  templateId: zod.number().optional(),
+  delayDays: zod.number(),
+  subject: zod.string().optional(),
+  body: zod.string().optional(),
+  status: zod.string(),
+  scheduledFor: zod.string().optional(),
+  sentAt: zod.string().optional(),
+  messageId: zod.string().optional(),
+  createdAt: zod.string(),
+});
+export const GetContactStepsResponse = zod.array(GetContactStepsResponseItem);
+
+/**
+ * @summary Get all campaigns
+ */
+export const GetCampaignsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().optional(),
+  templateSetId: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+  contactCount: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const GetCampaignsResponse = zod.array(GetCampaignsResponseItem);
+
+/**
+ * @summary Create a campaign
+ */
+export const CreateCampaignBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  templateSetId: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+/**
+ * @summary Update a campaign
+ */
+export const UpdateCampaignParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateCampaignBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  templateSetId: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateCampaignResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().optional(),
+  templateSetId: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+  contactCount: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Delete a campaign
+ */
+export const DeleteCampaignParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteCampaignResponse = zod.object({
+  success: zod.boolean().optional(),
+});
+
+/**
+ * @summary Get all template sets (sequences)
+ */
+export const GetTemplateSetsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().optional(),
+  stepCount: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const GetTemplateSetsResponse = zod.array(GetTemplateSetsResponseItem);
+
+/**
+ * @summary Create a template set
+ */
+export const CreateTemplateSetBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+});
+
+/**
+ * @summary Update a template set
+ */
+export const UpdateTemplateSetParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateTemplateSetBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+});
+
+export const UpdateTemplateSetResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().optional(),
+  stepCount: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Delete a template set
+ */
+export const DeleteTemplateSetParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteTemplateSetResponse = zod.object({
+  success: zod.boolean().optional(),
+});
+
+/**
+ * @summary Get all scheduled sequence steps
+ */
+export const GetSequenceQueueQueryParams = zod.object({
+  status: zod.coerce.string().optional(),
+  dueToday: zod.coerce.boolean().optional(),
+});
+
+export const GetSequenceQueueResponseItem = zod.object({
+  id: zod.number(),
+  contactId: zod.number(),
+  contactName: zod.string().optional(),
+  contactEmail: zod.string().optional(),
+  company: zod.string().optional(),
+  stepNumber: zod.number(),
+  subject: zod.string().optional(),
+  status: zod.string(),
+  scheduledFor: zod.string().optional(),
+  templateSetName: zod.string().optional(),
+  campaignName: zod.string().optional(),
+});
+export const GetSequenceQueueResponse = zod.array(GetSequenceQueueResponseItem);
+
+/**
+ * @summary Process due sequence steps (scheduler)
+ */
+export const ProcessSequenceQueueResponse = zod.object({
+  processed: zod.number().optional(),
+  skipped: zod.number().optional(),
+  errors: zod.number().optional(),
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Get send logs
+ */
+export const GetSendLogsQueryParams = zod.object({
+  contactId: zod.coerce.number().optional(),
+  limit: zod.coerce.number().optional(),
+});
+
+export const GetSendLogsResponseItem = zod.object({
+  id: zod.number(),
+  contactId: zod.number(),
+  contactName: zod.string().optional(),
+  contactEmail: zod.string().optional(),
+  company: zod.string().optional(),
+  sequenceStepId: zod.number().optional(),
+  stepNumber: zod.number().optional(),
+  subject: zod.string().optional(),
+  body: zod.string().optional(),
+  status: zod.string(),
+  messageId: zod.string().optional(),
+  errorMessage: zod.string().optional(),
+  sentAt: zod.string(),
+});
+export const GetSendLogsResponse = zod.array(GetSendLogsResponseItem);
+
+/**
+ * @summary Get import history
+ */
+export const GetImportsResponseItem = zod.object({
+  id: zod.number(),
+  fileName: zod.string(),
+  totalRows: zod.number().optional(),
+  importedRows: zod.number().optional(),
+  skippedRows: zod.number().optional(),
+  duplicateRows: zod.number().optional(),
+  invalidRows: zod.number().optional(),
+  campaignName: zod.string().optional(),
+  templateSetName: zod.string().optional(),
+  status: zod.string(),
+  importedAt: zod.string(),
+});
+export const GetImportsResponse = zod.array(GetImportsResponseItem);
+
+/**
+ * @summary Import contacts from CSV data
+ */
+export const ImportContactsBody = zod.object({
+  fileName: zod.string(),
+  campaignName: zod.string().optional(),
+  templateSetName: zod.string().optional(),
+  autoEnroll: zod.boolean().optional(),
+  rows: zod.array(
+    zod.object({
+      fullName: zod.string(),
+      company: zod.string(),
+      title: zod.string().optional(),
+      email: zod.string(),
+      phone: zod.string().optional(),
+      location: zod.string().optional(),
+      intentSignal: zod.string().optional(),
+      whySelected: zod.string().optional(),
+    }),
+  ),
+});
+
+export const ImportContactsResponse = zod.object({
+  success: zod.boolean().optional(),
+  importId: zod.number().optional(),
+  totalRows: zod.number().optional(),
+  imported: zod.number().optional(),
+  skipped: zod.number().optional(),
+  duplicates: zod.number().optional(),
+  invalid: zod.number().optional(),
+  enrolled: zod.number().optional(),
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Get outbound analytics
+ */
+export const GetOutboundAnalyticsResponse = zod.object({
+  totalContacts: zod.number().optional(),
+  activeSequences: zod.number().optional(),
+  importedToday: zod.number().optional(),
+  sentToday: zod.number().optional(),
+  scheduledToday: zod.number().optional(),
+  scheduledTomorrow: zod.number().optional(),
+  pausedReplied: zod.number().optional(),
+  completed: zod.number().optional(),
+  bouncedCount: zod.number().optional(),
+  reactivationDue: zod.number().optional(),
+  byCampaign: zod
+    .array(
+      zod.object({
+        campaign: zod.string().optional(),
+        count: zod.number().optional(),
+      }),
+    )
+    .optional(),
+  byStep: zod
+    .array(
+      zod.object({
+        step: zod.number().optional(),
+        count: zod.number().optional(),
+      }),
+    )
+    .optional(),
+  recentSends: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        contactId: zod.number(),
+        contactName: zod.string().optional(),
+        contactEmail: zod.string().optional(),
+        company: zod.string().optional(),
+        sequenceStepId: zod.number().optional(),
+        stepNumber: zod.number().optional(),
+        subject: zod.string().optional(),
+        body: zod.string().optional(),
+        status: zod.string(),
+        messageId: zod.string().optional(),
+        errorMessage: zod.string().optional(),
+        sentAt: zod.string(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Get outbound settings
+ */
+export const GetOutboundSettingsResponseItem = zod.object({
+  id: zod.number().optional(),
+  key: zod.string(),
+  value: zod.string(),
+});
+export const GetOutboundSettingsResponse = zod.array(
+  GetOutboundSettingsResponseItem,
+);
+
+/**
+ * @summary Update outbound settings
+ */
+export const UpdateOutboundSettingsBody = zod.object({
+  settings: zod.array(
+    zod.object({
+      key: zod.string(),
+      value: zod.string(),
+    }),
+  ),
+});
+
+export const UpdateOutboundSettingsResponseItem = zod.object({
+  id: zod.number().optional(),
+  key: zod.string(),
+  value: zod.string(),
+});
+export const UpdateOutboundSettingsResponse = zod.array(
+  UpdateOutboundSettingsResponseItem,
+);

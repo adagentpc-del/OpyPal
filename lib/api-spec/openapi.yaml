@@ -21,6 +21,22 @@ tags:
     description: Dashboard operations
   - name: sync
     description: Google Sheets sync operations
+  - name: contacts
+    description: Outbound contact operations
+  - name: campaigns
+    description: Campaign management
+  - name: template-sets
+    description: Template set (sequence) management
+  - name: sequence
+    description: Sequence engine operations
+  - name: send-logs
+    description: Send log operations
+  - name: imports
+    description: Import operations
+  - name: outbound-analytics
+    description: Outbound analytics
+  - name: outbound-settings
+    description: Outbound settings
 
 paths:
   /healthz:
@@ -639,6 +655,594 @@ paths:
               schema:
                 $ref: "#/components/schemas/SeedResult"
 
+  /contacts:
+    get:
+      operationId: getContacts
+      tags: [contacts]
+      summary: Get all outbound contacts
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: sequenceStatus
+          in: query
+          schema:
+            type: string
+        - name: campaignName
+          in: query
+          schema:
+            type: string
+        - name: doNotContact
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of contacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+    post:
+      operationId: createContact
+      tags: [contacts]
+      summary: Create a contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactInput"
+      responses:
+        "201":
+          description: Created contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/{id}:
+    get:
+      operationId: getContact
+      tags: [contacts]
+      summary: Get a single contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+    put:
+      operationId: updateContact
+      tags: [contacts]
+      summary: Update a contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactInput"
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+    delete:
+      operationId: deleteContact
+      tags: [contacts]
+      summary: Delete a contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /contacts/{id}/enroll:
+    post:
+      operationId: enrollContact
+      tags: [sequence]
+      summary: Enroll a contact in a sequence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollInput"
+      responses:
+        "200":
+          description: Enrollment result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollResult"
+
+  /contacts/{id}/pause:
+    post:
+      operationId: pauseContact
+      tags: [sequence]
+      summary: Pause a contact sequence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/{id}/resume:
+    post:
+      operationId: resumeContact
+      tags: [sequence]
+      summary: Resume a paused contact sequence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/{id}/skip-step:
+    post:
+      operationId: skipContactStep
+      tags: [sequence]
+      summary: Skip the next step for a contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/{id}/force-send:
+    post:
+      operationId: forceSendStep
+      tags: [sequence]
+      summary: Force send the next step immediately
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Send result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /contacts/{id}/mark-replied:
+    post:
+      operationId: markContactReplied
+      tags: [sequence]
+      summary: Mark contact as replied
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/{id}/mark-dnc:
+    post:
+      operationId: markContactDnc
+      tags: [sequence]
+      summary: Mark contact as do not contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/{id}/steps:
+    get:
+      operationId: getContactSteps
+      tags: [sequence]
+      summary: Get sequence steps for a contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sequence steps
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SequenceStep"
+
+  /campaigns:
+    get:
+      operationId: getCampaigns
+      tags: [campaigns]
+      summary: Get all campaigns
+      responses:
+        "200":
+          description: List of campaigns
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignItem"
+    post:
+      operationId: createCampaign
+      tags: [campaigns]
+      summary: Create a campaign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignInput"
+      responses:
+        "201":
+          description: Created campaign
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignItem"
+
+  /campaigns/{id}:
+    put:
+      operationId: updateCampaign
+      tags: [campaigns]
+      summary: Update a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignInput"
+      responses:
+        "200":
+          description: Updated campaign
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignItem"
+    delete:
+      operationId: deleteCampaign
+      tags: [campaigns]
+      summary: Delete a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /template-sets:
+    get:
+      operationId: getTemplateSets
+      tags: [template-sets]
+      summary: Get all template sets (sequences)
+      responses:
+        "200":
+          description: List of template sets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TemplateSetItem"
+    post:
+      operationId: createTemplateSet
+      tags: [template-sets]
+      summary: Create a template set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateSetInput"
+      responses:
+        "201":
+          description: Created template set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateSetItem"
+
+  /template-sets/{id}:
+    put:
+      operationId: updateTemplateSet
+      tags: [template-sets]
+      summary: Update a template set
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateSetInput"
+      responses:
+        "200":
+          description: Updated template set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateSetItem"
+    delete:
+      operationId: deleteTemplateSet
+      tags: [template-sets]
+      summary: Delete a template set
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /sequence/queue:
+    get:
+      operationId: getSequenceQueue
+      tags: [sequence]
+      summary: Get all scheduled sequence steps
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: dueToday
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Queue items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QueueItem"
+
+  /sequence/process:
+    post:
+      operationId: processSequenceQueue
+      tags: [sequence]
+      summary: Process due sequence steps (scheduler)
+      responses:
+        "200":
+          description: Processing result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  processed:
+                    type: integer
+                  skipped:
+                    type: integer
+                  errors:
+                    type: integer
+                  message:
+                    type: string
+
+  /send-logs:
+    get:
+      operationId: getSendLogs
+      tags: [send-logs]
+      summary: Get send logs
+      parameters:
+        - name: contactId
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Send logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SendLogItem"
+
+  /imports:
+    get:
+      operationId: getImports
+      tags: [imports]
+      summary: Get import history
+      responses:
+        "200":
+          description: Import records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ImportRecord"
+
+  /imports/upload:
+    post:
+      operationId: importContacts
+      tags: [imports]
+      summary: Import contacts from CSV data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportContactsInput"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+
+  /outbound-analytics:
+    get:
+      operationId: getOutboundAnalytics
+      tags: [outbound-analytics]
+      summary: Get outbound analytics
+      responses:
+        "200":
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutboundAnalytics"
+
+  /outbound-settings:
+    get:
+      operationId: getOutboundSettings
+      tags: [outbound-settings]
+      summary: Get outbound settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SettingItem"
+    put:
+      operationId: updateOutboundSettings
+      tags: [outbound-settings]
+      summary: Update outbound settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                settings:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/SettingInput"
+              required:
+                - settings
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SettingItem"
+
 components:
   schemas:
     HealthStatus:
@@ -1167,3 +1771,467 @@ components:
       required:
         - message
         - seeded
+
+    Contact:
+      type: object
+      properties:
+        id:
+          type: integer
+        fullName:
+          type: string
+        company:
+          type: string
+        title:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        location:
+          type: string
+        intentSignal:
+          type: string
+        whySelected:
+          type: string
+        campaignName:
+          type: string
+        assignedTemplateSet:
+          type: string
+        currentStep:
+          type: integer
+        sequenceStatus:
+          type: string
+        lastEmailSentAt:
+          type: string
+        lastReplyAt:
+          type: string
+        nextSendAt:
+          type: string
+        doNotContact:
+          type: boolean
+        unsubscribed:
+          type: boolean
+        bounced:
+          type: boolean
+        sourceFileName:
+          type: string
+        uploadedAt:
+          type: string
+        notes:
+          type: string
+        importId:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - fullName
+        - company
+        - email
+        - sequenceStatus
+        - createdAt
+        - updatedAt
+
+    ContactInput:
+      type: object
+      properties:
+        fullName:
+          type: string
+        company:
+          type: string
+        title:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        location:
+          type: string
+        intentSignal:
+          type: string
+        whySelected:
+          type: string
+        campaignName:
+          type: string
+        assignedTemplateSet:
+          type: string
+        currentStep:
+          type: integer
+        sequenceStatus:
+          type: string
+        nextSendAt:
+          type: string
+        doNotContact:
+          type: boolean
+        unsubscribed:
+          type: boolean
+        bounced:
+          type: boolean
+        sourceFileName:
+          type: string
+        notes:
+          type: string
+        importId:
+          type: integer
+      required:
+        - fullName
+        - company
+        - email
+
+    EnrollInput:
+      type: object
+      properties:
+        templateSetName:
+          type: string
+        campaignName:
+          type: string
+      required:
+        - templateSetName
+
+    EnrollResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        stepsCreated:
+          type: integer
+
+    SequenceStep:
+      type: object
+      properties:
+        id:
+          type: integer
+        contactId:
+          type: integer
+        stepNumber:
+          type: integer
+        templateSetName:
+          type: string
+        templateId:
+          type: integer
+        delayDays:
+          type: integer
+        subject:
+          type: string
+        body:
+          type: string
+        status:
+          type: string
+        scheduledFor:
+          type: string
+        sentAt:
+          type: string
+        messageId:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - contactId
+        - stepNumber
+        - delayDays
+        - status
+        - createdAt
+
+    CampaignItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        templateSetId:
+          type: string
+        isActive:
+          type: boolean
+        contactCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+
+    CampaignInput:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        templateSetId:
+          type: string
+        isActive:
+          type: boolean
+      required:
+        - name
+
+    TemplateSetItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        stepCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+
+    TemplateSetInput:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      required:
+        - name
+
+    QueueItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        contactId:
+          type: integer
+        contactName:
+          type: string
+        contactEmail:
+          type: string
+        company:
+          type: string
+        stepNumber:
+          type: integer
+        subject:
+          type: string
+        status:
+          type: string
+        scheduledFor:
+          type: string
+        templateSetName:
+          type: string
+        campaignName:
+          type: string
+      required:
+        - id
+        - contactId
+        - stepNumber
+        - status
+
+    SendLogItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        contactId:
+          type: integer
+        contactName:
+          type: string
+        contactEmail:
+          type: string
+        company:
+          type: string
+        sequenceStepId:
+          type: integer
+        stepNumber:
+          type: integer
+        subject:
+          type: string
+        body:
+          type: string
+        status:
+          type: string
+        messageId:
+          type: string
+        errorMessage:
+          type: string
+        sentAt:
+          type: string
+      required:
+        - id
+        - contactId
+        - status
+        - sentAt
+
+    ImportRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        fileName:
+          type: string
+        totalRows:
+          type: integer
+        importedRows:
+          type: integer
+        skippedRows:
+          type: integer
+        duplicateRows:
+          type: integer
+        invalidRows:
+          type: integer
+        campaignName:
+          type: string
+        templateSetName:
+          type: string
+        status:
+          type: string
+        importedAt:
+          type: string
+      required:
+        - id
+        - fileName
+        - status
+        - importedAt
+
+    ImportContactsInput:
+      type: object
+      properties:
+        fileName:
+          type: string
+        campaignName:
+          type: string
+        templateSetName:
+          type: string
+        autoEnroll:
+          type: boolean
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              fullName:
+                type: string
+              company:
+                type: string
+              title:
+                type: string
+              email:
+                type: string
+              phone:
+                type: string
+              location:
+                type: string
+              intentSignal:
+                type: string
+              whySelected:
+                type: string
+            required:
+              - fullName
+              - company
+              - email
+      required:
+        - fileName
+        - rows
+
+    ImportResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        importId:
+          type: integer
+        totalRows:
+          type: integer
+        imported:
+          type: integer
+        skipped:
+          type: integer
+        duplicates:
+          type: integer
+        invalid:
+          type: integer
+        enrolled:
+          type: integer
+        message:
+          type: string
+
+    OutboundAnalytics:
+      type: object
+      properties:
+        totalContacts:
+          type: integer
+        activeSequences:
+          type: integer
+        importedToday:
+          type: integer
+        sentToday:
+          type: integer
+        scheduledToday:
+          type: integer
+        scheduledTomorrow:
+          type: integer
+        pausedReplied:
+          type: integer
+        completed:
+          type: integer
+        bouncedCount:
+          type: integer
+        reactivationDue:
+          type: integer
+        byCampaign:
+          type: array
+          items:
+            type: object
+            properties:
+              campaign:
+                type: string
+              count:
+                type: integer
+        byStep:
+          type: array
+          items:
+            type: object
+            properties:
+              step:
+                type: integer
+              count:
+                type: integer
+        recentSends:
+          type: array
+          items:
+            $ref: "#/components/schemas/SendLogItem"
+
+    SettingItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        key:
+          type: string
+        value:
+          type: string
+      required:
+        - key
+        - value
+
+    SettingInput:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+      required:
+        - key
+        - value

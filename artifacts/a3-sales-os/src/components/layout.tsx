@@ -12,6 +12,13 @@ import {
   Menu,
   X,
   Zap,
+  Upload,
+  Target,
+  ListOrdered,
+  Clock,
+  MessageCircle,
+  BarChart3,
+  Contact,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -24,6 +31,16 @@ const NAV_ITEMS = [
   { name: "Templates", href: "/templates", icon: FileText },
   { name: "Assets", href: "/assets", icon: Images },
   { name: "Import / Export", href: "/data", icon: ArrowDownUp },
+];
+
+const OUTBOUND_ITEMS = [
+  { name: "CSV Upload", href: "/ob/upload", icon: Upload },
+  { name: "Contacts", href: "/ob/contacts", icon: Contact },
+  { name: "Campaigns", href: "/ob/campaigns", icon: Target },
+  { name: "Sequences", href: "/ob/sequences", icon: ListOrdered },
+  { name: "Queue", href: "/ob/queue", icon: Clock },
+  { name: "Replies", href: "/ob/replies", icon: MessageCircle },
+  { name: "Analytics", href: "/ob/analytics", icon: BarChart3 },
 ];
 
 function SidebarContent({ location, onNavigate }: { location: string; onNavigate?: () => void }) {
@@ -42,6 +59,31 @@ function SidebarContent({ location, onNavigate }: { location: string; onNavigate
 
       <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
         {NAV_ITEMS.map((item) => {
+          const isActive = location === item.href;
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              onClick={onNavigate}
+              className={`
+                flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 group text-sm
+                ${isActive
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                }
+              `}
+            >
+              <item.icon className={`h-5 w-5 flex-shrink-0 ${isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-primary transition-colors"}`} />
+              {item.name}
+            </Link>
+          );
+        })}
+
+        <div className="pt-4 pb-1">
+          <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Outbound Engine</span>
+        </div>
+
+        {OUTBOUND_ITEMS.map((item) => {
           const isActive = location === item.href;
           return (
             <Link
