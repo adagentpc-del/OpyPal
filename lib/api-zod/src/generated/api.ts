@@ -666,6 +666,11 @@ export const GetContactsResponseItem = zod.object({
   unsubscribed: zod.boolean().optional(),
   bounced: zod.boolean().optional(),
   bounceStatus: zod.string().optional(),
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
   sourceFileName: zod.string().optional(),
   uploadedAt: zod.string().optional(),
   notes: zod.string().optional(),
@@ -741,6 +746,11 @@ export const GetContactResponse = zod.object({
   unsubscribed: zod.boolean().optional(),
   bounced: zod.boolean().optional(),
   bounceStatus: zod.string().optional(),
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
   sourceFileName: zod.string().optional(),
   uploadedAt: zod.string().optional(),
   notes: zod.string().optional(),
@@ -812,6 +822,11 @@ export const UpdateContactResponse = zod.object({
   unsubscribed: zod.boolean().optional(),
   bounced: zod.boolean().optional(),
   bounceStatus: zod.string().optional(),
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
   sourceFileName: zod.string().optional(),
   uploadedAt: zod.string().optional(),
   notes: zod.string().optional(),
@@ -892,6 +907,11 @@ export const PauseContactResponse = zod.object({
   unsubscribed: zod.boolean().optional(),
   bounced: zod.boolean().optional(),
   bounceStatus: zod.string().optional(),
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
   sourceFileName: zod.string().optional(),
   uploadedAt: zod.string().optional(),
   notes: zod.string().optional(),
@@ -941,6 +961,11 @@ export const ResumeContactResponse = zod.object({
   unsubscribed: zod.boolean().optional(),
   bounced: zod.boolean().optional(),
   bounceStatus: zod.string().optional(),
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
   sourceFileName: zod.string().optional(),
   uploadedAt: zod.string().optional(),
   notes: zod.string().optional(),
@@ -990,6 +1015,11 @@ export const SkipContactStepResponse = zod.object({
   unsubscribed: zod.boolean().optional(),
   bounced: zod.boolean().optional(),
   bounceStatus: zod.string().optional(),
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
   sourceFileName: zod.string().optional(),
   uploadedAt: zod.string().optional(),
   notes: zod.string().optional(),
@@ -1051,6 +1081,11 @@ export const MarkContactRepliedResponse = zod.object({
   unsubscribed: zod.boolean().optional(),
   bounced: zod.boolean().optional(),
   bounceStatus: zod.string().optional(),
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
   sourceFileName: zod.string().optional(),
   uploadedAt: zod.string().optional(),
   notes: zod.string().optional(),
@@ -1100,6 +1135,11 @@ export const MarkContactDncResponse = zod.object({
   unsubscribed: zod.boolean().optional(),
   bounced: zod.boolean().optional(),
   bounceStatus: zod.string().optional(),
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
   sourceFileName: zod.string().optional(),
   uploadedAt: zod.string().optional(),
   notes: zod.string().optional(),
@@ -1149,6 +1189,11 @@ export const MarkContactUnsubscribedResponse = zod.object({
   unsubscribed: zod.boolean().optional(),
   bounced: zod.boolean().optional(),
   bounceStatus: zod.string().optional(),
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
   sourceFileName: zod.string().optional(),
   uploadedAt: zod.string().optional(),
   notes: zod.string().optional(),
@@ -1790,6 +1835,11 @@ export const UpdateContactCustomLineResponse = zod.object({
   unsubscribed: zod.boolean().optional(),
   bounced: zod.boolean().optional(),
   bounceStatus: zod.string().optional(),
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
   sourceFileName: zod.string().optional(),
   uploadedAt: zod.string().optional(),
   notes: zod.string().optional(),
@@ -1850,3 +1900,419 @@ export const UpdateOutboundSettingsResponseItem = zod.object({
 export const UpdateOutboundSettingsResponse = zod.array(
   UpdateOutboundSettingsResponseItem,
 );
+
+/**
+ * @summary Get contacts by routing state
+ */
+export const GetRoutingQueueParams = zod.object({
+  state: zod.coerce.string(),
+});
+
+export const GetRoutingQueueResponseItem = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  firstName: zod.string().optional(),
+  lastName: zod.string().optional(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  industry: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  customLine: zod.string().optional(),
+  customLineStatus: zod.string().optional(),
+  customLineSource: zod.string().optional(),
+  customLineGeneratedAt: zod.string().optional(),
+  customLineLocked: zod.boolean().optional(),
+  whySelected: zod.string().optional(),
+  segmentType: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  campaignId: zod.number().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  templateSetId: zod.number().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string(),
+  engagementScore: zod.number().optional(),
+  engagementTier: zod.string().optional(),
+  lastEmailSentAt: zod.string().optional(),
+  lastReplyAt: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  bounceStatus: zod.string().optional(),
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
+  sourceFileName: zod.string().optional(),
+  uploadedAt: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const GetRoutingQueueResponse = zod.array(GetRoutingQueueResponseItem);
+
+/**
+ * @summary Get routing recommendations for a contact
+ */
+export const GetRoutingRecommendationsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetRoutingRecommendationsResponse = zod.object({
+  contact: zod
+    .object({
+      id: zod.number().optional(),
+      fullName: zod.string().optional(),
+      company: zod.string().optional(),
+      title: zod.string().optional(),
+      email: zod.string().optional(),
+      segmentType: zod.string().optional(),
+      engagementScore: zod.number().optional(),
+      engagementTier: zod.string().optional(),
+      routingState: zod.string().optional(),
+      routingLocked: zod.boolean().optional(),
+      recommendedNextAction: zod.string().optional(),
+      qualifiedStatus: zod.string().optional(),
+      manualPriority: zod.boolean().optional(),
+      sequenceStatus: zod.string().optional(),
+      lastEmailSentAt: zod.string().optional(),
+      lastReplyAt: zod.string().optional(),
+    })
+    .optional(),
+  events: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        contactId: zod.number(),
+        sendLogId: zod.number().optional(),
+        eventType: zod.string(),
+        metadataJson: zod.string().optional(),
+        timestamp: zod.string().optional(),
+        createdAt: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  routingHistory: zod
+    .array(
+      zod.object({
+        id: zod.number().optional(),
+        contactId: zod.number().optional(),
+        previousRoutingState: zod.string().optional(),
+        newRoutingState: zod.string().optional(),
+        reason: zod.string().optional(),
+        recommendedNextAction: zod.string().optional(),
+        createdAt: zod.string().optional(),
+      }),
+    )
+    .optional(),
+  sendHistory: zod.array(zod.unknown()).optional(),
+  recommendedActions: zod
+    .array(
+      zod.object({
+        id: zod.number().optional(),
+        name: zod.string().optional(),
+        description: zod.string().optional(),
+        recommendedForTier: zod.string().optional(),
+        recommendedForSegment: zod.string().optional(),
+        isActive: zod.boolean().optional(),
+        createdAt: zod.string().optional(),
+        updatedAt: zod.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Update contact routing state manually
+ */
+export const UpdateContactRoutingParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateContactRoutingBody = zod.object({
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
+  reason: zod.string().optional(),
+});
+
+export const UpdateContactRoutingResponse = zod.object({
+  id: zod.number(),
+  fullName: zod.string(),
+  firstName: zod.string().optional(),
+  lastName: zod.string().optional(),
+  company: zod.string(),
+  title: zod.string().optional(),
+  email: zod.string(),
+  phone: zod.string().optional(),
+  location: zod.string().optional(),
+  industry: zod.string().optional(),
+  intentSignal: zod.string().optional(),
+  customLine: zod.string().optional(),
+  customLineStatus: zod.string().optional(),
+  customLineSource: zod.string().optional(),
+  customLineGeneratedAt: zod.string().optional(),
+  customLineLocked: zod.boolean().optional(),
+  whySelected: zod.string().optional(),
+  segmentType: zod.string().optional(),
+  campaignName: zod.string().optional(),
+  campaignId: zod.number().optional(),
+  assignedTemplateSet: zod.string().optional(),
+  templateSetId: zod.number().optional(),
+  currentStep: zod.number().optional(),
+  sequenceStatus: zod.string(),
+  engagementScore: zod.number().optional(),
+  engagementTier: zod.string().optional(),
+  lastEmailSentAt: zod.string().optional(),
+  lastReplyAt: zod.string().optional(),
+  nextSendAt: zod.string().optional(),
+  doNotContact: zod.boolean().optional(),
+  unsubscribed: zod.boolean().optional(),
+  bounced: zod.boolean().optional(),
+  bounceStatus: zod.string().optional(),
+  routingState: zod.string().optional(),
+  routingLocked: zod.boolean().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  manualPriority: zod.boolean().optional(),
+  sourceFileName: zod.string().optional(),
+  uploadedAt: zod.string().optional(),
+  notes: zod.string().optional(),
+  importId: zod.number().optional(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Bulk update routing state for contacts
+ */
+export const BulkUpdateRoutingBody = zod.object({
+  contactIds: zod.array(zod.number()),
+  routingState: zod.string().optional(),
+  recommendedNextAction: zod.string().optional(),
+  qualifiedStatus: zod.string().optional(),
+  reason: zod.string().optional(),
+});
+
+export const BulkUpdateRoutingResponse = zod.object({
+  success: zod.boolean().optional(),
+  updated: zod.number().optional(),
+});
+
+/**
+ * @summary Get routing analytics
+ */
+export const GetRoutingAnalyticsResponse = zod.object({
+  total: zod.number().optional(),
+  byState: zod.record(zod.string(), zod.number()).optional(),
+  byTier: zod.record(zod.string(), zod.number()).optional(),
+  qualifiedBySegment: zod.record(zod.string(), zod.number()).optional(),
+  awaitingManualOutreach: zod.number().optional(),
+  reactivationPool: zod.number().optional(),
+  hotPriority: zod.number().optional(),
+  warmFollowup: zod.number().optional(),
+  recentRoutingChanges: zod
+    .array(
+      zod.object({
+        id: zod.number().optional(),
+        contactId: zod.number().optional(),
+        previousRoutingState: zod.string().optional(),
+        newRoutingState: zod.string().optional(),
+        reason: zod.string().optional(),
+        recommendedNextAction: zod.string().optional(),
+        createdAt: zod.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Get routing log history for a contact
+ */
+export const GetRoutingLogsParams = zod.object({
+  contactId: zod.coerce.number(),
+});
+
+export const GetRoutingLogsResponseItem = zod.object({
+  id: zod.number().optional(),
+  contactId: zod.number().optional(),
+  previousRoutingState: zod.string().optional(),
+  newRoutingState: zod.string().optional(),
+  reason: zod.string().optional(),
+  recommendedNextAction: zod.string().optional(),
+  createdAt: zod.string().optional(),
+});
+export const GetRoutingLogsResponse = zod.array(GetRoutingLogsResponseItem);
+
+/**
+ * @summary Re-evaluate routing for a contact
+ */
+export const EvaluateContactRoutingParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const EvaluateContactRoutingResponse = zod.object({
+  routingState: zod.string().optional(),
+  recommendedNextAction: zod.string().optional(),
+  reason: zod.string().optional(),
+});
+
+/**
+ * @summary List all next actions
+ */
+export const GetNextActionsResponseItem = zod.object({
+  id: zod.number().optional(),
+  name: zod.string().optional(),
+  description: zod.string().optional(),
+  recommendedForTier: zod.string().optional(),
+  recommendedForSegment: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+export const GetNextActionsResponse = zod.array(GetNextActionsResponseItem);
+
+/**
+ * @summary Create a next action
+ */
+export const CreateNextActionBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  recommendedForTier: zod.string().optional(),
+  recommendedForSegment: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const CreateNextActionResponse = zod.object({
+  id: zod.number().optional(),
+  name: zod.string().optional(),
+  description: zod.string().optional(),
+  recommendedForTier: zod.string().optional(),
+  recommendedForSegment: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+
+/**
+ * @summary Update a next action
+ */
+export const UpdateNextActionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateNextActionBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  recommendedForTier: zod.string().optional(),
+  recommendedForSegment: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateNextActionResponse = zod.object({
+  id: zod.number().optional(),
+  name: zod.string().optional(),
+  description: zod.string().optional(),
+  recommendedForTier: zod.string().optional(),
+  recommendedForSegment: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+
+/**
+ * @summary Delete a next action
+ */
+export const DeleteNextActionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteNextActionResponse = zod.object({
+  success: zod.boolean().optional(),
+});
+
+/**
+ * @summary List all CTA entries
+ */
+export const GetCtaLibraryResponseItem = zod.object({
+  id: zod.number().optional(),
+  name: zod.string().optional(),
+  description: zod.string().optional(),
+  text: zod.string().optional(),
+  recommendedForTier: zod.string().optional(),
+  recommendedForSegment: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+export const GetCtaLibraryResponse = zod.array(GetCtaLibraryResponseItem);
+
+/**
+ * @summary Create a CTA entry
+ */
+export const CreateCtaEntryBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  text: zod.string(),
+  recommendedForTier: zod.string().optional(),
+  recommendedForSegment: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const CreateCtaEntryResponse = zod.object({
+  id: zod.number().optional(),
+  name: zod.string().optional(),
+  description: zod.string().optional(),
+  text: zod.string().optional(),
+  recommendedForTier: zod.string().optional(),
+  recommendedForSegment: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+
+/**
+ * @summary Update a CTA entry
+ */
+export const UpdateCtaEntryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateCtaEntryBody = zod.object({
+  name: zod.string(),
+  description: zod.string().optional(),
+  text: zod.string(),
+  recommendedForTier: zod.string().optional(),
+  recommendedForSegment: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+});
+
+export const UpdateCtaEntryResponse = zod.object({
+  id: zod.number().optional(),
+  name: zod.string().optional(),
+  description: zod.string().optional(),
+  text: zod.string().optional(),
+  recommendedForTier: zod.string().optional(),
+  recommendedForSegment: zod.string().optional(),
+  isActive: zod.boolean().optional(),
+  createdAt: zod.string().optional(),
+  updatedAt: zod.string().optional(),
+});
+
+/**
+ * @summary Delete a CTA entry
+ */
+export const DeleteCtaEntryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteCtaEntryResponse = zod.object({
+  success: zod.boolean().optional(),
+});

@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
-import { db, contactsTable, sequenceStepsTable, sendLogsTable, importsTable, settingsTable, sequenceTemplatesTable, templateSetsTable, sequenceEnrollmentsTable, emailEventsTable, suppressionListTable, personalizationLogsTable } from "@workspace/db";
-import { eq, and, or, sql, desc, ilike } from "drizzle-orm";
+import { db, contactsTable, sequenceStepsTable, sendLogsTable, importsTable, settingsTable, sequenceTemplatesTable, templateSetsTable, sequenceEnrollmentsTable, emailEventsTable, suppressionListTable, personalizationLogsTable, routingLogsTable, nextActionsTable, ctaLibraryTable } from "@workspace/db";
+import { eq, and, or, sql, desc, ilike, asc } from "drizzle-orm";
 import { renderTemplate, renderSubject, splitFullName, calculateEngagementScore, getEngagementTier, type TemplateContact } from "../lib/template-engine";
 import { generateCustomLine, generateBatch, type PersonalizationMode, type PersonalizationContact } from "../lib/personalization";
+import { evaluateAndUpdateContact } from "../lib/routing-engine";
 
 const router: IRouter = Router();
 
@@ -500,6 +501,7 @@ router.get("/track/open", async (req, res) => {
       const score = calculateEngagementScore(events);
       const tier = getEngagementTier(score);
       await db.update(contactsTable).set({ engagementScore: score, engagementTier: tier, updatedAt: new Date() }).where(eq(contactsTable.id, contactId));
+      evaluateAndUpdateContact(contactId).catch(() => {});
     }
 
     const pixel = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
@@ -544,6 +546,7 @@ router.get("/track/click", async (req, res) => {
       const score = calculateEngagementScore(events);
       const tier = getEngagementTier(score);
       await db.update(contactsTable).set({ engagementScore: score, engagementTier: tier, updatedAt: new Date() }).where(eq(contactsTable.id, contactId));
+      evaluateAndUpdateContact(contactId).catch(() => {});
     }
 
     safeRedirect(redirectUrl);
@@ -805,6 +808,312 @@ router.get("/personalization/analytics", async (req, res) => {
     });
   } catch (err: any) {
     res.status(500).json({ message: err.message || "Analytics failed" });
+  }
+});
+
+router.get("/routing/queue/:state", async (req, res) => {
+  try {
+    const state = req.params.state;
+    const contacts = await db.select().from(contactsTable)
+      .where(eq(contactsTable.routingState, state))
+      .orderBy(desc(contactsTable.engagementScore));
+    res.json(contacts);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/routing/recommendations/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, id));
+    if (!contact) return res.status(404).json({ message: "Contact not found" });
+
+    const events = await db.select().from(emailEventsTable).where(eq(emailEventsTable.contactId, id));
+    const logs = await db.select().from(routingLogsTable)
+      .where(eq(routingLogsTable.contactId, id))
+      .orderBy(desc(routingLogsTable.createdAt))
+      .limit(20);
+    const sendHistory = await db.select().from(sendLogsTable)
+      .where(eq(sendLogsTable.contactId, id))
+      .orderBy(desc(sendLogsTable.sentAt))
+      .limit(10);
+
+    const nextActions = await db.select().from(nextActionsTable).where(eq(nextActionsTable.isActive, true));
+    const tier = contact.engagementTier || "cold";
+    const segment = contact.segmentType || "general";
+    const recommended = nextActions.filter(a =>
+      (!a.recommendedForTier || a.recommendedForTier === tier) &&
+      (!a.recommendedForSegment || a.recommendedForSegment === segment)
+    );
+
+    res.json({
+      contact: {
+        id: contact.id,
+        fullName: contact.fullName,
+        company: contact.company,
+        title: contact.title,
+        email: contact.email,
+        segmentType: contact.segmentType,
+        engagementScore: contact.engagementScore,
+        engagementTier: contact.engagementTier,
+        routingState: contact.routingState,
+        routingLocked: contact.routingLocked,
+        recommendedNextAction: contact.recommendedNextAction,
+        qualifiedStatus: contact.qualifiedStatus,
+        manualPriority: contact.manualPriority,
+        sequenceStatus: contact.sequenceStatus,
+        lastEmailSentAt: contact.lastEmailSentAt,
+        lastReplyAt: contact.lastReplyAt,
+      },
+      events,
+      routingHistory: logs,
+      sendHistory,
+      recommendedActions: recommended,
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put("/contacts/:id/routing", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { routingState, routingLocked, recommendedNextAction, qualifiedStatus, manualPriority, reason } = req.body;
+
+    const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, id));
+    if (!contact) return res.status(404).json({ message: "Contact not found" });
+
+    const updates: Record<string, any> = { updatedAt: new Date() };
+    if (routingState !== undefined) updates.routingState = routingState;
+    if (routingLocked !== undefined) updates.routingLocked = routingLocked;
+    if (recommendedNextAction !== undefined) updates.recommendedNextAction = recommendedNextAction;
+    if (qualifiedStatus !== undefined) updates.qualifiedStatus = qualifiedStatus;
+    if (manualPriority !== undefined) updates.manualPriority = manualPriority;
+
+    await db.update(contactsTable).set(updates).where(eq(contactsTable.id, id));
+
+    if (routingState && routingState !== contact.routingState) {
+      await db.insert(routingLogsTable).values({
+        contactId: id,
+        previousRoutingState: contact.routingState,
+        newRoutingState: routingState,
+        reason: reason || "Manual override by admin",
+        recommendedNextAction: recommendedNextAction || contact.recommendedNextAction,
+      });
+    }
+
+    const [updated] = await db.select().from(contactsTable).where(eq(contactsTable.id, id));
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post("/routing/bulk-update", async (req, res) => {
+  try {
+    const { contactIds, routingState, recommendedNextAction, qualifiedStatus, reason } = req.body;
+    const ids = (contactIds || []).map((id: any) => parseInt(id));
+    if (ids.length === 0) return res.status(400).json({ message: "No contact IDs provided" });
+
+    let updated = 0;
+    let skippedLocked = 0;
+    let notFound = 0;
+
+    for (const id of ids) {
+      if (isNaN(id)) continue;
+      const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, id));
+      if (!contact) { notFound++; continue; }
+      if (contact.routingLocked) { skippedLocked++; continue; }
+
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      if (routingState) updates.routingState = routingState;
+      if (recommendedNextAction) updates.recommendedNextAction = recommendedNextAction;
+      if (qualifiedStatus) updates.qualifiedStatus = qualifiedStatus;
+
+      await db.update(contactsTable).set(updates).where(eq(contactsTable.id, id));
+      updated++;
+
+      if (routingState && routingState !== contact.routingState) {
+        await db.insert(routingLogsTable).values({
+          contactId: id,
+          previousRoutingState: contact.routingState,
+          newRoutingState: routingState,
+          reason: reason || "Bulk update by admin",
+          recommendedNextAction: recommendedNextAction || contact.recommendedNextAction,
+        });
+      }
+    }
+
+    res.json({ success: true, updated, skippedLocked, notFound });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/routing/analytics", async (_req, res) => {
+  try {
+    const allContacts = await db.select({
+      routingState: contactsTable.routingState,
+      engagementTier: contactsTable.engagementTier,
+      segmentType: contactsTable.segmentType,
+      qualifiedStatus: contactsTable.qualifiedStatus,
+    }).from(contactsTable);
+
+    const byState: Record<string, number> = {};
+    const byTier: Record<string, number> = {};
+    const qualifiedBySegment: Record<string, number> = {};
+
+    for (const c of allContacts) {
+      const state = c.routingState || "standard_nurture";
+      byState[state] = (byState[state] || 0) + 1;
+
+      const tier = c.engagementTier || "cold";
+      byTier[tier] = (byTier[tier] || 0) + 1;
+
+      if (c.qualifiedStatus === "qualified" || c.qualifiedStatus === "candidate") {
+        const seg = c.segmentType || "general";
+        qualifiedBySegment[seg] = (qualifiedBySegment[seg] || 0) + 1;
+      }
+    }
+
+    const recentLogs = await db.select().from(routingLogsTable)
+      .orderBy(desc(routingLogsTable.createdAt))
+      .limit(50);
+
+    res.json({
+      total: allContacts.length,
+      byState,
+      byTier,
+      qualifiedBySegment,
+      awaitingManualOutreach: byState.awaiting_manual_outreach || 0,
+      reactivationPool: byState.reactivation_pool || 0,
+      hotPriority: byState.hot_priority || 0,
+      warmFollowup: byState.warm_followup || 0,
+      recentRoutingChanges: recentLogs,
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/routing/logs/:contactId", async (req, res) => {
+  try {
+    const contactId = parseInt(req.params.contactId);
+    const logs = await db.select().from(routingLogsTable)
+      .where(eq(routingLogsTable.contactId, contactId))
+      .orderBy(desc(routingLogsTable.createdAt));
+    res.json(logs);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/next-actions", async (_req, res) => {
+  try {
+    const actions = await db.select().from(nextActionsTable).orderBy(asc(nextActionsTable.name));
+    res.json(actions);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post("/next-actions", async (req, res) => {
+  try {
+    const { name, description, recommendedForTier, recommendedForSegment, isActive } = req.body;
+    const [action] = await db.insert(nextActionsTable).values({
+      name, description, recommendedForTier, recommendedForSegment, isActive: isActive !== false,
+    }).returning();
+    res.json(action);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put("/next-actions/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { name, description, recommendedForTier, recommendedForSegment, isActive } = req.body;
+    const updates: Record<string, any> = { updatedAt: new Date() };
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (recommendedForTier !== undefined) updates.recommendedForTier = recommendedForTier;
+    if (recommendedForSegment !== undefined) updates.recommendedForSegment = recommendedForSegment;
+    if (isActive !== undefined) updates.isActive = isActive;
+    const [updated] = await db.update(nextActionsTable).set(updates).where(eq(nextActionsTable.id, id)).returning();
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.delete("/next-actions/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await db.delete(nextActionsTable).where(eq(nextActionsTable.id, id));
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/cta-library", async (_req, res) => {
+  try {
+    const entries = await db.select().from(ctaLibraryTable).orderBy(asc(ctaLibraryTable.name));
+    res.json(entries);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post("/cta-library", async (req, res) => {
+  try {
+    const { name, description, text, recommendedForTier, recommendedForSegment, isActive } = req.body;
+    const [entry] = await db.insert(ctaLibraryTable).values({
+      name, description, text, recommendedForTier, recommendedForSegment, isActive: isActive !== false,
+    }).returning();
+    res.json(entry);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.put("/cta-library/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { name, description, text, recommendedForTier, recommendedForSegment, isActive } = req.body;
+    const updates: Record<string, any> = { updatedAt: new Date() };
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (text !== undefined) updates.text = text;
+    if (recommendedForTier !== undefined) updates.recommendedForTier = recommendedForTier;
+    if (recommendedForSegment !== undefined) updates.recommendedForSegment = recommendedForSegment;
+    if (isActive !== undefined) updates.isActive = isActive;
+    const [updated] = await db.update(ctaLibraryTable).set(updates).where(eq(ctaLibraryTable.id, id)).returning();
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.delete("/cta-library/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await db.delete(ctaLibraryTable).where(eq(ctaLibraryTable.id, id));
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post("/routing/evaluate/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const decision = await evaluateAndUpdateContact(id);
+    if (!decision) return res.status(404).json({ message: "Contact not found or routing locked" });
+    res.json(decision);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
   }
 });
 

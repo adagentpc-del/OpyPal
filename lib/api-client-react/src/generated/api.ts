@@ -24,13 +24,19 @@ import type {
   BulkClearPersonalizationBody,
   BulkGeneratePersonalizationBody,
   BulkPersonalizationResult,
+  BulkUpdateRouting200,
+  BulkUpdateRoutingBody,
   CampaignInput,
   CampaignItem,
   Contact,
   ContactInput,
+  CtaEntry,
+  CtaEntryInput,
   DashboardData,
   DeleteCampaign200,
   DeleteContact200,
+  DeleteCtaEntry200,
+  DeleteNextAction200,
   DeleteTemplateSet200,
   EmailEvent,
   EnrollInput,
@@ -55,6 +61,8 @@ import type {
   Lead,
   LeadInput,
   MessageResponse,
+  NextAction,
+  NextActionInput,
   OutboundAnalytics,
   OutreachHistoryEntry,
   OutreachHistoryInput,
@@ -62,6 +70,10 @@ import type {
   PersonalizationResult,
   ProcessSequenceQueue200,
   QueueItem,
+  RoutingAnalytics,
+  RoutingDecision,
+  RoutingLog,
+  RoutingRecommendations,
   SeedResult,
   SendLogItem,
   SequenceStep,
@@ -81,6 +93,7 @@ import type {
   TemplateSetInput,
   TemplateSetItem,
   UpdateContactCustomLineBody,
+  UpdateContactRoutingInput,
   UpdateLeadStatusBody,
   UpdateOutboundSettingsBody,
 } from "./api.schemas";
@@ -6463,4 +6476,1268 @@ export const useUpdateOutboundSettings = <
   TContext
 > => {
   return useMutation(getUpdateOutboundSettingsMutationOptions(options));
+};
+
+/**
+ * @summary Get contacts by routing state
+ */
+export const getGetRoutingQueueUrl = (state: string) => {
+  return `/api/routing/queue/${state}`;
+};
+
+export const getRoutingQueue = async (
+  state: string,
+  options?: RequestInit,
+): Promise<Contact[]> => {
+  return customFetch<Contact[]>(getGetRoutingQueueUrl(state), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetRoutingQueueQueryKey = (state: string) => {
+  return [`/api/routing/queue/${state}`] as const;
+};
+
+export const getGetRoutingQueueQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRoutingQueue>>,
+  TError = ErrorType<unknown>,
+>(
+  state: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getRoutingQueue>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetRoutingQueueQueryKey(state);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getRoutingQueue>>> = ({
+    signal,
+  }) => getRoutingQueue(state, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!state,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRoutingQueue>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetRoutingQueueQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRoutingQueue>>
+>;
+export type GetRoutingQueueQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get contacts by routing state
+ */
+
+export function useGetRoutingQueue<
+  TData = Awaited<ReturnType<typeof getRoutingQueue>>,
+  TError = ErrorType<unknown>,
+>(
+  state: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getRoutingQueue>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRoutingQueueQueryOptions(state, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get routing recommendations for a contact
+ */
+export const getGetRoutingRecommendationsUrl = (id: number) => {
+  return `/api/routing/recommendations/${id}`;
+};
+
+export const getRoutingRecommendations = async (
+  id: number,
+  options?: RequestInit,
+): Promise<RoutingRecommendations> => {
+  return customFetch<RoutingRecommendations>(
+    getGetRoutingRecommendationsUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetRoutingRecommendationsQueryKey = (id: number) => {
+  return [`/api/routing/recommendations/${id}`] as const;
+};
+
+export const getGetRoutingRecommendationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRoutingRecommendations>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getRoutingRecommendations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetRoutingRecommendationsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getRoutingRecommendations>>
+  > = ({ signal }) =>
+    getRoutingRecommendations(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRoutingRecommendations>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetRoutingRecommendationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRoutingRecommendations>>
+>;
+export type GetRoutingRecommendationsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get routing recommendations for a contact
+ */
+
+export function useGetRoutingRecommendations<
+  TData = Awaited<ReturnType<typeof getRoutingRecommendations>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getRoutingRecommendations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRoutingRecommendationsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update contact routing state manually
+ */
+export const getUpdateContactRoutingUrl = (id: number) => {
+  return `/api/contacts/${id}/routing`;
+};
+
+export const updateContactRouting = async (
+  id: number,
+  updateContactRoutingInput: UpdateContactRoutingInput,
+  options?: RequestInit,
+): Promise<Contact> => {
+  return customFetch<Contact>(getUpdateContactRoutingUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateContactRoutingInput),
+  });
+};
+
+export const getUpdateContactRoutingMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateContactRouting>>,
+    TError,
+    { id: number; data: BodyType<UpdateContactRoutingInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateContactRouting>>,
+  TError,
+  { id: number; data: BodyType<UpdateContactRoutingInput> },
+  TContext
+> => {
+  const mutationKey = ["updateContactRouting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateContactRouting>>,
+    { id: number; data: BodyType<UpdateContactRoutingInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateContactRouting(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateContactRoutingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateContactRouting>>
+>;
+export type UpdateContactRoutingMutationBody =
+  BodyType<UpdateContactRoutingInput>;
+export type UpdateContactRoutingMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update contact routing state manually
+ */
+export const useUpdateContactRouting = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateContactRouting>>,
+    TError,
+    { id: number; data: BodyType<UpdateContactRoutingInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateContactRouting>>,
+  TError,
+  { id: number; data: BodyType<UpdateContactRoutingInput> },
+  TContext
+> => {
+  return useMutation(getUpdateContactRoutingMutationOptions(options));
+};
+
+/**
+ * @summary Bulk update routing state for contacts
+ */
+export const getBulkUpdateRoutingUrl = () => {
+  return `/api/routing/bulk-update`;
+};
+
+export const bulkUpdateRouting = async (
+  bulkUpdateRoutingBody: BulkUpdateRoutingBody,
+  options?: RequestInit,
+): Promise<BulkUpdateRouting200> => {
+  return customFetch<BulkUpdateRouting200>(getBulkUpdateRoutingUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(bulkUpdateRoutingBody),
+  });
+};
+
+export const getBulkUpdateRoutingMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkUpdateRouting>>,
+    TError,
+    { data: BodyType<BulkUpdateRoutingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkUpdateRouting>>,
+  TError,
+  { data: BodyType<BulkUpdateRoutingBody> },
+  TContext
+> => {
+  const mutationKey = ["bulkUpdateRouting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkUpdateRouting>>,
+    { data: BodyType<BulkUpdateRoutingBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return bulkUpdateRouting(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkUpdateRoutingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkUpdateRouting>>
+>;
+export type BulkUpdateRoutingMutationBody = BodyType<BulkUpdateRoutingBody>;
+export type BulkUpdateRoutingMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Bulk update routing state for contacts
+ */
+export const useBulkUpdateRouting = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkUpdateRouting>>,
+    TError,
+    { data: BodyType<BulkUpdateRoutingBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkUpdateRouting>>,
+  TError,
+  { data: BodyType<BulkUpdateRoutingBody> },
+  TContext
+> => {
+  return useMutation(getBulkUpdateRoutingMutationOptions(options));
+};
+
+/**
+ * @summary Get routing analytics
+ */
+export const getGetRoutingAnalyticsUrl = () => {
+  return `/api/routing/analytics`;
+};
+
+export const getRoutingAnalytics = async (
+  options?: RequestInit,
+): Promise<RoutingAnalytics> => {
+  return customFetch<RoutingAnalytics>(getGetRoutingAnalyticsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetRoutingAnalyticsQueryKey = () => {
+  return [`/api/routing/analytics`] as const;
+};
+
+export const getGetRoutingAnalyticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRoutingAnalytics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getRoutingAnalytics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetRoutingAnalyticsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getRoutingAnalytics>>
+  > = ({ signal }) => getRoutingAnalytics({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRoutingAnalytics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetRoutingAnalyticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRoutingAnalytics>>
+>;
+export type GetRoutingAnalyticsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get routing analytics
+ */
+
+export function useGetRoutingAnalytics<
+  TData = Awaited<ReturnType<typeof getRoutingAnalytics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getRoutingAnalytics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRoutingAnalyticsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get routing log history for a contact
+ */
+export const getGetRoutingLogsUrl = (contactId: number) => {
+  return `/api/routing/logs/${contactId}`;
+};
+
+export const getRoutingLogs = async (
+  contactId: number,
+  options?: RequestInit,
+): Promise<RoutingLog[]> => {
+  return customFetch<RoutingLog[]>(getGetRoutingLogsUrl(contactId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetRoutingLogsQueryKey = (contactId: number) => {
+  return [`/api/routing/logs/${contactId}`] as const;
+};
+
+export const getGetRoutingLogsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRoutingLogs>>,
+  TError = ErrorType<unknown>,
+>(
+  contactId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getRoutingLogs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetRoutingLogsQueryKey(contactId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getRoutingLogs>>> = ({
+    signal,
+  }) => getRoutingLogs(contactId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!contactId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRoutingLogs>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetRoutingLogsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRoutingLogs>>
+>;
+export type GetRoutingLogsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get routing log history for a contact
+ */
+
+export function useGetRoutingLogs<
+  TData = Awaited<ReturnType<typeof getRoutingLogs>>,
+  TError = ErrorType<unknown>,
+>(
+  contactId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getRoutingLogs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRoutingLogsQueryOptions(contactId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Re-evaluate routing for a contact
+ */
+export const getEvaluateContactRoutingUrl = (id: number) => {
+  return `/api/routing/evaluate/${id}`;
+};
+
+export const evaluateContactRouting = async (
+  id: number,
+  options?: RequestInit,
+): Promise<RoutingDecision> => {
+  return customFetch<RoutingDecision>(getEvaluateContactRoutingUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getEvaluateContactRoutingMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof evaluateContactRouting>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof evaluateContactRouting>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["evaluateContactRouting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof evaluateContactRouting>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return evaluateContactRouting(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EvaluateContactRoutingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof evaluateContactRouting>>
+>;
+
+export type EvaluateContactRoutingMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Re-evaluate routing for a contact
+ */
+export const useEvaluateContactRouting = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof evaluateContactRouting>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof evaluateContactRouting>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getEvaluateContactRoutingMutationOptions(options));
+};
+
+/**
+ * @summary List all next actions
+ */
+export const getGetNextActionsUrl = () => {
+  return `/api/next-actions`;
+};
+
+export const getNextActions = async (
+  options?: RequestInit,
+): Promise<NextAction[]> => {
+  return customFetch<NextAction[]>(getGetNextActionsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetNextActionsQueryKey = () => {
+  return [`/api/next-actions`] as const;
+};
+
+export const getGetNextActionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getNextActions>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getNextActions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetNextActionsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getNextActions>>> = ({
+    signal,
+  }) => getNextActions({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getNextActions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetNextActionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getNextActions>>
+>;
+export type GetNextActionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all next actions
+ */
+
+export function useGetNextActions<
+  TData = Awaited<ReturnType<typeof getNextActions>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getNextActions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetNextActionsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a next action
+ */
+export const getCreateNextActionUrl = () => {
+  return `/api/next-actions`;
+};
+
+export const createNextAction = async (
+  nextActionInput: NextActionInput,
+  options?: RequestInit,
+): Promise<NextAction> => {
+  return customFetch<NextAction>(getCreateNextActionUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(nextActionInput),
+  });
+};
+
+export const getCreateNextActionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createNextAction>>,
+    TError,
+    { data: BodyType<NextActionInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createNextAction>>,
+  TError,
+  { data: BodyType<NextActionInput> },
+  TContext
+> => {
+  const mutationKey = ["createNextAction"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createNextAction>>,
+    { data: BodyType<NextActionInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createNextAction(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateNextActionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createNextAction>>
+>;
+export type CreateNextActionMutationBody = BodyType<NextActionInput>;
+export type CreateNextActionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a next action
+ */
+export const useCreateNextAction = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createNextAction>>,
+    TError,
+    { data: BodyType<NextActionInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createNextAction>>,
+  TError,
+  { data: BodyType<NextActionInput> },
+  TContext
+> => {
+  return useMutation(getCreateNextActionMutationOptions(options));
+};
+
+/**
+ * @summary Update a next action
+ */
+export const getUpdateNextActionUrl = (id: number) => {
+  return `/api/next-actions/${id}`;
+};
+
+export const updateNextAction = async (
+  id: number,
+  nextActionInput: NextActionInput,
+  options?: RequestInit,
+): Promise<NextAction> => {
+  return customFetch<NextAction>(getUpdateNextActionUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(nextActionInput),
+  });
+};
+
+export const getUpdateNextActionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateNextAction>>,
+    TError,
+    { id: number; data: BodyType<NextActionInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateNextAction>>,
+  TError,
+  { id: number; data: BodyType<NextActionInput> },
+  TContext
+> => {
+  const mutationKey = ["updateNextAction"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateNextAction>>,
+    { id: number; data: BodyType<NextActionInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateNextAction(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateNextActionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateNextAction>>
+>;
+export type UpdateNextActionMutationBody = BodyType<NextActionInput>;
+export type UpdateNextActionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a next action
+ */
+export const useUpdateNextAction = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateNextAction>>,
+    TError,
+    { id: number; data: BodyType<NextActionInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateNextAction>>,
+  TError,
+  { id: number; data: BodyType<NextActionInput> },
+  TContext
+> => {
+  return useMutation(getUpdateNextActionMutationOptions(options));
+};
+
+/**
+ * @summary Delete a next action
+ */
+export const getDeleteNextActionUrl = (id: number) => {
+  return `/api/next-actions/${id}`;
+};
+
+export const deleteNextAction = async (
+  id: number,
+  options?: RequestInit,
+): Promise<DeleteNextAction200> => {
+  return customFetch<DeleteNextAction200>(getDeleteNextActionUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteNextActionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteNextAction>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteNextAction>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteNextAction"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteNextAction>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteNextAction(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteNextActionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteNextAction>>
+>;
+
+export type DeleteNextActionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a next action
+ */
+export const useDeleteNextAction = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteNextAction>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteNextAction>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteNextActionMutationOptions(options));
+};
+
+/**
+ * @summary List all CTA entries
+ */
+export const getGetCtaLibraryUrl = () => {
+  return `/api/cta-library`;
+};
+
+export const getCtaLibrary = async (
+  options?: RequestInit,
+): Promise<CtaEntry[]> => {
+  return customFetch<CtaEntry[]>(getGetCtaLibraryUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCtaLibraryQueryKey = () => {
+  return [`/api/cta-library`] as const;
+};
+
+export const getGetCtaLibraryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCtaLibrary>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCtaLibrary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCtaLibraryQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCtaLibrary>>> = ({
+    signal,
+  }) => getCtaLibrary({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCtaLibrary>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCtaLibraryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCtaLibrary>>
+>;
+export type GetCtaLibraryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all CTA entries
+ */
+
+export function useGetCtaLibrary<
+  TData = Awaited<ReturnType<typeof getCtaLibrary>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCtaLibrary>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCtaLibraryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a CTA entry
+ */
+export const getCreateCtaEntryUrl = () => {
+  return `/api/cta-library`;
+};
+
+export const createCtaEntry = async (
+  ctaEntryInput: CtaEntryInput,
+  options?: RequestInit,
+): Promise<CtaEntry> => {
+  return customFetch<CtaEntry>(getCreateCtaEntryUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(ctaEntryInput),
+  });
+};
+
+export const getCreateCtaEntryMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCtaEntry>>,
+    TError,
+    { data: BodyType<CtaEntryInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCtaEntry>>,
+  TError,
+  { data: BodyType<CtaEntryInput> },
+  TContext
+> => {
+  const mutationKey = ["createCtaEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCtaEntry>>,
+    { data: BodyType<CtaEntryInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createCtaEntry(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCtaEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCtaEntry>>
+>;
+export type CreateCtaEntryMutationBody = BodyType<CtaEntryInput>;
+export type CreateCtaEntryMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a CTA entry
+ */
+export const useCreateCtaEntry = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCtaEntry>>,
+    TError,
+    { data: BodyType<CtaEntryInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createCtaEntry>>,
+  TError,
+  { data: BodyType<CtaEntryInput> },
+  TContext
+> => {
+  return useMutation(getCreateCtaEntryMutationOptions(options));
+};
+
+/**
+ * @summary Update a CTA entry
+ */
+export const getUpdateCtaEntryUrl = (id: number) => {
+  return `/api/cta-library/${id}`;
+};
+
+export const updateCtaEntry = async (
+  id: number,
+  ctaEntryInput: CtaEntryInput,
+  options?: RequestInit,
+): Promise<CtaEntry> => {
+  return customFetch<CtaEntry>(getUpdateCtaEntryUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(ctaEntryInput),
+  });
+};
+
+export const getUpdateCtaEntryMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCtaEntry>>,
+    TError,
+    { id: number; data: BodyType<CtaEntryInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateCtaEntry>>,
+  TError,
+  { id: number; data: BodyType<CtaEntryInput> },
+  TContext
+> => {
+  const mutationKey = ["updateCtaEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateCtaEntry>>,
+    { id: number; data: BodyType<CtaEntryInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateCtaEntry(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateCtaEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateCtaEntry>>
+>;
+export type UpdateCtaEntryMutationBody = BodyType<CtaEntryInput>;
+export type UpdateCtaEntryMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a CTA entry
+ */
+export const useUpdateCtaEntry = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCtaEntry>>,
+    TError,
+    { id: number; data: BodyType<CtaEntryInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateCtaEntry>>,
+  TError,
+  { id: number; data: BodyType<CtaEntryInput> },
+  TContext
+> => {
+  return useMutation(getUpdateCtaEntryMutationOptions(options));
+};
+
+/**
+ * @summary Delete a CTA entry
+ */
+export const getDeleteCtaEntryUrl = (id: number) => {
+  return `/api/cta-library/${id}`;
+};
+
+export const deleteCtaEntry = async (
+  id: number,
+  options?: RequestInit,
+): Promise<DeleteCtaEntry200> => {
+  return customFetch<DeleteCtaEntry200>(getDeleteCtaEntryUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteCtaEntryMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCtaEntry>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteCtaEntry>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteCtaEntry"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteCtaEntry>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteCtaEntry(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteCtaEntryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteCtaEntry>>
+>;
+
+export type DeleteCtaEntryMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a CTA entry
+ */
+export const useDeleteCtaEntry = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCtaEntry>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteCtaEntry>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteCtaEntryMutationOptions(options));
 };

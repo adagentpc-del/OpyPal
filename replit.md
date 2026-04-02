@@ -69,6 +69,15 @@ The A3 Sales OS is a pnpm workspace monorepo built with Node.js 24 and TypeScrip
     *   **Contact Fields:** `customLine`, `customLineStatus` (not_generated/generated_safe/generated_enhanced/manual/failed), `customLineSource` (ai/fallback/manual), `customLineGeneratedAt`, `customLineLocked`.
     *   **Personalization Logs Table:** Tracks every generation attempt with mode, input fields, output, status, and errors.
 
+8.  **Offer Routing & Conversion Logic:**
+    *   **Routing Engine** (`artifacts/api-server/src/lib/routing-engine.ts`): Auto-classifies contacts into routing states (standard_nurture, warm_followup, hot_priority, awaiting_manual_outreach, meeting_candidate, qualified_opportunity, reactivation_pool, closed_won, closed_lost, disqualified). Triggered on track/open and track/click events.
+    *   **Routing Logic:** Bounced/unsub/DNC → disqualified; reply → awaiting_manual_outreach; hot tier (score ≥8) or 3+ clicks → hot_priority + book_call; warm tier (score ≥3) → warm_followup + segment-aware action; completed sequence + low score → reactivation_pool. Respects routingLocked flag.
+    *   **Contact Fields:** `routingState`, `routingLocked`, `recommendedNextAction`, `qualifiedStatus` (unreviewed/candidate/qualified/disqualified), `manualPriority`.
+    *   **API Endpoints:** `GET /routing/queue/:state`, `GET /routing/recommendations/:id`, `PUT /contacts/:id/routing`, `POST /routing/bulk-update`, `GET /routing/analytics`, `GET /routing/logs/:id`, `POST /routing/evaluate/:id`, CRUD for `next-actions` and `cta-library`.
+    *   **Frontend:** Routing page (ob-routing.tsx) with 4 tabs: Routing Queues (filterable by state), Next Actions CRUD, CTA Library CRUD, Routing Analytics. Contact detail routing panel in ob-contacts.tsx. Routing stats in ob-analytics.tsx.
+    *   **Admin Controls:** Manual state override, lock/unlock routing, flag priority, bulk update, re-evaluate routing.
+    *   **Seed Data:** 10 next actions (segment-aware) and 6 CTA library entries.
+
 **Database Schema (Drizzle ORM):**
 Key tables include:
 -   `leads`: CRM lead records.
@@ -79,6 +88,9 @@ Key tables include:
 -   `outreach_history`: Log of sent emails per lead.
 -   `contacts`, `campaigns`, `template_sets`, `sequence_enrollments`, `sequence_steps`, `send_logs`, `email_events`, `suppression_list`, `imports`, `settings`: Tables for the Outbound Sequence Engine and analytics.
 -   `personalization_logs`: Tracks AI personalization generation attempts with mode, input fields, output text, status, and errors.
+-   `routing_logs`: Tracks routing state changes per contact with previous/new state and reason.
+-   `next_actions`: Library of recommended next actions with tier and segment targeting.
+-   `cta_library`: Library of CTA texts with tier and segment targeting.
 
 **TypeScript & Composite Projects:**
 The monorepo leverages TypeScript composite projects, with all packages extending `tsconfig.base.json`. Type checking is performed from the root, emitting only `.d.ts` files. Project references are configured for inter-package dependencies.

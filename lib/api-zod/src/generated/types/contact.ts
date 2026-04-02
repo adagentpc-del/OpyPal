@@ -40,6 +40,11 @@ export interface Contact {
   unsubscribed?: boolean;
   bounced?: boolean;
   bounceStatus?: string;
+  routingState?: string;
+  routingLocked?: boolean;
+  recommendedNextAction?: string;
+  qualifiedStatus?: string;
+  manualPriority?: boolean;
   sourceFileName?: string;
   uploadedAt?: string;
   notes?: string;

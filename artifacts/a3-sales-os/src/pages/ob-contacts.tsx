@@ -381,7 +381,7 @@ export default function ObContacts() {
 function ContactDetail({ contact, onUpdate }: { contact: any; onUpdate: () => void }) {
   const { data: steps } = useGetContactSteps(contact.id);
   const { data: events } = useGetContactEvents(contact.id);
-  const [tab, setTab] = useState<"details" | "steps" | "events" | "personalization">("details");
+  const [tab, setTab] = useState<"details" | "steps" | "events" | "personalization" | "routing">("details");
   const [editingCL, setEditingCL] = useState(false);
   const [clText, setClText] = useState(contact.customLine || "");
 
@@ -429,10 +429,10 @@ function ContactDetail({ contact, onUpdate }: { contact: any; onUpdate: () => vo
   return (
     <div className="space-y-4">
       <div className="flex gap-2 border-b border-border">
-        {(["details", "personalization", "steps", "events"] as const).map(t => (
+        {(["details", "personalization", "routing", "steps", "events"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition ${tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-            {t === "details" ? "Details" : t === "personalization" ? "Personalization" : t === "steps" ? "Sequence Steps" : "Engagement Timeline"}
+            {t === "details" ? "Details" : t === "personalization" ? "Personalization" : t === "routing" ? "Routing" : t === "steps" ? "Sequence Steps" : "Engagement Timeline"}
           </button>
         ))}
       </div>
@@ -548,6 +548,53 @@ function ContactDetail({ contact, onUpdate }: { contact: any; onUpdate: () => vo
               </p>
             )}
           </Card>
+        </div>
+      )}
+
+      {tab === "routing" && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <h4 className="font-semibold text-sm">Routing State</h4>
+            <div className="space-y-1.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">State:</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                  contact.routingState === "hot_priority" ? "bg-red-50 text-red-600" :
+                  contact.routingState === "warm_followup" ? "bg-amber-50 text-amber-600" :
+                  contact.routingState === "awaiting_manual_outreach" ? "bg-blue-50 text-blue-600" :
+                  contact.routingState === "qualified_opportunity" ? "bg-emerald-50 text-emerald-600" :
+                  "bg-gray-50 text-gray-600"
+                }`}>
+                  {(contact.routingState || "standard_nurture").replace(/_/g, " ")}
+                </span>
+              </div>
+              <div><span className="text-muted-foreground">Qualified:</span> <span className="capitalize">{contact.qualifiedStatus || "unreviewed"}</span></div>
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">Locked:</span>
+                {contact.routingLocked ? <Lock className="h-3 w-3 text-amber-500" /> : <Unlock className="h-3 w-3 text-gray-400" />}
+                <span>{contact.routingLocked ? "Yes" : "No"}</span>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-semibold text-sm">Recommended Action</h4>
+            {contact.recommendedNextAction ? (
+              <div className="p-3 rounded-xl bg-primary/5 border border-primary/10">
+                <div className="font-medium text-sm">{contact.recommendedNextAction.replace(/_/g, " ")}</div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">No action recommended yet.</p>
+            )}
+            {contact.manualPriority && (
+              <div className="flex items-center gap-1 text-xs text-yellow-600 font-medium">
+                <Flame className="h-3 w-3" /> Manually flagged as priority
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-semibold text-sm">Quick Actions</h4>
+            <p className="text-xs text-muted-foreground">Use the Routing page for full admin controls, routing history, and bulk updates.</p>
+          </div>
         </div>
       )}
 

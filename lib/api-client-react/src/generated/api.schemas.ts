@@ -280,6 +280,11 @@ export interface Contact {
   unsubscribed?: boolean;
   bounced?: boolean;
   bounceStatus?: string;
+  routingState?: string;
+  routingLocked?: boolean;
+  recommendedNextAction?: string;
+  qualifiedStatus?: string;
+  manualPriority?: boolean;
   sourceFileName?: string;
   uploadedAt?: string;
   notes?: string;
@@ -621,6 +626,116 @@ export interface PersonalizationAnalytics {
   bySegment?: PersonalizationAnalyticsBySegmentItem[];
 }
 
+export type RoutingRecommendationsContact = {
+  id?: number;
+  fullName?: string;
+  company?: string;
+  title?: string;
+  email?: string;
+  segmentType?: string;
+  engagementScore?: number;
+  engagementTier?: string;
+  routingState?: string;
+  routingLocked?: boolean;
+  recommendedNextAction?: string;
+  qualifiedStatus?: string;
+  manualPriority?: boolean;
+  sequenceStatus?: string;
+  lastEmailSentAt?: string;
+  lastReplyAt?: string;
+};
+
+export interface RoutingLog {
+  id?: number;
+  contactId?: number;
+  previousRoutingState?: string;
+  newRoutingState?: string;
+  reason?: string;
+  recommendedNextAction?: string;
+  createdAt?: string;
+}
+
+export interface NextAction {
+  id?: number;
+  name?: string;
+  description?: string;
+  recommendedForTier?: string;
+  recommendedForSegment?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RoutingRecommendations {
+  contact?: RoutingRecommendationsContact;
+  events?: EmailEvent[];
+  routingHistory?: RoutingLog[];
+  sendHistory?: SendLog[];
+  recommendedActions?: NextAction[];
+}
+
+export interface UpdateContactRoutingInput {
+  routingState?: string;
+  routingLocked?: boolean;
+  recommendedNextAction?: string;
+  qualifiedStatus?: string;
+  manualPriority?: boolean;
+  reason?: string;
+}
+
+export type RoutingAnalyticsByState = { [key: string]: number };
+
+export type RoutingAnalyticsByTier = { [key: string]: number };
+
+export type RoutingAnalyticsQualifiedBySegment = { [key: string]: number };
+
+export interface RoutingAnalytics {
+  total?: number;
+  byState?: RoutingAnalyticsByState;
+  byTier?: RoutingAnalyticsByTier;
+  qualifiedBySegment?: RoutingAnalyticsQualifiedBySegment;
+  awaitingManualOutreach?: number;
+  reactivationPool?: number;
+  hotPriority?: number;
+  warmFollowup?: number;
+  recentRoutingChanges?: RoutingLog[];
+}
+
+export interface RoutingDecision {
+  routingState?: string;
+  recommendedNextAction?: string;
+  reason?: string;
+}
+
+export interface NextActionInput {
+  name: string;
+  description?: string;
+  recommendedForTier?: string;
+  recommendedForSegment?: string;
+  isActive?: boolean;
+}
+
+export interface CtaEntry {
+  id?: number;
+  name?: string;
+  description?: string;
+  text?: string;
+  recommendedForTier?: string;
+  recommendedForSegment?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CtaEntryInput {
+  name: string;
+  description?: string;
+  text: string;
+  recommendedForTier?: string;
+  recommendedForSegment?: string;
+  isActive?: boolean;
+}
+
 export type GetLeadsParams = {
   search?: string;
   pipelineType?: string;
@@ -759,4 +874,25 @@ export type GetEmailEventsParams = {
 
 export type UpdateOutboundSettingsBody = {
   settings: SettingInput[];
+};
+
+export type BulkUpdateRoutingBody = {
+  contactIds: number[];
+  routingState?: string;
+  recommendedNextAction?: string;
+  qualifiedStatus?: string;
+  reason?: string;
+};
+
+export type BulkUpdateRouting200 = {
+  success?: boolean;
+  updated?: number;
+};
+
+export type DeleteNextAction200 = {
+  success?: boolean;
+};
+
+export type DeleteCtaEntry200 = {
+  success?: boolean;
 };

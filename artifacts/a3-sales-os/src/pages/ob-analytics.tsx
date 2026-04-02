@@ -5,6 +5,7 @@ import {
   useGetOutboundSettings,
   useUpdateOutboundSettings,
   useGetPersonalizationAnalytics,
+  useGetRoutingAnalytics,
   getGetOutboundSettingsQueryKey,
 } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
@@ -26,6 +27,7 @@ import {
   Ban,
   MailX,
   Sparkles,
+  Route,
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +39,7 @@ export default function ObAnalytics() {
   const { data: sendLogs } = useGetSendLogs({ limit: 20 });
   const { data: settings } = useGetOutboundSettings();
   const { data: pAnalytics } = useGetPersonalizationAnalytics();
+  const { data: routingAnalytics } = useGetRoutingAnalytics();
   const updateSettings = useUpdateOutboundSettings();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -196,6 +199,49 @@ export default function ObAnalytics() {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {routingAnalytics && (
+          <Card className="p-5 border-blue-200">
+            <div className="flex items-center gap-2 mb-4">
+              <Route className="h-5 w-5 text-blue-600" />
+              <h3 className="font-semibold text-blue-900">Offer Routing</h3>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+              <div className="text-center p-3 rounded-xl bg-red-50">
+                <div className="text-2xl font-bold text-red-600">{routingAnalytics.hotPriority || 0}</div>
+                <div className="text-xs text-red-500">Hot Priority</div>
+              </div>
+              <div className="text-center p-3 rounded-xl bg-amber-50">
+                <div className="text-2xl font-bold text-amber-600">{routingAnalytics.warmFollowup || 0}</div>
+                <div className="text-xs text-amber-500">Warm Follow-up</div>
+              </div>
+              <div className="text-center p-3 rounded-xl bg-blue-50">
+                <div className="text-2xl font-bold text-blue-600">{routingAnalytics.awaitingManualOutreach || 0}</div>
+                <div className="text-xs text-blue-500">Awaiting Manual</div>
+              </div>
+              <div className="text-center p-3 rounded-xl bg-orange-50">
+                <div className="text-2xl font-bold text-orange-600">{routingAnalytics.reactivationPool || 0}</div>
+                <div className="text-xs text-orange-500">Reactivation</div>
+              </div>
+              <div className="text-center p-3 rounded-xl bg-emerald-50">
+                <div className="text-2xl font-bold text-emerald-600">{(routingAnalytics.byState as any)?.qualified_opportunity || 0}</div>
+                <div className="text-xs text-emerald-500">Qualified</div>
+              </div>
+            </div>
+            {routingAnalytics.qualifiedBySegment && Object.keys(routingAnalytics.qualifiedBySegment).length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Qualified by Segment</h4>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(routingAnalytics.qualifiedBySegment).map(([segment, count]: [string, any]) => (
+                    <span key={segment} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-muted capitalize">
+                      {segment}: <span className="font-bold">{count}</span>
+                    </span>
+                  ))}
                 </div>
               </div>
             )}

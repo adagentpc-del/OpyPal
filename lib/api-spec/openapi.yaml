@@ -37,6 +37,12 @@ tags:
     description: Outbound analytics
   - name: outbound-settings
     description: Outbound settings
+  - name: routing
+    description: Offer routing and conversion logic
+  - name: next-actions
+    description: Next action management
+  - name: cta-library
+    description: CTA library management
 
 paths:
   /healthz:
@@ -1598,6 +1604,317 @@ paths:
                 items:
                   $ref: "#/components/schemas/SettingItem"
 
+  /routing/queue/{state}:
+    get:
+      operationId: getRoutingQueue
+      tags: [routing]
+      summary: Get contacts by routing state
+      parameters:
+        - name: state
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Contacts in routing state
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+
+  /routing/recommendations/{id}:
+    get:
+      operationId: getRoutingRecommendations
+      tags: [routing]
+      summary: Get routing recommendations for a contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Routing recommendations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutingRecommendations"
+
+  /contacts/{id}/routing:
+    put:
+      operationId: updateContactRouting
+      tags: [routing]
+      summary: Update contact routing state manually
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContactRoutingInput"
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /routing/bulk-update:
+    post:
+      operationId: bulkUpdateRouting
+      tags: [routing]
+      summary: Bulk update routing state for contacts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contactIds:
+                  type: array
+                  items:
+                    type: integer
+                routingState:
+                  type: string
+                recommendedNextAction:
+                  type: string
+                qualifiedStatus:
+                  type: string
+                reason:
+                  type: string
+              required:
+                - contactIds
+      responses:
+        "200":
+          description: Bulk update result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  updated:
+                    type: integer
+
+  /routing/analytics:
+    get:
+      operationId: getRoutingAnalytics
+      tags: [routing]
+      summary: Get routing analytics
+      responses:
+        "200":
+          description: Routing analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutingAnalytics"
+
+  /routing/logs/{contactId}:
+    get:
+      operationId: getRoutingLogs
+      tags: [routing]
+      summary: Get routing log history for a contact
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Routing logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoutingLog"
+
+  /routing/evaluate/{id}:
+    post:
+      operationId: evaluateContactRouting
+      tags: [routing]
+      summary: Re-evaluate routing for a contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Routing decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutingDecision"
+
+  /next-actions:
+    get:
+      operationId: getNextActions
+      tags: [next-actions]
+      summary: List all next actions
+      responses:
+        "200":
+          description: Next actions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NextAction"
+    post:
+      operationId: createNextAction
+      tags: [next-actions]
+      summary: Create a next action
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NextActionInput"
+      responses:
+        "200":
+          description: Created next action
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NextAction"
+
+  /next-actions/{id}:
+    put:
+      operationId: updateNextAction
+      tags: [next-actions]
+      summary: Update a next action
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NextActionInput"
+      responses:
+        "200":
+          description: Updated next action
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NextAction"
+    delete:
+      operationId: deleteNextAction
+      tags: [next-actions]
+      summary: Delete a next action
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /cta-library:
+    get:
+      operationId: getCtaLibrary
+      tags: [cta-library]
+      summary: List all CTA entries
+      responses:
+        "200":
+          description: CTA library entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CtaEntry"
+    post:
+      operationId: createCtaEntry
+      tags: [cta-library]
+      summary: Create a CTA entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CtaEntryInput"
+      responses:
+        "200":
+          description: Created CTA entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CtaEntry"
+
+  /cta-library/{id}:
+    put:
+      operationId: updateCtaEntry
+      tags: [cta-library]
+      summary: Update a CTA entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CtaEntryInput"
+      responses:
+        "200":
+          description: Updated CTA entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CtaEntry"
+    delete:
+      operationId: deleteCtaEntry
+      tags: [cta-library]
+      summary: Delete a CTA entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
 components:
   schemas:
     HealthStatus:
@@ -2196,6 +2513,16 @@ components:
           type: boolean
         bounceStatus:
           type: string
+        routingState:
+          type: string
+        routingLocked:
+          type: boolean
+        recommendedNextAction:
+          type: string
+        qualifiedStatus:
+          type: string
+        manualPriority:
+          type: boolean
         sourceFileName:
           type: string
         uploadedAt:
@@ -2894,3 +3221,209 @@ components:
                 type: integer
               withoutPersonalization:
                 type: integer
+
+    RoutingRecommendations:
+      type: object
+      properties:
+        contact:
+          type: object
+          properties:
+            id:
+              type: integer
+            fullName:
+              type: string
+            company:
+              type: string
+            title:
+              type: string
+            email:
+              type: string
+            segmentType:
+              type: string
+            engagementScore:
+              type: integer
+            engagementTier:
+              type: string
+            routingState:
+              type: string
+            routingLocked:
+              type: boolean
+            recommendedNextAction:
+              type: string
+            qualifiedStatus:
+              type: string
+            manualPriority:
+              type: boolean
+            sequenceStatus:
+              type: string
+            lastEmailSentAt:
+              type: string
+            lastReplyAt:
+              type: string
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmailEvent"
+        routingHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutingLog"
+        sendHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/SendLog"
+        recommendedActions:
+          type: array
+          items:
+            $ref: "#/components/schemas/NextAction"
+
+    UpdateContactRoutingInput:
+      type: object
+      properties:
+        routingState:
+          type: string
+        routingLocked:
+          type: boolean
+        recommendedNextAction:
+          type: string
+        qualifiedStatus:
+          type: string
+        manualPriority:
+          type: boolean
+        reason:
+          type: string
+
+    RoutingAnalytics:
+      type: object
+      properties:
+        total:
+          type: integer
+        byState:
+          type: object
+          additionalProperties:
+            type: integer
+        byTier:
+          type: object
+          additionalProperties:
+            type: integer
+        qualifiedBySegment:
+          type: object
+          additionalProperties:
+            type: integer
+        awaitingManualOutreach:
+          type: integer
+        reactivationPool:
+          type: integer
+        hotPriority:
+          type: integer
+        warmFollowup:
+          type: integer
+        recentRoutingChanges:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutingLog"
+
+    RoutingLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        contactId:
+          type: integer
+        previousRoutingState:
+          type: string
+        newRoutingState:
+          type: string
+        reason:
+          type: string
+        recommendedNextAction:
+          type: string
+        createdAt:
+          type: string
+
+    RoutingDecision:
+      type: object
+      properties:
+        routingState:
+          type: string
+        recommendedNextAction:
+          type: string
+        reason:
+          type: string
+
+    NextAction:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        recommendedForTier:
+          type: string
+        recommendedForSegment:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    NextActionInput:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        recommendedForTier:
+          type: string
+        recommendedForSegment:
+          type: string
+        isActive:
+          type: boolean
+      required:
+        - name
+
+    CtaEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        text:
+          type: string
+        recommendedForTier:
+          type: string
+        recommendedForSegment:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    CtaEntryInput:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        text:
+          type: string
+        recommendedForTier:
+          type: string
+        recommendedForSegment:
+          type: string
+        isActive:
+          type: boolean
+      required:
+        - name
+        - text

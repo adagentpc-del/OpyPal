@@ -20,6 +20,7 @@ import {
   BarChart3,
   Contact,
   ShieldX,
+  Route,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -41,6 +42,7 @@ const OUTBOUND_ITEMS = [
   { name: "Sequences", href: "/ob/sequences", icon: ListOrdered },
   { name: "Queue", href: "/ob/queue", icon: Clock },
   { name: "Replies", href: "/ob/replies", icon: MessageCircle },
+  { name: "Routing", href: "/ob/routing", icon: Route },
   { name: "Analytics", href: "/ob/analytics", icon: BarChart3 },
   { name: "Suppression", href: "/ob/suppression", icon: ShieldX },
 ];

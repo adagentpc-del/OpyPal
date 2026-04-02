@@ -1,4 +1,4 @@
-import { db, leadsTable, tasksTable, templatesTable, activityTable, assetsTable, templateSetsTable, sequenceTemplatesTable, campaignsTable, settingsTable } from "@workspace/db";
+import { db, leadsTable, tasksTable, templatesTable, activityTable, assetsTable, templateSetsTable, sequenceTemplatesTable, campaignsTable, settingsTable, nextActionsTable, ctaLibraryTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const A3_GENERAL_TEMPLATES = [
@@ -546,6 +546,31 @@ async function seed() {
   ]);
 
   console.log("Seeded activity feed");
+
+  await db.insert(nextActionsTable).values([
+    { name: "continue_sequence", description: "Continue with the current automated sequence", recommendedForTier: "cold", isActive: true },
+    { name: "reactivation_later", description: "Move to reactivation pool for long-term follow-up", recommendedForTier: "cold", isActive: true },
+    { name: "send_capabilities_overview", description: "Send a capabilities overview deck", recommendedForTier: "warm", isActive: true },
+    { name: "send_case_study", description: "Send a relevant case study based on segment", recommendedForTier: "warm", isActive: true },
+    { name: "manual_review", description: "Flag for manual review by sales team", recommendedForTier: "warm", isActive: true },
+    { name: "manual_followup", description: "Direct manual follow-up recommended", recommendedForTier: "hot", isActive: true },
+    { name: "book_call", description: "Request a meeting or phone call", recommendedForTier: "hot", isActive: true },
+    { name: "mark_qualified", description: "Mark as qualified opportunity candidate", recommendedForTier: "hot", isActive: true },
+    { name: "move_to_pipeline", description: "Move contact to the sales pipeline as an opportunity", recommendedForTier: "hot", isActive: true },
+    { name: "archive", description: "Archive contact — no further outreach needed", isActive: true },
+  ]).onConflictDoNothing();
+  console.log("Seeded next actions");
+
+  await db.insert(ctaLibraryTable).values([
+    { name: "Quick Conversation", description: "Low-pressure meeting ask", text: "Worth a quick conversation to see if there is a fit?", recommendedForTier: "warm", isActive: true },
+    { name: "Share Examples", description: "Offer to share relevant work samples", text: "If helpful, I can send over a few relevant examples based on the type of work your team may be evaluating.", recommendedForTier: "warm", isActive: true },
+    { name: "Capabilities Overview", description: "Offer to send capabilities deck", text: "Happy to share a quick capabilities overview if that would be useful.", recommendedForTier: "warm", isActive: true },
+    { name: "Project Timing", description: "Check on upcoming project timing", text: "If timing is relevant, we could also set up a short conversation and see whether there is a fit.", recommendedForTier: "warm", isActive: true },
+    { name: "Execution Options", description: "Discuss execution possibilities", text: "Would it make sense to walk through some execution options that might be relevant to your team?", recommendedForTier: "hot", isActive: true },
+    { name: "Schedule Call", description: "Direct meeting request", text: "Would a 15-minute call make sense this week or next to explore whether there is a fit?", recommendedForTier: "hot", isActive: true },
+  ]).onConflictDoNothing();
+  console.log("Seeded CTA library");
+
   console.log("Seeding complete!");
   process.exit(0);
 }
