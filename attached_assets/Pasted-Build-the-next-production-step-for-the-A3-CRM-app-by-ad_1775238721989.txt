@@ -1,0 +1,103 @@
+Build the next production step for the A3 CRM app by adding a full app shell with a persistent left sidebar navigation across all authenticated pages.
+
+Objective:
+Turn the CRM into a structured multi page application with a professional navigation system that feels like a real SaaS dashboard.
+
+Requirements:
+
+1. Create a reusable app shell layout
+- Build a global authenticated layout component
+- Include:
+  - Left sidebar for desktop
+  - Top header bar
+  - Mobile slide out navigation drawer
+  - Main content area
+- Sidebar should remain visible on desktop and collapse on smaller screens
+- Main content should resize correctly when sidebar is collapsed or expanded
+
+2. Sidebar behavior
+- Fixed left sidebar on desktop
+- Collapsible with icon only mode
+- Expand and collapse state should persist in local storage
+- Mobile menu should open from top header button
+- Active route should be visually highlighted
+- Navigation should support grouped sections and icons
+- Add smooth transitions and clean spacing
+- Use a premium modern SaaS style consistent with the rest of the CRM
+
+3. Navigation structure
+Use exactly this sidebar structure:
+
+Main
+- Dashboard
+- Leads
+- Companies
+- Contacts
+- Campaigns
+- Email Templates
+- Sequences
+- CSV Uploads
+
+Outreach
+- Outbox
+- Scheduled Emails
+- Follow Ups
+- Deliverability
+- Opens and Clicks
+- Unsubscribes
+
+Qualification
+- Intent Signals
+- Lead Scoring
+- Segments
+- Pipeline
+
+Admin
+- Settings
+- Team Notes
+- Activity Log
+
+4. Routing
+- Create routes and placeholder pages for any sections not already created
+- If pages already exist, wire them into the sidebar
+- Each page should render inside the shared app shell
+- Add route metadata so page title can show in the top bar
+
+5. Page placeholders
+For new pages, create clean placeholder content with:
+- Page title
+- Short description
+- Empty state card showing what will live there
+- Button placeholder for future actions where relevant
+
+6. UI expectations
+- Professional CRM dashboard look
+- Clean typography
+- Strong spacing and visual hierarchy
+- Icons for every nav item
+- Support dark and light mode if current app already has theme support
+- Keep design modular and production ready
+- No fake sample data unless necessary for layout preview
+- Use reusable components
+
+7. Technical requirements
+- Refactor app so authenticated pages use a shared layout wrapper
+- Keep code clean and modular
+- Avoid duplicating sidebar logic
+- Create a centralized navigation config file so new items can be added easily
+- Use route based active state detection
+- Make sidebar compatible with future role based permissions
+
+8. Nice to have
+- Add a small A3 CRM logo or text mark at top of sidebar
+- Add user profile summary at bottom of sidebar
+- Add collapse toggle
+- Add breadcrumb or current page title in top bar
+
+9. Deliverable
+When complete, the app should feel like a real multi section CRM with a persistent sidebar and every main section accessible from navigation.
+
+After building, provide:
+- any new files created
+- any routes added
+- any files I need to review manually

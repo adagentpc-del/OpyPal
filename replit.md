@@ -30,6 +30,19 @@ The A3 Sales OS is a pnpm workspace monorepo built with Node.js 24 and TypeScrip
 - **Color Scheme:** A palette of blue, yellow, black, and white, defined as CSS custom properties in HSL format within `artifacts/a3-sales-os/src/index.css`.
 - **Components:** Utilizes shadcn/ui for consistent and accessible UI components.
 
+**App Shell & Navigation:**
+- **Layout:** `artifacts/a3-sales-os/src/components/layout.tsx` provides the global app shell with persistent left sidebar, top header bar (shows current page title), and mobile slide-out drawer.
+- **Navigation Config:** `artifacts/a3-sales-os/src/lib/navigation.ts` is the centralized navigation definition. All sidebar items, groups, routes, icons, and descriptions are defined here. To add new nav items, edit this file.
+- **Sidebar Structure (4 groups):**
+  - **Main:** Dashboard, Leads, Companies, Contacts, Campaigns, Email Templates, Sequences, CSV Uploads
+  - **Outreach:** Outbox, Scheduled Emails, Follow Ups, Deliverability, Opens and Clicks, Unsubscribes
+  - **Qualification:** Intent Signals, Lead Scoring, Segments, Pipeline
+  - **Admin:** Settings, Team Notes, Activity Log
+- **Collapsible Sidebar:** Desktop sidebar toggles between full width (w-60) and icon-only mode (w-16). State persists in localStorage key `a3-sidebar-collapsed`. Tooltips appear on hover in collapsed mode. Collapse toggle is hidden on mobile.
+- **Legacy Route Aliases:** Old routes (`/outreach`, `/tasks`, `/ob/*`, etc.) remain functional and map to canonical nav items via `legacyRouteAliases` in navigation.ts.
+- **Placeholder Pages:** 9 placeholder pages for future sections (Companies, Deliverability, Opens & Clicks, Intent Signals, Lead Scoring, Segments, Settings, Team Notes, Activity Log) use the reusable `PlaceholderPage` component.
+- **Route Matching:** `isActiveRoute()` supports exact and prefix matching. `resolveCanonicalPath()` maps legacy URLs to new canonical paths for correct active state + title display.
+
 **Key Features & Technical Implementations:**
 
 1.  **CRM & Lead Management:**
