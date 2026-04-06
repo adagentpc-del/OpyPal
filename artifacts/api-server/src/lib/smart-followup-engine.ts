@@ -1,5 +1,5 @@
-import { db, leadsTable, scheduledEmailsTable, activityTable, notificationsTable, leadEngagementEventsTable } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { db, leadsTable, scheduledEmailsTable, activityTable, notificationsTable, leadEngagementEventsTable, tasksTable } from "@workspace/db";
+import { eq, and, inArray, sql } from "drizzle-orm";
 
 interface SmartRule {
   name: string;
@@ -8,7 +8,7 @@ interface SmartRule {
 }
 
 interface SmartAction {
-  type: "pause_sequence" | "cancel_sequence" | "suppress" | "update_engagement" | "update_score" | "notify" | "update_status" | "update_next_action" | "create_activity";
+  type: "pause_sequence" | "cancel_sequence" | "suppress" | "update_engagement" | "update_score" | "notify" | "update_status" | "update_next_action" | "create_activity" | "create_task" | "update_priority_flag";
   params?: Record<string, any>;
 }
 
@@ -20,7 +20,9 @@ const DEFAULT_RULES: SmartRule[] = [
       { type: "pause_sequence" },
       { type: "update_engagement", params: { status: "engaged", scoreChange: 25 } },
       { type: "update_next_action", params: { action: "Manual follow-up — lead replied" } },
-      { type: "notify", params: { title: "Reply received", priority: "high" } },
+      { type: "update_priority_flag", params: { flag: "urgent" } },
+      { type: "notify", params: { title: "Reply received", priority: "high", severity: "urgent" } },
+      { type: "create_task", params: { title: "Review reply and respond", taskType: "review_reply", priority: "high", dueSameDay: true } },
       { type: "create_activity", params: { type: "reply_logged", description: "Lead replied to outreach" } },
     ],
   },
@@ -31,7 +33,7 @@ const DEFAULT_RULES: SmartRule[] = [
       { type: "cancel_sequence" },
       { type: "suppress", params: { reason: "unsubscribed" } },
       { type: "update_engagement", params: { status: "suppressed", scoreChange: -10 } },
-      { type: "notify", params: { title: "Lead unsubscribed", priority: "normal" } },
+      { type: "notify", params: { title: "Lead unsubscribed", priority: "normal", severity: "warning" } },
       { type: "create_activity", params: { type: "lead_unsubscribed", description: "Lead unsubscribed from outreach" } },
     ],
   },
@@ -43,7 +45,9 @@ const DEFAULT_RULES: SmartRule[] = [
       { type: "suppress", params: { reason: "bounced" } },
       { type: "update_engagement", params: { status: "bounced", scoreChange: -15 } },
       { type: "update_next_action", params: { action: "Review — email bounced" } },
-      { type: "notify", params: { title: "Email bounced", priority: "normal" } },
+      { type: "update_priority_flag", params: { flag: "review" } },
+      { type: "notify", params: { title: "Email bounced", priority: "normal", severity: "warning" } },
+      { type: "create_task", params: { title: "Verify email and contact data", taskType: "verify_bounced_email", priority: "medium" } },
       { type: "create_activity", params: { type: "email_bounced", description: "Email bounced — address may be invalid" } },
     ],
   },
@@ -53,7 +57,9 @@ const DEFAULT_RULES: SmartRule[] = [
     actions: [
       { type: "update_engagement", params: { status: "interested", scoreChange: 10 } },
       { type: "update_next_action", params: { action: "High intent — manual follow-up recommended" } },
-      { type: "notify", params: { title: "Lead clicked link", priority: "high" } },
+      { type: "update_priority_flag", params: { flag: "high" } },
+      { type: "notify", params: { title: "Lead clicked link", priority: "high", severity: "important" } },
+      { type: "create_task", params: { title: "High intent lead — follow up", taskType: "check_high_intent", priority: "high" } },
       { type: "create_activity", params: { type: "email_clicked", description: "Lead clicked a link in the email" } },
     ],
   },
@@ -85,11 +91,55 @@ const DEFAULT_RULES: SmartRule[] = [
     eventType: "failed",
     actions: [
       { type: "update_next_action", params: { action: "Review — email delivery failed" } },
-      { type: "notify", params: { title: "Email delivery failed", priority: "normal" } },
+      { type: "notify", params: { title: "Email delivery failed", priority: "normal", severity: "warning" } },
       { type: "create_activity", params: { type: "email_failed", description: "Email delivery failed" } },
     ],
   },
+  {
+    name: "Sequence paused due to reply",
+    eventType: "sequence_paused_reply",
+    actions: [
+      { type: "update_priority_flag", params: { flag: "high" } },
+      { type: "notify", params: { title: "Sequence paused — reply received", priority: "high", severity: "important" } },
+      { type: "create_task", params: { title: "Continue conversation manually", taskType: "follow_up_call", priority: "high" } },
+      { type: "create_activity", params: { type: "sequence_paused", description: "Sequence paused — reply received, manual follow-up needed" } },
+    ],
+  },
 ];
+
+let ruleOverrides: Record<string, boolean> = {
+  create_task_on_reply: true,
+  create_task_on_click: true,
+  create_task_on_bounce: true,
+  notify_on_reply: true,
+  notify_on_bounce: true,
+  notify_on_click: true,
+  notify_on_unsubscribe: true,
+  high_intent_score_threshold: true,
+};
+
+export function getAutoTaskSettings(): Record<string, boolean> {
+  return { ...ruleOverrides };
+}
+
+export function updateAutoTaskSettings(settings: Record<string, boolean>) {
+  ruleOverrides = { ...ruleOverrides, ...settings };
+}
+
+function shouldCreateTask(eventType: string): boolean {
+  if (eventType === "replied") return ruleOverrides.create_task_on_reply !== false;
+  if (eventType === "clicked") return ruleOverrides.create_task_on_click !== false;
+  if (eventType === "bounced") return ruleOverrides.create_task_on_bounce !== false;
+  return true;
+}
+
+function shouldNotify(eventType: string): boolean {
+  if (eventType === "replied") return ruleOverrides.notify_on_reply !== false;
+  if (eventType === "bounced") return ruleOverrides.notify_on_bounce !== false;
+  if (eventType === "clicked") return ruleOverrides.notify_on_click !== false;
+  if (eventType === "unsubscribed") return ruleOverrides.notify_on_unsubscribe !== false;
+  return true;
+}
 
 export async function processEngagementEvent(
   leadId: number,
@@ -125,6 +175,69 @@ export async function processEngagementEvent(
   if (!leads.length) return { actionsApplied: ["lead_not_found"] };
   const lead = leads[0];
 
+  if (eventType === "opened") {
+    const openCount = await db.select({ count: sql<number>`count(*)::int` })
+      .from(leadEngagementEventsTable)
+      .where(and(eq(leadEngagementEventsTable.leadId, leadId), eq(leadEngagementEventsTable.eventType, "opened")));
+    const totalOpens = openCount[0]?.count || 0;
+    if (totalOpens >= 3 && !lead.lastRepliedAt) {
+      const existingWarmTask = await db.select({ id: tasksTable.id }).from(tasksTable)
+        .where(and(
+          eq(tasksTable.leadId, leadId),
+          eq(tasksTable.taskType, "follow_up_call"),
+          eq(tasksTable.source, "system"),
+          inArray(tasksTable.status, ["open", "in_progress"])
+        )).limit(1);
+      if (existingWarmTask.length === 0) {
+        await db.insert(tasksTable).values({
+          title: "Warm lead — multiple opens, no reply",
+          taskType: "follow_up_call",
+          leadId,
+          priority: "medium",
+          status: "open",
+          source: "system",
+          createdBy: "smart_engine",
+          dueDate: new Date().toISOString().split("T")[0],
+          campaignId: metadata?.campaignId || null,
+          sequenceId: metadata?.sequenceId || null,
+        });
+        await db.insert(notificationsTable).values({
+          type: "multiple_opens",
+          title: "Multiple opens detected",
+          description: `${lead.companyName} — ${lead.contactName} opened ${totalOpens} times without replying`,
+          severity: "info",
+          priority: "normal",
+          leadId,
+          campaignId: metadata?.campaignId || null,
+        });
+        actionsApplied.push("warm_lead_task_created");
+      }
+    }
+  }
+
+  const newScore = Math.max(0, (lead.engagementScore || 0) + (rule.actions.find(a => a.type === "update_engagement")?.params?.scoreChange || 0));
+  if (newScore >= 30 && (lead.engagementScore || 0) < 30 && ruleOverrides.high_intent_score_threshold !== false) {
+    await db.insert(tasksTable).values({
+      title: "High intent lead — personal outreach recommended",
+      taskType: "check_high_intent",
+      leadId,
+      priority: "high",
+      status: "open",
+      source: "system",
+      createdBy: "smart_engine",
+      dueDate: new Date().toISOString().split("T")[0],
+    });
+    await db.insert(notificationsTable).values({
+      type: "score_threshold",
+      title: "Lead score threshold crossed",
+      description: `${lead.companyName} reached engagement score ${newScore}`,
+      severity: "important",
+      priority: "high",
+      leadId,
+    });
+    actionsApplied.push("high_intent_task_created");
+  }
+
   for (const action of rule.actions) {
     switch (action.type) {
       case "pause_sequence": {
@@ -158,8 +271,8 @@ export async function processEngagementEvent(
       case "update_engagement": {
         const updates: any = { updatedAt: new Date() };
         if (action.params?.status) updates.engagementStatus = action.params.status;
-        const newScore = Math.max(0, (lead.engagementScore || 0) + (action.params?.scoreChange || 0));
-        updates.engagementScore = newScore;
+        const score = Math.max(0, (lead.engagementScore || 0) + (action.params?.scoreChange || 0));
+        updates.engagementScore = score;
         updates.lastEngagementType = eventType;
         updates.lastEngagementAt = new Date();
         if (eventType === "opened") updates.lastOpenedAt = new Date();
@@ -174,16 +287,42 @@ export async function processEngagementEvent(
         actionsApplied.push("next_action_set");
         break;
       }
+      case "update_priority_flag": {
+        await db.update(leadsTable).set({ priorityFlag: action.params?.flag, updatedAt: new Date() }).where(eq(leadsTable.id, leadId));
+        actionsApplied.push("priority_flag_set");
+        break;
+      }
       case "notify": {
+        if (!shouldNotify(eventType)) break;
         await db.insert(notificationsTable).values({
           type: eventType,
           title: action.params?.title || eventType,
           description: `${lead.companyName} — ${lead.contactName}`,
+          severity: action.params?.severity || "info",
           leadId,
           priority: action.params?.priority || "normal",
+          campaignId: metadata?.campaignId || null,
           metadata: { eventType, scheduledEmailId: metadata?.scheduledEmailId, sequenceId: metadata?.sequenceId },
         });
         actionsApplied.push("notification_created");
+        break;
+      }
+      case "create_task": {
+        if (!shouldCreateTask(eventType)) break;
+        const today = new Date().toISOString().split("T")[0];
+        await db.insert(tasksTable).values({
+          title: action.params?.title || `Follow up: ${eventType}`,
+          taskType: action.params?.taskType || "custom",
+          leadId,
+          priority: action.params?.priority || "medium",
+          status: "open",
+          dueDate: action.params?.dueSameDay ? today : undefined,
+          source: "system",
+          createdBy: "smart_engine",
+          campaignId: metadata?.campaignId || null,
+          sequenceId: metadata?.sequenceId || null,
+        });
+        actionsApplied.push("task_created");
         break;
       }
       case "create_activity": {

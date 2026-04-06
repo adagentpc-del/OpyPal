@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, notificationsTable } from "@workspace/db";
+import { db, notificationsTable, leadsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -9,9 +9,30 @@ router.get("/notifications", async (req, res) => {
     const conditions: any[] = [];
     if (req.query.unreadOnly === "true") conditions.push(eq(notificationsTable.isRead, false));
     if (req.query.priority) conditions.push(eq(notificationsTable.priority, String(req.query.priority)));
+    if (req.query.severity) conditions.push(eq(notificationsTable.severity, String(req.query.severity)));
+    if (req.query.type) conditions.push(eq(notificationsTable.type, String(req.query.type)));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const notifications = await db.select().from(notificationsTable)
+    const notifications = await db
+      .select({
+        id: notificationsTable.id,
+        type: notificationsTable.type,
+        title: notificationsTable.title,
+        description: notificationsTable.description,
+        severity: notificationsTable.severity,
+        leadId: notificationsTable.leadId,
+        contactId: notificationsTable.contactId,
+        campaignId: notificationsTable.campaignId,
+        taskId: notificationsTable.taskId,
+        metadata: notificationsTable.metadata,
+        priority: notificationsTable.priority,
+        isRead: notificationsTable.isRead,
+        createdAt: notificationsTable.createdAt,
+        leadCompanyName: leadsTable.companyName,
+        leadContactName: leadsTable.contactName,
+      })
+      .from(notificationsTable)
+      .leftJoin(leadsTable, eq(notificationsTable.leadId, leadsTable.id))
       .where(where)
       .orderBy(desc(notificationsTable.createdAt))
       .limit(Number(req.query.limit) || 50);

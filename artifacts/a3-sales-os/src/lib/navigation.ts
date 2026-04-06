@@ -54,7 +54,7 @@ export const navigationConfig: NavGroup[] = [
     items: [
       { name: "Outbox", href: "/outbox", icon: Send, description: "Your outbound email queue" },
       { name: "Scheduled Emails", href: "/scheduled-emails", icon: CalendarClock, description: "Manage scheduled outbound sends" },
-      { name: "Follow Ups", href: "/follow-ups", icon: PhoneForwarded, description: "Track follow-ups and tasks" },
+      { name: "Tasks", href: "/follow-ups", icon: PhoneForwarded, description: "Sales tasks and follow-ups" },
       { name: "Deliverability", href: "/deliverability", icon: Shield, description: "Monitor email deliverability health" },
       { name: "Opens and Clicks", href: "/opens-clicks", icon: MousePointerClick, description: "Track email engagement metrics" },
       { name: "Unsubscribes", href: "/unsubscribes", icon: UserX, description: "Manage suppression list" },

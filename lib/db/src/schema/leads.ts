@@ -37,6 +37,7 @@ export const leadsTable = pgTable("leads", {
   isBounced: boolean("is_bounced").default(false),
   suppressionReason: text("suppression_reason"),
   smartNextAction: text("smart_next_action"),
+  priorityFlag: text("priority_flag"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

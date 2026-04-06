@@ -67,10 +67,17 @@ The A3 Sales OS is a pnpm workspace monorepo built with Node.js 24 and TypeScrip
     *   **Routing Logic:** Defines rules for state transitions based on engagement events (bounced, unsubscribed, replied, clicked).
     *   **Frontend:** Dedicated routing page with queues, next actions, CTA library management, and analytics.
 
-9.  **Smart Follow-Up Engine:**
+9.  **Smart Follow-Up Engine & Task/Alert Layer:**
     *   **Engagement Intelligence:** Tracks detailed lead engagement fields (score, status, last engagement type/time).
-    *   **Rules Engine:** Processes inbound engagement events through configurable rules to trigger actions (pause/cancel sequences, suppress lead, update engagement, create notifications).
-    *   **Notifications System:** In-app notifications with a dedicated UI and polling for unread counts.
+    *   **Rules Engine:** Processes inbound engagement events through configurable rules to trigger actions (pause/cancel sequences, suppress lead, update engagement, create notifications, create tasks, update priority flags).
+    *   **Auto-Task Creation:** System-generated tasks on reply (review_reply), click (check_high_intent), bounce (verify_bounced_email), warm lead (3+ opens), high intent score threshold (≥30), sequence paused. Deduplicated to prevent spam on repeated events.
+    *   **Task System:** Tasks have title, taskType, priority (low/medium/high/urgent), source (user/system), status (open/in_progress/completed/dismissed), dueDate, linkedLeadId, createdBy. API: GET/POST /tasks, GET /tasks/summary, PATCH /tasks/:id/complete, PATCH /tasks/:id/dismiss, DELETE /tasks/:id.
+    *   **Auto-Rules Configuration:** Toggleable rules via GET/PUT /tasks/auto-rules. Controls: create_task_on_reply, create_task_on_click, create_task_on_bounce, notify_on_reply/bounce/click/unsubscribe, high_intent_score_threshold.
+    *   **Notifications System:** In-app notifications with severity levels (urgent/important/warning/info), severity filter pills, lead links with company/contact names via JOIN. Polling for unread counts.
+    *   **Dashboard Alert Widgets:** Six alert cards: Replies to Review, High Intent Leads, Tasks Due Today, Overdue Tasks, Bounced to Review, Paused Sequences.
+    *   **Lead Drawer Tasks:** Tasks section with open/overdue/completed tasks, quick complete/dismiss buttons, quick-create task dropdown.
+    *   **Priority Flag Badges:** Leads table shows priority flag badges (urgent/high/review) from auto-engine events.
+    *   **Tasks Page:** Full table view at /follow-ups with 7 filter tabs (all/open/today/overdue/urgent/system/completed), search, type filter, Auto Rules settings modal, New Task modal.
     *   **Enhanced Lead Drawer:** Displays engagement intelligence, activity timeline, and bulk sequence actions. Lead table shows engagement score badges and smart next actions.
 
 10. **Bulk Outreach with Resend (Queue-Based Model):**

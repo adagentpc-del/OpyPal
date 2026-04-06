@@ -5,12 +5,22 @@ import { leadsTable } from "./leads";
 
 export const tasksTable = pgTable("tasks", {
   id: serial("id").primaryKey(),
+  title: text("title"),
   leadId: integer("lead_id").references(() => leadsTable.id, { onDelete: "cascade" }),
+  contactId: integer("contact_id"),
+  campaignId: integer("campaign_id"),
+  sequenceId: integer("sequence_id"),
   taskType: text("task_type").notNull(),
+  priority: text("priority").notNull().default("medium"),
+  status: text("status").notNull().default("open"),
   dueDate: text("due_date"),
-  status: text("status").notNull().default("pending"),
+  reminderAt: timestamp("reminder_at"),
+  ownerId: text("owner_id"),
   notes: text("notes"),
+  source: text("source").notNull().default("user"),
+  createdBy: text("created_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

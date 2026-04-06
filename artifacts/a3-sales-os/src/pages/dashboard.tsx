@@ -1,15 +1,25 @@
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout";
 import { useGetDashboard, useGetActivity, useGetTasks } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, PieChart, Pie, Cell, Legend } from "recharts";
-import { Users, DollarSign, CalendarCheck, Clock, Activity, TrendingUp, Mail, MessageSquare, Handshake, Target, AlertTriangle, CheckCircle2, XCircle, Repeat } from "lucide-react";
+import { Users, DollarSign, CalendarCheck, Clock, Activity, TrendingUp, Mail, MessageSquare, Handshake, Target, AlertTriangle, CheckCircle2, XCircle, Repeat, Zap, PauseCircle, ShieldAlert } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
+
+const API_BASE = import.meta.env.BASE_URL + "api";
 
 export default function Dashboard() {
   const { data: dashboard, isLoading: dashboardLoading } = useGetDashboard();
   const { data: activities } = useGetActivity();
   const { data: allTasks } = useGetTasks();
+  const [taskSummary, setTaskSummary] = useState<any>(null);
+  const [alerts, setAlerts] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/tasks/summary`).then(r => r.ok ? r.json() : null).then(d => d && setTaskSummary(d)).catch(() => {});
+    fetch(`${API_BASE}/notifications?unreadOnly=true&limit=20`).then(r => r.ok ? r.json() : []).then(setAlerts).catch(() => {});
+  }, []);
 
   if (dashboardLoading || !dashboard) {
     return (
@@ -26,9 +36,17 @@ export default function Dashboard() {
   const PIE_COLORS = ["hsl(215, 79%, 28%)", "hsl(44, 100%, 48%)"];
 
   const upcomingTasks = (allTasks || [])
-    .filter((t) => t.status !== "completed" && t.dueDate)
-    .sort((a, b) => (a.dueDate! > b.dueDate! ? 1 : -1))
-    .slice(0, 5);
+    .filter((t: any) => t.status !== "completed" && t.status !== "dismissed")
+    .sort((a: any, b: any) => {
+      const pOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+      const pa = pOrder[a.priority] ?? 2;
+      const pb = pOrder[b.priority] ?? 2;
+      if (pa !== pb) return pa - pb;
+      if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+      if (a.dueDate) return -1;
+      return 1;
+    })
+    .slice(0, 6);
 
   return (
     <AppLayout>
@@ -68,6 +86,17 @@ export default function Dashboard() {
           <BigKpi label="Closed Revenue" value={`$${formatNum(d.closedRevenue)}`} icon={Handshake} accent="bg-emerald-500/10 text-emerald-600" />
           <BigKpi label="Follow-Ups Due Today" value={d.followUpsDueToday.toString()} icon={CalendarCheck} accent="bg-accent/20 text-yellow-700" sub={d.overdueFollowUps > 0 ? `${d.overdueFollowUps} overdue` : undefined} subColor="text-destructive" />
         </div>
+
+        {taskSummary && (taskSummary.overdue > 0 || taskSummary.urgent > 0 || taskSummary.dueToday > 0 || alerts.length > 0) && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <AlertCard icon={MessageSquare} label="Replies to Review" count={alerts.filter(a => a.type === "replied" || a.type === "reply_received").length} color="text-emerald-600" bg="bg-emerald-50" href="/follow-ups" />
+            <AlertCard icon={Zap} label="High Intent Leads" count={alerts.filter(a => a.type === "clicked" || a.type === "score_threshold").length} color="text-orange-600" bg="bg-orange-50" href="/follow-ups" />
+            <AlertCard icon={CalendarCheck} label="Tasks Due Today" count={taskSummary?.dueToday || 0} color="text-blue-600" bg="bg-blue-50" href="/follow-ups" />
+            <AlertCard icon={AlertTriangle} label="Overdue Tasks" count={taskSummary?.overdue || 0} color="text-red-600" bg="bg-red-50" href="/follow-ups" />
+            <AlertCard icon={ShieldAlert} label="Bounced to Review" count={alerts.filter(a => a.type === "bounced").length} color="text-amber-600" bg="bg-amber-50" href="/follow-ups" />
+            <AlertCard icon={PauseCircle} label="Paused Sequences" count={alerts.filter(a => a.type === "sequence_paused_reply").length} color="text-violet-600" bg="bg-violet-50" href="/follow-ups" />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <Card className="p-5 lg:col-span-2 border-border/50 bg-card rounded-2xl">
@@ -128,14 +157,21 @@ export default function Dashboard() {
               {upcomingTasks.length === 0 ? (
                 <p className="text-center py-6 text-muted-foreground text-sm">No pending tasks</p>
               ) : (
-                upcomingTasks.map((task) => {
-                  const isOverdue = task.dueDate! < new Date().toISOString().split("T")[0];
+                upcomingTasks.map((task: any) => {
+                  const isOverdue = task.dueDate && task.dueDate < new Date().toISOString().split("T")[0];
+                  const priorityColors: Record<string, string> = { urgent: "bg-red-100 text-red-700", high: "bg-orange-100 text-orange-700", medium: "bg-blue-100 text-blue-700", low: "bg-slate-100 text-slate-600" };
                   return (
                     <div key={task.id} className={`flex items-start gap-3 p-3 rounded-xl border ${isOverdue ? "border-destructive/30 bg-destructive/5" : "border-border/50 hover:bg-muted/50"} transition-colors`}>
-                      <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${isOverdue ? "bg-destructive" : "bg-primary"}`} />
+                      <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${isOverdue ? "bg-destructive" : task.priority === "urgent" ? "bg-red-500" : task.priority === "high" ? "bg-orange-500" : "bg-primary"}`} />
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">{task.taskType}{task.leadCompanyName ? ` - ${task.leadCompanyName}` : ""}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{task.notes}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-sm truncate">{task.title || task.taskType}{task.leadCompanyName ? ` — ${task.leadCompanyName}` : ""}</p>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${priorityColors[task.priority] || priorityColors.medium}`}>
+                            {(task.priority || "medium").toUpperCase()}
+                          </span>
+                          {task.source === "system" && <span className="text-[9px] px-1 py-0.5 rounded bg-violet-50 text-violet-700">Auto</span>}
+                        </div>
+                        {task.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate">{task.notes}</p>}
                       </div>
                       <span className={`text-xs font-medium flex-shrink-0 ${isOverdue ? "text-destructive" : "text-muted-foreground"}`}>
                         {task.dueDate ? format(new Date(task.dueDate + "T12:00:00"), "MMM d") : ""}
@@ -186,6 +222,20 @@ function MiniKpi({ label, value, color, icon }: { label: string; value: number; 
         <span className={`text-xl font-bold ${color || "text-foreground"}`}>{value}</span>
       </div>
     </Card>
+  );
+}
+
+function AlertCard({ icon: Icon, label, count, color, bg, href }: { icon: any; label: string; count: number; color: string; bg: string; href: string }) {
+  return (
+    <Link href={href}>
+      <Card className={`p-3 rounded-xl border-border/50 ${bg} hover:shadow-md transition-all cursor-pointer`}>
+        <div className="flex items-center gap-2">
+          <Icon className={`h-4 w-4 ${color}`} />
+          <span className={`text-lg font-bold ${color}`}>{count}</span>
+        </div>
+        <p className="text-[11px] text-muted-foreground font-medium mt-1">{label}</p>
+      </Card>
+    </Link>
   );
 }
 

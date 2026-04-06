@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/layout";
 import { useGetLeads, useCreateLead, useUpdateLead, useDeleteLead, useDuplicateLead, useUpdateLeadStatus, useGetSyncStatus, useGetTemplates, useGetAssets, useGetLeadHistory, useCreateLeadHistory, useGetScheduledEmails, useCreateScheduledEmail, useUpdateScheduledEmail, useGetLeadActivities, useGetTemplateSets, getGetLeadsQueryKey, getGetDashboardQueryKey, getGetLeadHistoryQueryKey, getGetScheduledEmailsQueryKey, getGetLeadActivitiesQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Search, Trash2, Edit2, Building2, Copy, X, Filter, Mail, Check, Clock, Send, FileText, Paperclip, History, ChevronDown, ChevronUp, Calendar, Save, ExternalLink, Loader2, AlertCircle, Link2, Play, Eye, XCircle, RefreshCw, Zap, TrendingUp, MousePointerClick, MessageSquare, PauseCircle, SkipForward, RotateCcw, Sparkles, StickyNote, CheckSquare } from "lucide-react";
+import { Plus, Search, Trash2, Edit2, Building2, Copy, X, Filter, Mail, Check, Clock, Send, FileText, Paperclip, History, ChevronDown, ChevronUp, Calendar, Save, ExternalLink, Loader2, AlertCircle, Link2, Play, Eye, XCircle, RefreshCw, Zap, TrendingUp, MousePointerClick, MessageSquare, PauseCircle, SkipForward, RotateCcw, Sparkles, StickyNote, CheckSquare, CheckCircle2, Circle, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -303,6 +303,16 @@ export default function Leads() {
                                 }`}>{lead.engagementScore}</span>
                               )}
                               {lead.smartNextAction && <Sparkles className="h-3 w-3 text-primary shrink-0" />}
+                              {lead.priorityFlag && (
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                                  lead.priorityFlag === "urgent" ? "bg-red-100 text-red-700" :
+                                  lead.priorityFlag === "high" ? "bg-orange-100 text-orange-700" :
+                                  lead.priorityFlag === "review" ? "bg-amber-100 text-amber-700" :
+                                  "bg-gray-100 text-gray-600"
+                                }`}>
+                                  {lead.priorityFlag === "urgent" ? "⚡ Urgent" : lead.priorityFlag === "high" ? "🔥 High" : lead.priorityFlag === "review" ? "👀 Review" : lead.priorityFlag}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{lead.contactName}</td>
@@ -454,6 +464,9 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
   const [conversationThread, setConversationThread] = useState<any[]>([]);
   const [conversationLoading, setConversationLoading] = useState(false);
   const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
+  const [leadTasks, setLeadTasks] = useState<any[]>([]);
+  const [showTasks, setShowTasks] = useState(true);
+  const [newTaskType, setNewTaskType] = useState("");
 
   const [scheduleMode, setScheduleMode] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
@@ -754,6 +767,32 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
   }, [lead.id]);
 
   useEffect(() => { fetchConversation(); }, [fetchConversation]);
+
+  const fetchLeadTasks = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/tasks?leadId=${lead.id}&limit=50`);
+      if (res.ok) setLeadTasks(await res.json());
+    } catch {}
+  }, [lead.id]);
+  useEffect(() => { fetchLeadTasks(); }, [fetchLeadTasks]);
+
+  const handleQuickCompleteTask = async (taskId: number) => {
+    await fetch(`${API_BASE}/tasks/${taskId}/complete`, { method: "PATCH" });
+    fetchLeadTasks();
+  };
+  const handleQuickDismissTask = async (taskId: number) => {
+    await fetch(`${API_BASE}/tasks/${taskId}/dismiss`, { method: "PATCH" });
+    fetchLeadTasks();
+  };
+  const handleCreateQuickTask = async () => {
+    if (!newTaskType) return;
+    await fetch(`${API_BASE}/tasks`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId: lead.id, taskType: newTaskType, title: newTaskType.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()), priority: "medium", source: "user" }),
+    });
+    setNewTaskType("");
+    fetchLeadTasks();
+  };
 
   const handleLogNote = async () => {
     if (!noteText.trim()) return;
@@ -1171,6 +1210,74 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                     </div>
                   </DrawerSection>
                 )}
+
+                <DrawerSection title={`Tasks (${leadTasks.filter((t: any) => t.status !== "completed" && t.status !== "dismissed").length})`} icon={<CheckCircle2 className="h-4 w-4" />}
+                  collapsible expanded={showTasks} onToggle={() => setShowTasks(!showTasks)}>
+                  {(() => {
+                    const openTasks = leadTasks.filter((t: any) => t.status === "open" || t.status === "in_progress");
+                    const overdueTasks = openTasks.filter((t: any) => t.dueDate && t.dueDate < new Date().toISOString().split("T")[0]);
+                    const completedTasks = leadTasks.filter((t: any) => t.status === "completed" || t.status === "dismissed");
+                    const priorityBadge: Record<string, string> = { urgent: "bg-red-100 text-red-700", high: "bg-orange-100 text-orange-700", medium: "bg-blue-100 text-blue-700", low: "bg-slate-100 text-slate-600" };
+                    return (
+                      <div className="space-y-2">
+                        {openTasks.length === 0 && completedTasks.length === 0 && (
+                          <p className="text-sm text-muted-foreground">No tasks for this lead.</p>
+                        )}
+                        {overdueTasks.length > 0 && (
+                          <div className="text-xs font-medium text-destructive flex items-center gap-1 mb-1">
+                            <AlertTriangle className="h-3 w-3" /> {overdueTasks.length} overdue
+                          </div>
+                        )}
+                        {openTasks.map((t: any) => (
+                          <div key={t.id} className={`flex items-center gap-2 p-2 rounded-lg border text-sm ${overdueTasks.includes(t) ? "border-destructive/30 bg-destructive/5" : "border-border/50"}`}>
+                            <button onClick={() => handleQuickCompleteTask(t.id)} className="text-muted-foreground hover:text-emerald-500 flex-shrink-0">
+                              <Circle className="h-4 w-4" />
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <span className="font-medium truncate block">{t.title || t.taskType}</span>
+                            </div>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${priorityBadge[t.priority] || priorityBadge.medium}`}>
+                              {(t.priority || "medium").toUpperCase()}
+                            </span>
+                            {t.source === "system" && <Zap className="h-3 w-3 text-violet-500" />}
+                            <button onClick={() => handleQuickDismissTask(t.id)} className="text-muted-foreground hover:text-amber-500 flex-shrink-0">
+                              <XCircle className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        {completedTasks.length > 0 && (
+                          <details className="mt-1">
+                            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">{completedTasks.length} completed</summary>
+                            <div className="mt-1 space-y-1">
+                              {completedTasks.slice(0, 5).map((t: any) => (
+                                <div key={t.id} className="flex items-center gap-2 p-1.5 text-xs text-muted-foreground opacity-60">
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                                  <span className="line-through truncate">{t.title || t.taskType}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                        <div className="flex gap-2 pt-1">
+                          <select value={newTaskType} onChange={(e) => setNewTaskType(e.target.value)}
+                            className="flex-1 px-2 py-1.5 border border-border rounded-lg text-xs bg-background">
+                            <option value="">Add task...</option>
+                            <option value="follow_up_call">Follow-Up Call</option>
+                            <option value="send_manual_email">Send Manual Email</option>
+                            <option value="review_reply">Review Reply</option>
+                            <option value="check_high_intent">Check High Intent</option>
+                            <option value="custom">Custom</option>
+                          </select>
+                          {newTaskType && (
+                            <Button size="sm" className="h-7 text-xs rounded-lg bg-primary text-white" onClick={handleCreateQuickTask}>
+                              <Plus className="h-3 w-3 mr-1" /> Add
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </DrawerSection>
 
                 <DrawerSection title="Outreach History" icon={<History className="h-4 w-4" />}
                   collapsible expanded={showHistory} onToggle={() => setShowHistory(!showHistory)}>
