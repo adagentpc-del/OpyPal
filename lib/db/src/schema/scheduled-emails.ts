@@ -22,6 +22,8 @@ export const scheduledEmailsTable = pgTable("scheduled_emails", {
   sentAt: timestamp("sent_at"),
   canceledAt: timestamp("canceled_at"),
   pausedAt: timestamp("paused_at"),
+  campaignId: integer("campaign_id"),
+  resendMessageId: text("resend_message_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

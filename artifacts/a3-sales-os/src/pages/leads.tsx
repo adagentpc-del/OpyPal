@@ -1,12 +1,13 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/layout";
 import { useGetLeads, useCreateLead, useUpdateLead, useDeleteLead, useDuplicateLead, useUpdateLeadStatus, useGetSyncStatus, useGetTemplates, useGetAssets, useGetLeadHistory, useCreateLeadHistory, useGetScheduledEmails, useCreateScheduledEmail, useUpdateScheduledEmail, useGetLeadActivities, useGetTemplateSets, getGetLeadsQueryKey, getGetDashboardQueryKey, getGetLeadHistoryQueryKey, getGetScheduledEmailsQueryKey, getGetLeadActivitiesQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Search, Trash2, Edit2, Building2, Copy, X, Filter, Mail, Check, Clock, Send, FileText, Paperclip, History, ChevronDown, ChevronUp, Calendar, Save, ExternalLink, Loader2, AlertCircle, Link2, Play, Eye, XCircle, RefreshCw, Zap, TrendingUp, MousePointerClick, MessageSquare, PauseCircle, SkipForward, RotateCcw, Sparkles, StickyNote } from "lucide-react";
+import { Plus, Search, Trash2, Edit2, Building2, Copy, X, Filter, Mail, Check, Clock, Send, FileText, Paperclip, History, ChevronDown, ChevronUp, Calendar, Save, ExternalLink, Loader2, AlertCircle, Link2, Play, Eye, XCircle, RefreshCw, Zap, TrendingUp, MousePointerClick, MessageSquare, PauseCircle, SkipForward, RotateCcw, Sparkles, StickyNote, CheckSquare } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { BulkOutreachModal } from "@/components/bulk-outreach-modal";
 
 const STATUSES = ["New Lead", "Contacted", "Replied", "Qualified", "Meeting Booked", "Meeting Completed", "Proposal Sent", "Negotiation", "Closed Won", "Closed Lost", "Nurture"];
 const PIPELINE_TYPES = ["Event", "Agency"];
@@ -69,6 +70,8 @@ export default function Leads() {
   const [drawerMode, setDrawerMode] = useState<"view" | "edit">("view");
   const [form, setForm] = useState({ ...emptyLead });
   const [showNewModal, setShowNewModal] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showBulkOutreach, setShowBulkOutreach] = useState(false);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -145,6 +148,28 @@ export default function Leads() {
     statusMutation.mutate({ id, data: { status } }, { onSuccess: invalidate });
   };
 
+  const toggleSelect = useCallback((id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (!leads) return;
+    if (selectedIds.size === leads.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(leads.map((l: any) => l.id)));
+    }
+  }, [leads, selectedIds.size]);
+
+  const selectedLeads = useMemo(() =>
+    (leads || []).filter((l: any) => selectedIds.has(l.id)),
+    [leads, selectedIds]
+  );
+
   const today = new Date().toISOString().split("T")[0];
   const activeFilters = [filterType, filterStatus, filterSource, filterOverdue, filterDueToday].filter(Boolean).length;
 
@@ -204,11 +229,32 @@ export default function Leads() {
             </div>
           )}
 
+          {selectedIds.size > 0 && (
+            <div className="flex items-center justify-between gap-3 p-3 bg-primary/5 border border-primary/20 rounded-xl">
+              <div className="flex items-center gap-2">
+                <CheckSquare className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">{selectedIds.size} lead{selectedIds.size !== 1 ? "s" : ""} selected</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" className="rounded-lg bg-primary text-white h-8 text-xs" onClick={() => setShowBulkOutreach(true)}>
+                  <Mail className="h-3.5 w-3.5 mr-1.5" /> Bulk Outreach
+                </Button>
+                <Button variant="outline" size="sm" className="rounded-lg h-8 text-xs" onClick={() => setSelectedIds(new Set())}>
+                  <X className="h-3.5 w-3.5 mr-1.5" /> Clear
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="border border-border/50 rounded-xl overflow-hidden flex-1 flex flex-col min-h-0">
             <div className="overflow-auto flex-1">
               <table className="w-full text-sm text-left whitespace-nowrap">
                 <thead className="bg-muted/50 text-muted-foreground sticky top-0 z-10 border-b border-border/50">
                   <tr>
+                    <th className="px-3 py-3 w-10" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={!!leads?.length && selectedIds.size === leads.length} onChange={toggleSelectAll}
+                        className="h-4 w-4 rounded border-border text-primary cursor-pointer" />
+                    </th>
                     <th className="px-4 py-3 font-semibold">Company</th>
                     <th className="px-4 py-3 font-semibold hidden sm:table-cell">Contact</th>
                     <th className="px-4 py-3 font-semibold hidden md:table-cell">Phone</th>
@@ -224,9 +270,9 @@ export default function Leads() {
                 </thead>
                 <tbody className="divide-y divide-border/50">
                   {isLoading ? (
-                    <tr><td colSpan={11} className="text-center py-8 text-muted-foreground">Loading...</td></tr>
+                    <tr><td colSpan={12} className="text-center py-8 text-muted-foreground">Loading...</td></tr>
                   ) : leads?.length === 0 ? (
-                    <tr><td colSpan={11} className="text-center py-12 text-muted-foreground">
+                    <tr><td colSpan={12} className="text-center py-12 text-muted-foreground">
                       <Building2 className="h-10 w-10 text-border mx-auto mb-2" />
                       <p>No leads found.</p>
                     </td></tr>
@@ -234,8 +280,12 @@ export default function Leads() {
                     leads?.map((lead) => {
                       const isOverdue = lead.nextFollowUpDate && lead.nextFollowUpDate < today && lead.status !== "Closed Won" && lead.status !== "Closed Lost";
                       return (
-                        <tr key={lead.id} className={`hover:bg-muted/30 transition-colors cursor-pointer ${isOverdue ? "bg-destructive/5" : ""}`}
+                        <tr key={lead.id} className={`hover:bg-muted/30 transition-colors cursor-pointer ${isOverdue ? "bg-destructive/5" : ""} ${selectedIds.has(lead.id) ? "bg-primary/5" : ""}`}
                           onClick={() => openDrawer(lead)}>
+                          <td className="px-3 py-3 w-10" onClick={(e) => e.stopPropagation()}>
+                            <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={() => toggleSelect(lead.id)}
+                              className="h-4 w-4 rounded border-border text-primary cursor-pointer" />
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${lead.pipelineType === "Event" ? "bg-primary" : "bg-accent"}`} />
@@ -313,6 +363,14 @@ export default function Leads() {
           onSetMode={setDrawerMode} onSave={handleSave} saving={updateMutation.isPending}
           onClose={() => setDrawerLead(null)} onDelete={() => handleDelete(drawerLead.id, drawerLead.companyName)}
           invalidate={invalidate} onLeadUpdate={setDrawerLead}
+        />
+      )}
+
+      {showBulkOutreach && selectedLeads.length > 0 && (
+        <BulkOutreachModal
+          selectedLeads={selectedLeads}
+          onClose={() => setShowBulkOutreach(false)}
+          onComplete={() => { setSelectedIds(new Set()); invalidate(); toast({ title: "Bulk outreach complete" }); }}
         />
       )}
     </AppLayout>
