@@ -1,0 +1,289 @@
+Build and upgrade the Email Templates page, Sequence Builder, and lead outreach scheduling system for the A3 Sales OS CRM.
+
+Primary objective:
+Restore and strengthen the template to sequence workflow so that when I select a template from a lead, I can send immediately, schedule, or activate an automated follow up sequence.
+I also need standard long tail follow up options for 1 month, 3 month, and 6 month follow up.
+
+Context:
+The lead drawer currently is not showing templates correctly.
+We need a durable template and sequence system that powers lead outreach from inside the CRM.
+
+Build the following:
+
+1. Email Templates page
+Create or upgrade a dedicated Email Templates page with a professional CRM UI.
+
+Each template should support:
+- Template name
+- Category
+- Subject
+- Body
+- Description or internal notes
+- Linked sequence optional
+- Template type
+  - one off
+  - intro
+  - follow up
+  - reactivation
+  - event
+  - custom
+- Audience or segment tags optional
+- Active or inactive status
+
+Page functionality:
+- View all templates in a table or card list
+- Search templates
+- Filter by category, type, active status
+- Create new template
+- Edit existing template
+- Duplicate template
+- Archive template
+- Delete template only with confirmation
+- Preview template in a side panel or modal
+- Show linked sequence name if applicable
+
+2. Sequence Builder page
+Create or upgrade a Sequence Builder page.
+
+Each sequence should support:
+- Sequence name
+- Description
+- Category
+- Active or inactive status
+- Default use case
+- Ordered sequence steps
+
+Each sequence step should support:
+- Step number
+- Delay amount
+- Delay unit
+  - days
+  - weeks
+  - months
+- Template selection
+- Step label
+- Channel field for future use but default email
+- Active or inactive step
+
+Important:
+Delay units must support month based scheduling, not just day based scheduling.
+
+3. Standard follow up scheduling presets
+Add built in follow up presets that can be used in sequence creation and lead outreach.
+
+Must support:
+- 1 month follow up
+- 3 month follow up
+- 6 month follow up
+
+Also support:
+- custom days
+- custom weeks
+- custom months
+
+In the UI, make these available as quick preset chips or buttons:
+- Follow up in 1 month
+- Follow up in 3 months
+- Follow up in 6 months
+
+4. Sequence templates and starter presets
+Create starter sequence presets for A3 outreach.
+
+Add at minimum:
+- Hospitality Intro Sequence
+- Event Prospecting Sequence
+- General A3 Intro Sequence
+- Re engagement Sequence
+- Long Term Nurture Sequence
+
+For Long Term Nurture Sequence include steps like:
+- Step 1 today
+- Step 2 in 1 month
+- Step 3 in 3 months
+- Step 4 in 6 months
+
+Allow these presets to be edited after creation.
+
+5. Lead drawer outreach integration
+Upgrade the lead detail drawer outreach section so it connects to the new template and sequence system.
+
+Inside the lead drawer outreach panel add:
+- Select Template dropdown
+- Linked Sequence display if selected template has one
+- Subject field auto populated from template
+- Body field auto populated from template
+- Send Now button
+- Schedule Email button
+- Save Draft button
+- Activate Linked Sequence toggle
+- Quick schedule chips:
+  - 1 month
+  - 3 months
+  - 6 months
+- Sequence preview panel
+- Upcoming scheduled outreach preview
+
+Behavior:
+- If template selected, auto fill subject and body
+- If template has linked sequence, show toggle to activate it
+- If scheduling is chosen, allow date and time selection
+- If quick preset selected, calculate scheduled date correctly
+- If linked sequence is activated, create all future scheduled items
+- Show all created future steps before confirm
+
+6. Date handling for month based follow up
+Implement proper date math for monthly scheduling.
+
+Requirements:
+- 1 month means same day next month when possible
+- 3 months means same day three months later
+- 6 months means same day six months later
+- Handle month end edge cases safely
+- Preserve user timezone
+- Do not convert 1 month into a fixed 30 day approximation if avoidable
+
+7. Scheduled Emails page upgrade
+Create or upgrade Scheduled Emails page so users can manage all future outreach.
+
+Show:
+- Lead name
+- Company
+- Template used
+- Sequence name if any
+- Scheduled date and time
+- Status
+- Next action
+- Source
+  - manual
+  - template
+  - sequence
+
+Actions:
+- Reschedule
+- Pause
+- Cancel
+- Edit subject and body before send
+- Filter by date range, status, sequence, template
+- Search by lead or company
+
+8. Sequence preview and confirmation
+Before a sequence is activated from a lead, show a confirmation modal or panel.
+
+Display:
+- Step 1 date and template
+- Step 2 date and template
+- Step 3 date and template
+- Additional month based steps if included
+- Total number of scheduled touches
+
+Allow:
+- confirm all
+- remove individual steps before confirm
+- edit timing of the first send
+- choose send first now and schedule the rest
+- choose schedule all
+
+9. Activity logging
+Every relevant action must create lead activity records.
+
+Log:
+- template selected
+- draft saved
+- email scheduled
+- quick preset used
+- linked sequence activated
+- sequence step scheduled
+- sequence step paused
+- scheduled email canceled
+- scheduled email rescheduled
+- email sent
+
+10. Data model support
+If not already present, make sure the schema supports:
+
+templates
+- id
+- name
+- category
+- type
+- subject
+- body
+- description
+- linked_sequence_id nullable
+- is_active
+- created_at
+- updated_at
+
+sequences
+- id
+- name
+- description
+- category
+- is_active
+- created_at
+- updated_at
+
+sequence_steps
+- id
+- sequence_id
+- step_number
+- step_label
+- delay_value
+- delay_unit
+- template_id
+- channel
+- is_active
+- created_at
+- updated_at
+
+scheduled_emails
+- id
+- lead_id
+- template_id nullable
+- sequence_id nullable
+- sequence_step_id nullable
+- subject
+- body
+- scheduled_for
+- status
+- source
+- created_at
+- updated_at
+
+lead_activities
+- id
+- lead_id
+- type
+- details
+- created_at
+
+11. UX requirements
+Use a clean premium CRM look consistent with the rest of A3 Sales OS.
+
+Requirements:
+- modular reusable components
+- clear empty states
+- loading states
+- error states
+- polished sequence builder interface
+- drag to reorder sequence steps if feasible
+- badges for month based follow up
+- easy to scan scheduling preview
+
+12. Routing and navigation
+Make sure sidebar links work for:
+- Email Templates
+- Sequences
+- Scheduled Emails
+
+If these pages already exist, upgrade them rather than replacing them.
+
+13. Deliverables
+When complete provide:
+- files created
+- files updated
+- routes added or changed
+- database changes or migrations
+- what caused templates to disappear from the lead drawer
+- what was fixed
+- how month based follow up is handled

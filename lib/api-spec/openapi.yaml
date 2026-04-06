@@ -21,6 +21,8 @@ tags:
     description: Dashboard operations
   - name: sync
     description: Google Sheets sync operations
+  - name: scheduled-emails
+    description: Scheduled email operations
   - name: contacts
     description: Outbound contact operations
   - name: campaigns
@@ -497,6 +499,119 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
+
+  /scheduled-emails:
+    get:
+      operationId: getScheduledEmails
+      tags: [scheduled-emails]
+      summary: Get scheduled emails
+      parameters:
+        - name: leadId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of scheduled emails
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduledEmail"
+    post:
+      operationId: createScheduledEmail
+      tags: [scheduled-emails]
+      summary: Schedule an email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduledEmailInput"
+      responses:
+        "201":
+          description: Scheduled email created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledEmail"
+
+  /scheduled-emails/{id}:
+    patch:
+      operationId: updateScheduledEmail
+      tags: [scheduled-emails]
+      summary: Update a scheduled email
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                scheduledFor:
+                  type: string
+                subject:
+                  type: string
+                body:
+                  type: string
+      responses:
+        "200":
+          description: Updated scheduled email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledEmail"
+    delete:
+      operationId: deleteScheduledEmail
+      tags: [scheduled-emails]
+      summary: Delete a scheduled email
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /leads/{id}/activities:
+    get:
+      operationId: getLeadActivities
+      tags: [leads]
+      summary: Get lead activity log
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Activity log
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeadActivity"
 
   /assets:
     get:
@@ -2203,6 +2318,9 @@ components:
         linkedAssetIds:
           type: string
           nullable: true
+        linkedTemplateSetId:
+          type: integer
+          nullable: true
         createdAt:
           type: string
         updatedAt:
@@ -2229,10 +2347,83 @@ components:
         linkedAssetIds:
           type: string
           nullable: true
+        linkedTemplateSetId:
+          type: integer
+          nullable: true
       required:
         - name
         - category
         - body
+
+    ScheduledEmail:
+      type: object
+      properties:
+        id:
+          type: integer
+        leadId:
+          type: integer
+        templateId:
+          type: integer
+          nullable: true
+        subject:
+          type: string
+        body:
+          type: string
+        scheduledFor:
+          type: string
+        status:
+          type: string
+        sequenceId:
+          type: integer
+          nullable: true
+        sequenceStepNumber:
+          type: integer
+          nullable: true
+        sentAt:
+          type: string
+          nullable: true
+        canceledAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - leadId
+        - subject
+        - body
+        - scheduledFor
+        - status
+        - createdAt
+        - updatedAt
+
+    ScheduledEmailInput:
+      type: object
+      properties:
+        leadId:
+          type: integer
+        templateId:
+          type: integer
+          nullable: true
+        subject:
+          type: string
+        body:
+          type: string
+        scheduledFor:
+          type: string
+        sequenceId:
+          type: integer
+          nullable: true
+        sequenceStepNumber:
+          type: integer
+          nullable: true
+      required:
+        - leadId
+        - subject
+        - body
+        - scheduledFor
 
     Asset:
       type: object
@@ -3427,3 +3618,23 @@ components:
       required:
         - name
         - text
+
+    LeadActivity:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        description:
+          type: string
+        leadId:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - type
+        - description
+        - createdAt

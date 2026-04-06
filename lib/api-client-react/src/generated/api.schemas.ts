@@ -138,6 +138,7 @@ export interface Template {
   subject?: string;
   body: string;
   linkedAssetIds?: string | null;
+  linkedTemplateSetId?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -148,6 +149,33 @@ export interface TemplateInput {
   subject?: string;
   body: string;
   linkedAssetIds?: string | null;
+  linkedTemplateSetId?: number | null;
+}
+
+export interface ScheduledEmail {
+  id: number;
+  leadId: number;
+  templateId?: number | null;
+  subject: string;
+  body: string;
+  scheduledFor: string;
+  status: string;
+  sequenceId?: number | null;
+  sequenceStepNumber?: number | null;
+  sentAt?: string | null;
+  canceledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScheduledEmailInput {
+  leadId: number;
+  templateId?: number | null;
+  subject: string;
+  body: string;
+  scheduledFor: string;
+  sequenceId?: number | null;
+  sequenceStepNumber?: number | null;
 }
 
 export interface Asset {
@@ -736,6 +764,14 @@ export interface CtaEntryInput {
   isActive?: boolean;
 }
 
+export interface LeadActivity {
+  id: number;
+  type: string;
+  description: string;
+  leadId?: number | null;
+  createdAt: string;
+}
+
 export type GetLeadsParams = {
   search?: string;
   pipelineType?: string;
@@ -778,6 +814,18 @@ export const GetTasksDueFilter = {
 
 export type GetTemplatesParams = {
   category?: string;
+};
+
+export type GetScheduledEmailsParams = {
+  leadId?: number;
+  status?: string;
+};
+
+export type UpdateScheduledEmailBody = {
+  status?: string;
+  scheduledFor?: string;
+  subject?: string;
+  body?: string;
 };
 
 export type GetAssetsParams = {

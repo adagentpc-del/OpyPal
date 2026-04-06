@@ -415,6 +415,7 @@ export const GetTemplatesResponseItem = zod.object({
   subject: zod.string().optional(),
   body: zod.string(),
   linkedAssetIds: zod.string().nullish(),
+  linkedTemplateSetId: zod.number().nullish(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -429,6 +430,7 @@ export const CreateTemplateBody = zod.object({
   subject: zod.string().optional(),
   body: zod.string(),
   linkedAssetIds: zod.string().nullish(),
+  linkedTemplateSetId: zod.number().nullish(),
 });
 
 /**
@@ -444,6 +446,7 @@ export const UpdateTemplateBody = zod.object({
   subject: zod.string().optional(),
   body: zod.string(),
   linkedAssetIds: zod.string().nullish(),
+  linkedTemplateSetId: zod.number().nullish(),
 });
 
 export const UpdateTemplateResponse = zod.object({
@@ -453,6 +456,7 @@ export const UpdateTemplateResponse = zod.object({
   subject: zod.string().optional(),
   body: zod.string(),
   linkedAssetIds: zod.string().nullish(),
+  linkedTemplateSetId: zod.number().nullish(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -467,6 +471,105 @@ export const DeleteTemplateParams = zod.object({
 export const DeleteTemplateResponse = zod.object({
   message: zod.string(),
 });
+
+/**
+ * @summary Get scheduled emails
+ */
+export const GetScheduledEmailsQueryParams = zod.object({
+  leadId: zod.coerce.number().optional(),
+  status: zod.coerce.string().optional(),
+});
+
+export const GetScheduledEmailsResponseItem = zod.object({
+  id: zod.number(),
+  leadId: zod.number(),
+  templateId: zod.number().nullish(),
+  subject: zod.string(),
+  body: zod.string(),
+  scheduledFor: zod.string(),
+  status: zod.string(),
+  sequenceId: zod.number().nullish(),
+  sequenceStepNumber: zod.number().nullish(),
+  sentAt: zod.string().nullish(),
+  canceledAt: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const GetScheduledEmailsResponse = zod.array(
+  GetScheduledEmailsResponseItem,
+);
+
+/**
+ * @summary Schedule an email
+ */
+export const CreateScheduledEmailBody = zod.object({
+  leadId: zod.number(),
+  templateId: zod.number().nullish(),
+  subject: zod.string(),
+  body: zod.string(),
+  scheduledFor: zod.string(),
+  sequenceId: zod.number().nullish(),
+  sequenceStepNumber: zod.number().nullish(),
+});
+
+/**
+ * @summary Update a scheduled email
+ */
+export const UpdateScheduledEmailParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateScheduledEmailBody = zod.object({
+  status: zod.string().optional(),
+  scheduledFor: zod.string().optional(),
+  subject: zod.string().optional(),
+  body: zod.string().optional(),
+});
+
+export const UpdateScheduledEmailResponse = zod.object({
+  id: zod.number(),
+  leadId: zod.number(),
+  templateId: zod.number().nullish(),
+  subject: zod.string(),
+  body: zod.string(),
+  scheduledFor: zod.string(),
+  status: zod.string(),
+  sequenceId: zod.number().nullish(),
+  sequenceStepNumber: zod.number().nullish(),
+  sentAt: zod.string().nullish(),
+  canceledAt: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Delete a scheduled email
+ */
+export const DeleteScheduledEmailParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DeleteScheduledEmailResponse = zod.object({
+  message: zod.string(),
+});
+
+/**
+ * @summary Get lead activity log
+ */
+export const GetLeadActivitiesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetLeadActivitiesResponseItem = zod.object({
+  id: zod.number(),
+  type: zod.string(),
+  description: zod.string(),
+  leadId: zod.number().nullish(),
+  createdAt: zod.string(),
+});
+export const GetLeadActivitiesResponse = zod.array(
+  GetLeadActivitiesResponseItem,
+);
 
 /**
  * @summary Get all assets

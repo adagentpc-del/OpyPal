@@ -19,3 +19,4 @@ export * from "./personalization-logs";
 export * from "./routing-logs";
 export * from "./next-actions";
 export * from "./cta-library";
+export * from "./scheduled-emails";

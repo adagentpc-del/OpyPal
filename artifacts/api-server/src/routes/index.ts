@@ -11,6 +11,7 @@ import campaignsRouter from "./campaigns";
 import templateSetsRouter from "./template-sets";
 import sequenceRouter from "./sequence";
 import outboundRouter from "./outbound";
+import scheduledEmailsRouter from "./scheduled-emails";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(campaignsRouter);
 router.use(templateSetsRouter);
 router.use(sequenceRouter);
 router.use(outboundRouter);
+router.use(scheduledEmailsRouter);
 
 export default router;

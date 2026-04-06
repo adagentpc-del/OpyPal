@@ -48,7 +48,7 @@ The A3 Sales OS is a pnpm workspace monorepo built with Node.js 24 and TypeScrip
 1.  **CRM & Lead Management:**
     *   **Dashboard:** Displays KPIs (Total Leads, Active Leads, Pipeline Value, Meetings Booked, Overdue Follow-ups), pipeline charts, recent activity, and upcoming tasks.
     *   **Lead Details:** A comprehensive CRM table with a right-side drawer for detailed lead information, organized into sections like Contact Info, CRM Status, Outreach, Outreach History, and Additional Details.
-    *   **Outreach Integration:** Features a template selector, editable email preview with placeholder substitution, asset attachment, and integration with Outlook for sending. Outreach history is logged, and post-send confirmations update lead status.
+    *   **Outreach Integration:** Features a template selector with loading/error states and refresh, editable email preview with placeholder substitution, asset attachment, and integration with Outlook for sending. Templates with linked sequences show a blue "Linked Sequence" badge with step preview and activation toggle. Supports email scheduling with date/time picker, sequence activation (auto-schedules follow-up steps), draft saving, and copy-to-clipboard. Post-send confirmation dialog updates lead status to "Contacted" and sets 2-business-day follow-up. Outreach history is logged with colored badges (Email Sent, Email Scheduled, Sequence Activated, Draft Saved). Activity log section tracks all actions chronologically. Upcoming scheduled emails section shows pending emails with cancel option.
     *   **Lead Status & Pipeline:** Quick status change dropdowns, auto-calculated forecast values, and a Kanban board for pipeline visualization with drag-and-drop functionality that updates lead status and syncs with Google Sheets.
     *   **Import/Export:** CSV import with smart header matching, duplicate detection, and auto-inference of pipeline type. Export leads and tasks to CSV.
 
@@ -99,6 +99,7 @@ Key tables include:
 -   `assets`: Local sales assets.
 -   `activity`: Dashboard activity log.
 -   `outreach_history`: Log of sent emails per lead.
+-   `scheduled_emails`: Scheduled emails per lead with status (scheduled/sent/canceled), optional sequence linkage.
 -   `contacts`, `campaigns`, `template_sets`, `sequence_enrollments`, `sequence_steps`, `send_logs`, `email_events`, `suppression_list`, `imports`, `settings`: Tables for the Outbound Sequence Engine and analytics.
 -   `personalization_logs`: Tracks AI personalization generation attempts with mode, input fields, output text, status, and errors.
 -   `routing_logs`: Tracks routing state changes per contact with previous/new state and reason.

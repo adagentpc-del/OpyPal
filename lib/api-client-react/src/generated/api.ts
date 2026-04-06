@@ -48,6 +48,7 @@ import type {
   GetContactsParams,
   GetEmailEventsParams,
   GetLeadsParams,
+  GetScheduledEmailsParams,
   GetSendLogsParams,
   GetSequenceQueueParams,
   GetTasksParams,
@@ -59,6 +60,7 @@ import type {
   ImportRecord,
   ImportResult,
   Lead,
+  LeadActivity,
   LeadInput,
   MessageResponse,
   NextAction,
@@ -74,6 +76,8 @@ import type {
   RoutingDecision,
   RoutingLog,
   RoutingRecommendations,
+  ScheduledEmail,
+  ScheduledEmailInput,
   SeedResult,
   SendLogItem,
   SequenceStep,
@@ -96,6 +100,7 @@ import type {
   UpdateContactRoutingInput,
   UpdateLeadStatusBody,
   UpdateOutboundSettingsBody,
+  UpdateScheduledEmailBody,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -1826,6 +1831,448 @@ export const useDeleteTemplate = <
 > => {
   return useMutation(getDeleteTemplateMutationOptions(options));
 };
+
+/**
+ * @summary Get scheduled emails
+ */
+export const getGetScheduledEmailsUrl = (params?: GetScheduledEmailsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/scheduled-emails?${stringifiedParams}`
+    : `/api/scheduled-emails`;
+};
+
+export const getScheduledEmails = async (
+  params?: GetScheduledEmailsParams,
+  options?: RequestInit,
+): Promise<ScheduledEmail[]> => {
+  return customFetch<ScheduledEmail[]>(getGetScheduledEmailsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetScheduledEmailsQueryKey = (
+  params?: GetScheduledEmailsParams,
+) => {
+  return [`/api/scheduled-emails`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetScheduledEmailsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getScheduledEmails>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetScheduledEmailsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getScheduledEmails>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetScheduledEmailsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getScheduledEmails>>
+  > = ({ signal }) => getScheduledEmails(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getScheduledEmails>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetScheduledEmailsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getScheduledEmails>>
+>;
+export type GetScheduledEmailsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get scheduled emails
+ */
+
+export function useGetScheduledEmails<
+  TData = Awaited<ReturnType<typeof getScheduledEmails>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetScheduledEmailsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getScheduledEmails>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetScheduledEmailsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Schedule an email
+ */
+export const getCreateScheduledEmailUrl = () => {
+  return `/api/scheduled-emails`;
+};
+
+export const createScheduledEmail = async (
+  scheduledEmailInput: ScheduledEmailInput,
+  options?: RequestInit,
+): Promise<ScheduledEmail> => {
+  return customFetch<ScheduledEmail>(getCreateScheduledEmailUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(scheduledEmailInput),
+  });
+};
+
+export const getCreateScheduledEmailMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createScheduledEmail>>,
+    TError,
+    { data: BodyType<ScheduledEmailInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createScheduledEmail>>,
+  TError,
+  { data: BodyType<ScheduledEmailInput> },
+  TContext
+> => {
+  const mutationKey = ["createScheduledEmail"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createScheduledEmail>>,
+    { data: BodyType<ScheduledEmailInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createScheduledEmail(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateScheduledEmailMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createScheduledEmail>>
+>;
+export type CreateScheduledEmailMutationBody = BodyType<ScheduledEmailInput>;
+export type CreateScheduledEmailMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Schedule an email
+ */
+export const useCreateScheduledEmail = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createScheduledEmail>>,
+    TError,
+    { data: BodyType<ScheduledEmailInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createScheduledEmail>>,
+  TError,
+  { data: BodyType<ScheduledEmailInput> },
+  TContext
+> => {
+  return useMutation(getCreateScheduledEmailMutationOptions(options));
+};
+
+/**
+ * @summary Update a scheduled email
+ */
+export const getUpdateScheduledEmailUrl = (id: number) => {
+  return `/api/scheduled-emails/${id}`;
+};
+
+export const updateScheduledEmail = async (
+  id: number,
+  updateScheduledEmailBody: UpdateScheduledEmailBody,
+  options?: RequestInit,
+): Promise<ScheduledEmail> => {
+  return customFetch<ScheduledEmail>(getUpdateScheduledEmailUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateScheduledEmailBody),
+  });
+};
+
+export const getUpdateScheduledEmailMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateScheduledEmail>>,
+    TError,
+    { id: number; data: BodyType<UpdateScheduledEmailBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateScheduledEmail>>,
+  TError,
+  { id: number; data: BodyType<UpdateScheduledEmailBody> },
+  TContext
+> => {
+  const mutationKey = ["updateScheduledEmail"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateScheduledEmail>>,
+    { id: number; data: BodyType<UpdateScheduledEmailBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateScheduledEmail(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateScheduledEmailMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateScheduledEmail>>
+>;
+export type UpdateScheduledEmailMutationBody =
+  BodyType<UpdateScheduledEmailBody>;
+export type UpdateScheduledEmailMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update a scheduled email
+ */
+export const useUpdateScheduledEmail = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateScheduledEmail>>,
+    TError,
+    { id: number; data: BodyType<UpdateScheduledEmailBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateScheduledEmail>>,
+  TError,
+  { id: number; data: BodyType<UpdateScheduledEmailBody> },
+  TContext
+> => {
+  return useMutation(getUpdateScheduledEmailMutationOptions(options));
+};
+
+/**
+ * @summary Delete a scheduled email
+ */
+export const getDeleteScheduledEmailUrl = (id: number) => {
+  return `/api/scheduled-emails/${id}`;
+};
+
+export const deleteScheduledEmail = async (
+  id: number,
+  options?: RequestInit,
+): Promise<MessageResponse> => {
+  return customFetch<MessageResponse>(getDeleteScheduledEmailUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteScheduledEmailMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteScheduledEmail>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteScheduledEmail>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteScheduledEmail"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteScheduledEmail>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteScheduledEmail(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteScheduledEmailMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteScheduledEmail>>
+>;
+
+export type DeleteScheduledEmailMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a scheduled email
+ */
+export const useDeleteScheduledEmail = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteScheduledEmail>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteScheduledEmail>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteScheduledEmailMutationOptions(options));
+};
+
+/**
+ * @summary Get lead activity log
+ */
+export const getGetLeadActivitiesUrl = (id: number) => {
+  return `/api/leads/${id}/activities`;
+};
+
+export const getLeadActivities = async (
+  id: number,
+  options?: RequestInit,
+): Promise<LeadActivity[]> => {
+  return customFetch<LeadActivity[]>(getGetLeadActivitiesUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLeadActivitiesQueryKey = (id: number) => {
+  return [`/api/leads/${id}/activities`] as const;
+};
+
+export const getGetLeadActivitiesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLeadActivities>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLeadActivities>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetLeadActivitiesQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getLeadActivities>>
+  > = ({ signal }) => getLeadActivities(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLeadActivities>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLeadActivitiesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLeadActivities>>
+>;
+export type GetLeadActivitiesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get lead activity log
+ */
+
+export function useGetLeadActivities<
+  TData = Awaited<ReturnType<typeof getLeadActivities>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLeadActivities>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLeadActivitiesQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get all assets

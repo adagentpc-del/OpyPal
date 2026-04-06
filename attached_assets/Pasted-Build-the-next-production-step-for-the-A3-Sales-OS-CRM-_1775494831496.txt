@@ -1,0 +1,238 @@
+Build the next production step for the A3 Sales OS CRM by adding a lead activity timeline and per lead sequence management controls.
+
+Primary objective:
+Once templates, scheduling, and follow up sequences are working, I need the ability to manage everything per lead from one place.
+I need a clear timeline of outreach actions and full control to pause, resume, reschedule, edit, or cancel future follow ups for an individual lead.
+
+Build the following:
+
+1. Lead activity timeline
+Create a timeline section inside the lead detail drawer or lead detail page.
+
+The timeline should show all major lead events in reverse chronological order.
+
+Include event types such as:
+- lead created
+- lead imported from CSV
+- lead edited
+- company/contact info updated
+- template selected
+- draft saved
+- email sent
+- email scheduled
+- quick preset used
+- linked sequence activated
+- sequence step scheduled
+- sequence step sent
+- sequence step paused
+- sequence step resumed
+- sequence step canceled
+- scheduled email rescheduled
+- reply logged
+- status changed
+- pipeline changed
+- note added
+
+Each timeline item should show:
+- event type label
+- short human readable description
+- date and time
+- user or system source if available
+- related template name if relevant
+- related sequence name if relevant
+
+Add filtering options:
+- all activity
+- outreach
+- scheduling
+- status changes
+- notes
+- system events
+
+2. Per lead sequence management panel
+Inside each lead record add a dedicated sequence management section.
+
+Show:
+- active sequences on this lead
+- upcoming scheduled steps
+- completed steps
+- paused steps
+- canceled steps
+- manually scheduled one off emails
+
+Each upcoming step should show:
+- step label
+- template name
+- sequence name
+- scheduled send date
+- status
+- source
+- actions
+
+Actions per scheduled step:
+- pause
+- resume
+- reschedule
+- edit subject
+- edit body
+- skip
+- cancel
+
+Actions per active sequence:
+- pause whole sequence
+- resume whole sequence
+- cancel whole sequence
+- view sequence structure
+- add another manual follow up
+- restart sequence if completed
+
+3. Upcoming outreach card in lead view
+Add a clear card near the top of the lead detail view called:
+Upcoming Outreach
+
+Show:
+- next scheduled email
+- next scheduled date and time
+- linked sequence name if applicable
+- number of additional future steps queued
+- quick actions:
+  - send now
+  - reschedule
+  - pause
+  - cancel
+
+4. Manual follow up controls
+Allow a user to add a manual follow up to any lead even if no sequence is active.
+
+Manual follow up should support:
+- choose template optional
+- custom subject
+- custom body
+- scheduled date and time
+- quick schedule presets
+  - 1 month
+  - 3 months
+  - 6 months
+
+Manual follow ups should appear in:
+- upcoming outreach card
+- scheduled emails page
+- lead activity timeline
+
+5. Sequence state management
+Implement robust status logic for sequence execution.
+
+Support statuses such as:
+- draft
+- scheduled
+- queued
+- sent
+- paused
+- skipped
+- canceled
+- failed
+- completed
+
+If a whole sequence is paused:
+- all future unsent steps become paused
+- sent steps remain unchanged
+
+If resumed:
+- future paused steps are recalculated from the resume point or retain dates based on system setting
+- expose a simple default behavior:
+  - preserve original dates if still in future
+  - reschedule missed steps intelligently if dates have passed
+
+If canceled:
+- all future unsent steps are canceled
+- activity log records it
+
+6. Rescheduling behavior
+For any scheduled email or sequence step:
+- allow date and time editing
+- preserve timezone
+- update the timeline
+- update the upcoming outreach card
+- keep template linkage intact
+- keep sequence linkage intact if part of a sequence
+
+7. Edit before send
+Allow editing subject and body on any future scheduled email.
+
+Rules:
+- edits affect only that lead’s scheduled message instance
+- do not overwrite the master template unless explicitly editing the template in the templates page
+- keep a reference to original template id for audit trail
+
+8. Notes and reply logging
+Inside the lead record allow:
+- add internal note
+- log a reply manually
+- mark lead as interested
+- mark lead as not interested
+- mark lead as follow up later
+
+These should all create timeline items and optionally influence pipeline or score.
+
+9. Lead activity data model
+Make sure the system supports a proper activity log structure.
+
+lead_activities
+- id
+- lead_id
+- type
+- description
+- metadata json or structured detail fields
+- related_template_id nullable
+- related_sequence_id nullable
+- related_scheduled_email_id nullable
+- created_by nullable
+- created_at
+
+10. Scheduled instance model behavior
+Each scheduled email must behave as an independent instance even when created from a sequence.
+
+Support:
+- source type
+  - manual
+  - template
+  - sequence
+- original template id nullable
+- overridden subject nullable
+- overridden body nullable
+- scheduled_for
+- status
+- pause reason nullable
+- canceled reason nullable
+
+11. UI and UX requirements
+Use a clean premium CRM interface consistent with A3 Sales OS.
+
+Requirements:
+- easy to scan timeline
+- color coded badges for statuses
+- clear sequence control panel
+- polished empty states
+- confirmation prompts for cancel or skip
+- responsive design
+- no clutter
+- strong visual hierarchy
+
+12. Integration requirements
+This must integrate with existing:
+- Leads
+- Email Templates
+- Sequences
+- Scheduled Emails
+- Pipeline
+- Lead Scoring if present
+
+13. Deliverables
+When complete provide:
+- files created
+- files updated
+- routes changed if any
+- schema or migration changes
+- how per lead sequence state is handled
+- how paused and resumed follow ups behave
+- where to review the lead timeline and controls in the app

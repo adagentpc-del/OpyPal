@@ -1,0 +1,148 @@
+Fix and enhance the lead detail outreach workflow inside the A3 Sales OS CRM.
+
+Current issue:
+Inside the lead detail drawer, the Outreach section says “No email templates available. You can still write a custom email below.”
+Previously template access existed, but it is no longer visible or loading.
+I need template selection restored, plus scheduling and sequence triggering based on the selected template.
+
+Build the following:
+
+1. Restore template selector in lead detail outreach panel
+- Add a visible “Select Template” dropdown at the top of the Outreach section
+- Load templates from the existing email templates data source
+- If templates exist, show them in the dropdown by template name
+- When a template is selected, auto populate:
+  - subject
+  - body
+  - any category or sequence metadata if available
+- Keep the subject and body editable after auto fill
+- If no templates exist, show a proper empty state with button:
+  - “Create Template”
+  - “Refresh Templates”
+
+2. Diagnose and fix template loading
+- Audit why templates are not appearing
+- Verify:
+  - template query is running
+  - correct table or collection is used
+  - correct tenant or workspace filter is used
+  - response is mapped correctly to dropdown options
+- Add defensive UI state:
+  - loading templates
+  - templates loaded
+  - no templates found
+  - error loading templates
+
+3. Add send and scheduling options
+In the Outreach section add:
+- Send Now button
+- Schedule Email button
+- Schedule date and time picker
+- Save Draft button
+
+When scheduling:
+- save a scheduled email record
+- connect it to the lead
+- connect it to the selected template if one was used
+- show the scheduled email in lead activity history
+
+4. Add template based sequence triggering
+Enhance templates so a template can optionally be linked to a follow up sequence
+
+When a user selects a template that has a linked sequence:
+- show the linked sequence name
+- show a toggle or checkbox:
+  - “Activate linked follow up sequence”
+- default toggle ON if sequence exists
+
+When confirmed:
+- create future follow up steps based on that sequence
+- generate scheduled follow up records tied to the lead
+- use the sequence cadence rules
+- prefill future emails from the sequence step templates
+- show a preview of all scheduled follow ups before confirming
+
+5. Sequence preview
+If a linked sequence exists, show a preview block:
+- Step 1: Today, selected template
+- Step 2: X days later, follow up template
+- Step 3: X days later, follow up template
+- etc
+
+Allow the user to:
+- confirm all steps
+- skip sequence and only send first email
+- edit first send date if scheduling instead of send now
+
+6. Lead activity logging
+Every action should create timeline records on the lead:
+- template selected
+- email sent
+- email scheduled
+- sequence activated
+- follow up step scheduled
+- sequence paused or canceled later
+
+7. Better outreach UI
+Refactor the Outreach card in the lead drawer to include:
+- Template dropdown
+- Linked sequence badge if present
+- Subject input
+- Email body textarea
+- Send now
+- Schedule
+- Save draft
+- Sequence activation toggle
+- Upcoming follow up preview
+- Template loading and error states
+
+8. Template management integration
+Add a shortcut button from the lead drawer to:
+- View Templates
+- Create New Template
+Open in modal or navigate to Email Templates page
+
+9. Data model updates if needed
+If not already present, support:
+- templates table
+  - id
+  - name
+  - subject
+  - body
+  - category
+  - linked_sequence_id nullable
+- sequences table
+  - id
+  - name
+  - description
+- sequence_steps table
+  - id
+  - sequence_id
+  - step_number
+  - delay_days
+  - template_id
+- scheduled_emails table
+  - id
+  - lead_id
+  - template_id nullable
+  - subject
+  - body
+  - scheduled_for
+  - status
+  - sequence_id nullable
+  - sequence_step_id nullable
+- lead_activities table
+  - id
+  - lead_id
+  - type
+  - details
+  - created_at
+
+10. Deliverable
+When complete:
+- templates should appear again in the lead drawer
+- selecting a template should populate the email
+- scheduling should work
+- linked sequences should be triggerable from template selection
+- all actions should be visible in the lead record
+- include notes on what broke template visibility and what was fixed

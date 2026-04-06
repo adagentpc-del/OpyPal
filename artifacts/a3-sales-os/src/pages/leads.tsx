@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "@/components/layout";
-import { useGetLeads, useCreateLead, useUpdateLead, useDeleteLead, useDuplicateLead, useUpdateLeadStatus, useGetSyncStatus, useGetTemplates, useGetAssets, useGetLeadHistory, useCreateLeadHistory, getGetLeadsQueryKey, getGetDashboardQueryKey, getGetLeadHistoryQueryKey } from "@workspace/api-client-react";
+import { useGetLeads, useCreateLead, useUpdateLead, useDeleteLead, useDuplicateLead, useUpdateLeadStatus, useGetSyncStatus, useGetTemplates, useGetAssets, useGetLeadHistory, useCreateLeadHistory, useGetScheduledEmails, useCreateScheduledEmail, useUpdateScheduledEmail, useGetLeadActivities, useGetTemplateSets, getGetLeadsQueryKey, getGetDashboardQueryKey, getGetLeadHistoryQueryKey, getGetScheduledEmailsQueryKey, getGetLeadActivitiesQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Search, Trash2, Edit2, Building2, Copy, X, Filter, Mail, Check, Clock, Send, FileText, Paperclip, History, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Search, Trash2, Edit2, Building2, Copy, X, Filter, Mail, Check, Clock, Send, FileText, Paperclip, History, ChevronDown, ChevronUp, Calendar, Save, ExternalLink, Loader2, AlertCircle, Link2, Play, Eye, XCircle, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +28,13 @@ function addBusinessDays(days: number): string {
   return d.toISOString().split("T")[0];
 }
 
+function addBusinessDaysToDate(startDate: Date, days: number): Date {
+  const d = new Date(startDate);
+  let added = 0;
+  while (added < days) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) added++; }
+  return d;
+}
+
 function replacePlaceholders(text: string, lead: any): string {
   const firstName = (lead.contactName || "").split(" ")[0] || lead.contactName || "";
   return text
@@ -37,7 +44,11 @@ function replacePlaceholders(text: string, lead: any): string {
     .replace(/\[Name\]/gi, lead.contactName || "")
     .replace(/\[venue \/ agency\]/gi, lead.companyName || "")
     .replace(/\[Location\]/gi, lead.location || "")
-    .replace(/\[Title\]/gi, lead.title || "");
+    .replace(/\[Title\]/gi, lead.title || "")
+    .replace(/\{\{greeting\}\}/gi, `Hi ${firstName},`)
+    .replace(/\{\{company\}\}/gi, lead.companyName || "")
+    .replace(/\{\{intent_line\}\}/gi, "")
+    .replace(/\{\{company_line\}\}/gi, "");
 }
 
 function SyncBadge({ status }: { status?: string }) {
@@ -334,10 +345,15 @@ function NewLeadModal({ form, setForm, onSave, onClose, saving }: any) {
 function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onClose, onDelete, invalidate, onLeadUpdate }: any) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: allTemplates } = useGetTemplates();
+  const { data: allTemplates, isLoading: templatesLoading, isError: templatesError, refetch: refetchTemplates } = useGetTemplates();
   const { data: allAssets } = useGetAssets();
   const { data: history } = useGetLeadHistory(lead.id);
+  const { data: scheduledEmails } = useGetScheduledEmails({ leadId: lead.id });
+  const { data: activities } = useGetLeadActivities(lead.id);
+  const { data: templateSets } = useGetTemplateSets();
   const createHistoryMutation = useCreateLeadHistory();
+  const createScheduledEmailMutation = useCreateScheduledEmail();
+  const updateScheduledEmailMutation = useUpdateScheduledEmail();
   const updateMutation = useUpdateLead();
 
   const emailTemplates = useMemo(() =>
@@ -356,6 +372,44 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
   const [sentAssetNames, setSentAssetNames] = useState("");
   const [showAdditional, setShowAdditional] = useState(false);
   const [showHistory, setShowHistory] = useState(true);
+  const [showActivities, setShowActivities] = useState(false);
+  const [showScheduled, setShowScheduled] = useState(true);
+
+  const [scheduleMode, setScheduleMode] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [activateSequence, setActivateSequence] = useState(true);
+  const [showSequencePreview, setShowSequencePreview] = useState(false);
+
+  const selectedTemplate = useMemo(() =>
+    selectedTemplateId ? (allTemplates || []).find((t: any) => t.id === selectedTemplateId) : null,
+    [selectedTemplateId, allTemplates]
+  );
+
+  const linkedSequence = useMemo(() => {
+    if (!selectedTemplate?.linkedTemplateSetId || !templateSets) return null;
+    return templateSets.find((s: any) => s.id === selectedTemplate.linkedTemplateSetId) || null;
+  }, [selectedTemplate, templateSets]);
+
+  const [sequenceSteps, setSequenceSteps] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (linkedSequence) {
+      fetch(`/api/template-sets/${linkedSequence.id}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.templates) {
+            setSequenceSteps(data.templates.sort((a: any, b: any) => a.stepNumber - b.stepNumber));
+          }
+        })
+        .catch(() => setSequenceSteps([]));
+      setActivateSequence(true);
+      setShowSequencePreview(true);
+    } else {
+      setSequenceSteps([]);
+      setShowSequencePreview(false);
+    }
+  }, [linkedSequence]);
 
   useEffect(() => {
     setSelectedTemplateId(null);
@@ -363,6 +417,8 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
     setEmailBody("");
     setSelectedAssetIds([]);
     setConfirmOpen(false);
+    setScheduleMode(false);
+    setShowSequencePreview(false);
   }, [lead.id]);
 
   const currentTemplateLinkedIds = useMemo(() => {
@@ -437,6 +493,98 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
     setTimeout(() => setConfirmOpen(true), 800);
   };
 
+  const handleScheduleEmail = () => {
+    if (!emailSubject || !emailBody) {
+      toast({ title: "Subject and body are required", variant: "destructive" });
+      return;
+    }
+    if (!scheduleDate) {
+      toast({ title: "Please select a date", variant: "destructive" });
+      return;
+    }
+
+    const scheduledFor = new Date(`${scheduleDate}T${scheduleTime}:00`).toISOString();
+    createScheduledEmailMutation.mutate({
+      data: {
+        leadId: lead.id,
+        templateId: selectedTemplateId || undefined,
+        subject: emailSubject,
+        body: emailBody,
+        scheduledFor,
+      },
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetScheduledEmailsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetLeadActivitiesQueryKey(lead.id) });
+
+        createHistoryMutation.mutate({
+          id: lead.id,
+          data: {
+            actionType: "Email Scheduled",
+            templateName: selectedTemplate?.name || "Custom",
+            subject: emailSubject,
+            body: emailBody,
+            sender: "Alyssa",
+          },
+        }, {
+          onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetLeadHistoryQueryKey(lead.id) }),
+        });
+
+        if (activateSequence && linkedSequence && sequenceSteps.length > 1) {
+          const startDate = new Date(`${scheduleDate}T${scheduleTime}:00`);
+          sequenceSteps.slice(1).forEach((step: any) => {
+            const stepDate = addBusinessDaysToDate(startDate, step.delayDays);
+            createScheduledEmailMutation.mutate({
+              data: {
+                leadId: lead.id,
+                templateId: undefined,
+                subject: replacePlaceholders(step.subject || `Follow-up Step ${step.stepNumber}`, lead),
+                body: replacePlaceholders(step.body || "", lead),
+                scheduledFor: stepDate.toISOString(),
+                sequenceId: linkedSequence.id,
+                sequenceStepNumber: step.stepNumber,
+              },
+            });
+          });
+
+          createHistoryMutation.mutate({
+            id: lead.id,
+            data: {
+              actionType: "Sequence Activated",
+              templateName: linkedSequence.name,
+              subject: `${sequenceSteps.length} steps scheduled`,
+              sender: "Alyssa",
+            },
+          });
+        }
+
+        toast({ title: "Email scheduled", description: `Scheduled for ${format(new Date(scheduledFor), "MMM d, yyyy h:mm a")}` });
+        setScheduleMode(false);
+        setScheduleDate("");
+      },
+      onError: () => toast({ title: "Failed to schedule email", variant: "destructive" }),
+    });
+  };
+
+  const handleSaveDraft = () => {
+    createHistoryMutation.mutate({
+      id: lead.id,
+      data: {
+        actionType: "Draft Saved",
+        templateName: selectedTemplate?.name || "Custom",
+        subject: emailSubject,
+        body: emailBody,
+        sender: "Alyssa",
+      },
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetLeadHistoryQueryKey(lead.id) });
+        queryClient.invalidateQueries({ queryKey: getGetLeadActivitiesQueryKey(lead.id) });
+        toast({ title: "Draft saved to outreach history" });
+      },
+    });
+  };
+
   const handleMarkContacted = () => {
     const todayStr = new Date().toISOString().split("T")[0];
     const followUpDate = addBusinessDays(2);
@@ -470,11 +618,56 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
       }, {
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetLeadHistoryQueryKey(lead.id) }); },
       });
+
+      if (activateSequence && linkedSequence && sequenceSteps.length > 1) {
+        const startDate = new Date();
+        sequenceSteps.slice(1).forEach((step: any) => {
+          const stepDate = addBusinessDaysToDate(startDate, step.delayDays);
+          createScheduledEmailMutation.mutate({
+            data: {
+              leadId: lead.id,
+              subject: replacePlaceholders(step.subject || `Follow-up Step ${step.stepNumber}`, lead),
+              body: replacePlaceholders(step.body || "", lead),
+              scheduledFor: stepDate.toISOString(),
+              sequenceId: linkedSequence.id,
+              sequenceStepNumber: step.stepNumber,
+            },
+          });
+        });
+
+        createHistoryMutation.mutate({
+          id: lead.id,
+          data: {
+            actionType: "Sequence Activated",
+            templateName: linkedSequence.name,
+            subject: `${sequenceSteps.length - 1} follow-up steps scheduled`,
+            sender: "Alyssa",
+          },
+        });
+
+        queryClient.invalidateQueries({ queryKey: getGetScheduledEmailsQueryKey() });
+        toast({ title: "Sequence activated", description: `${sequenceSteps.length - 1} follow-up emails scheduled` });
+      }
     }
     setConfirmOpen(false);
   };
 
+  const handleCancelScheduled = (emailId: number) => {
+    updateScheduledEmailMutation.mutate({ id: emailId, data: { status: "canceled" } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetScheduledEmailsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetLeadActivitiesQueryKey(lead.id) });
+        toast({ title: "Scheduled email canceled" });
+      },
+    });
+  };
+
   const forecast = ((form.proposalValue || form.dealValueEstimate || 0) * (form.closeProbability || 0)) / 100;
+
+  const pendingScheduledEmails = useMemo(() =>
+    (scheduledEmails || []).filter((e: any) => e.status === "scheduled"),
+    [scheduledEmails]
+  );
 
   return (
     <>
@@ -525,17 +718,84 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                 <DrawerSection title="Outreach" icon={<Send className="h-4 w-4" />}>
                   <div className="space-y-3">
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground block mb-1">Select Template</label>
-                      {emailTemplates.length > 0 ? (
-                        <select value={selectedTemplateId !== null ? String(selectedTemplateId) : ""} onChange={(e) => { const v = e.target.value; if (v) handleTemplateSelect(Number(v)); else { setSelectedTemplateId(null); } }}
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-muted-foreground">Select Template</label>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => window.open("/templates", "_blank")}>
+                            <ExternalLink className="h-3 w-3" /> View Templates
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => refetchTemplates()}>
+                            <RefreshCw className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      {templatesLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                          <Loader2 className="h-4 w-4 animate-spin" /> Loading templates...
+                        </div>
+                      ) : templatesError ? (
+                        <div className="flex items-center gap-2 text-sm text-destructive py-2">
+                          <AlertCircle className="h-4 w-4" /> Error loading templates
+                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => refetchTemplates()}>Retry</Button>
+                        </div>
+                      ) : emailTemplates.length > 0 ? (
+                        <select value={selectedTemplateId !== null ? String(selectedTemplateId) : ""} onChange={(e) => { const v = e.target.value; if (v) handleTemplateSelect(Number(v)); else { setSelectedTemplateId(null); setEmailSubject(""); setEmailBody(""); setSelectedAssetIds([]); } }}
                           className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none">
                           <option value="">Choose a template...</option>
-                          {emailTemplates.map((t: any) => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
+                          {emailTemplates.map((t: any) => (
+                            <option key={t.id} value={String(t.id)}>
+                              {t.name} {t.linkedTemplateSetId ? "⚡" : ""}
+                            </option>
+                          ))}
                         </select>
                       ) : (
-                        <p className="text-xs text-muted-foreground">No email templates available. You can still write a custom email below.</p>
+                        <div className="bg-muted/30 rounded-xl p-3 text-center space-y-2">
+                          <p className="text-xs text-muted-foreground">No email templates available.</p>
+                          <div className="flex gap-2 justify-center">
+                            <Button variant="outline" size="sm" className="h-7 text-xs rounded-lg" onClick={() => window.open("/templates", "_blank")}>
+                              <Plus className="h-3 w-3 mr-1" /> Create Template
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-7 text-xs rounded-lg" onClick={() => refetchTemplates()}>
+                              <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+                            </Button>
+                          </div>
+                        </div>
                       )}
                     </div>
+
+                    {linkedSequence && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Link2 className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm font-medium text-blue-800">Linked Sequence: {linkedSequence.name}</span>
+                          </div>
+                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-blue-700" onClick={() => setShowSequencePreview(!showSequencePreview)}>
+                            <Eye className="h-3 w-3 mr-1" /> {showSequencePreview ? "Hide" : "Preview"}
+                          </Button>
+                        </div>
+
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={activateSequence} onChange={(e) => setActivateSequence(e.target.checked)} className="rounded" />
+                          <span className="text-xs text-blue-700">Activate linked follow-up sequence</span>
+                        </label>
+
+                        {showSequencePreview && sequenceSteps.length > 0 && (
+                          <div className="space-y-1.5 mt-2">
+                            <p className="text-xs font-medium text-blue-800 mb-1">Sequence Preview:</p>
+                            {sequenceSteps.map((step: any, i: number) => (
+                              <div key={step.id} className={`flex items-center gap-2 text-xs ${i === 0 ? "text-blue-800 font-medium" : "text-blue-600"}`}>
+                                <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold shrink-0">{step.stepNumber}</span>
+                                <span className="truncate">{step.name || `Step ${step.stepNumber}`}</span>
+                                <span className="text-blue-400 ml-auto shrink-0">
+                                  {step.delayDays === 0 ? "Today" : `+${step.delayDays}d`}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div>
                       <label className="text-xs font-medium text-muted-foreground block mb-1">Subject</label>
@@ -587,19 +847,78 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                       </div>
                     )}
 
+                    {scheduleMode && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-amber-800 flex items-center gap-1.5">
+                            <Calendar className="h-4 w-4" /> Schedule Email
+                          </span>
+                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-amber-600" onClick={() => setScheduleMode(false)}>
+                            Cancel
+                          </Button>
+                        </div>
+                        <div className="flex gap-2">
+                          <input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)}
+                            min={new Date().toISOString().split("T")[0]}
+                            className="flex-1 px-3 py-1.5 border border-amber-300 rounded-lg text-sm bg-white focus:border-amber-500 outline-none" />
+                          <input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)}
+                            className="w-28 px-3 py-1.5 border border-amber-300 rounded-lg text-sm bg-white focus:border-amber-500 outline-none" />
+                        </div>
+                        <Button size="sm" className="w-full rounded-lg bg-amber-600 hover:bg-amber-700 text-white gap-1.5"
+                          onClick={handleScheduleEmail} disabled={!scheduleDate || createScheduledEmailMutation.isPending}>
+                          {createScheduledEmailMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Calendar className="h-3.5 w-3.5" />}
+                          Confirm Schedule
+                        </Button>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={handleCopyEmail} disabled={!emailSubject && !emailBody}>
-                        <Copy className="h-3.5 w-3.5" /> Copy Email
+                        <Copy className="h-3.5 w-3.5" /> Copy
                       </Button>
                       <Button size="sm" className="rounded-xl bg-primary text-white gap-1.5" onClick={handleSendOutlook} disabled={!emailSubject || !emailBody}>
                         <Mail className="h-3.5 w-3.5" /> Send via Outlook
                       </Button>
+                      <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setScheduleMode(!scheduleMode)} disabled={!emailSubject || !emailBody}>
+                        <Calendar className="h-3.5 w-3.5" /> Schedule
+                      </Button>
+                      <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={handleSaveDraft} disabled={!emailSubject && !emailBody}>
+                        <Save className="h-3.5 w-3.5" /> Save Draft
+                      </Button>
                       <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={handleMarkContacted}>
-                        <Check className="h-3.5 w-3.5" /> Mark as Contacted
+                        <Check className="h-3.5 w-3.5" /> Mark Contacted
                       </Button>
                     </div>
                   </div>
                 </DrawerSection>
+
+                {pendingScheduledEmails.length > 0 && (
+                  <DrawerSection title={`Upcoming Emails (${pendingScheduledEmails.length})`} icon={<Calendar className="h-4 w-4" />}
+                    collapsible expanded={showScheduled} onToggle={() => setShowScheduled(!showScheduled)}>
+                    <div className="space-y-2">
+                      {pendingScheduledEmails.map((e: any) => (
+                        <div key={e.id} className="border border-border/50 rounded-xl p-3 bg-amber-50/50">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-3.5 w-3.5 text-amber-600" />
+                              <span className="text-xs font-semibold text-amber-700">
+                                {format(new Date(e.scheduledFor), "MMM d, yyyy h:mm a")}
+                              </span>
+                              {e.sequenceStepNumber && (
+                                <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">Step {e.sequenceStepNumber}</span>
+                              )}
+                            </div>
+                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-destructive" onClick={() => handleCancelScheduled(e.id)}>
+                              <XCircle className="h-3 w-3 mr-1" /> Cancel
+                            </Button>
+                          </div>
+                          <p className="text-sm font-medium truncate">{e.subject}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{e.body}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </DrawerSection>
+                )}
 
                 <DrawerSection title="Outreach History" icon={<History className="h-4 w-4" />}
                   collapsible expanded={showHistory} onToggle={() => setShowHistory(!showHistory)}>
@@ -610,7 +929,13 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                       {history.map((h: any) => (
                         <div key={h.id} className="border border-border/50 rounded-xl p-3 bg-muted/20">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-semibold text-primary">{h.actionType}</span>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              h.actionType === "Email Sent" ? "bg-emerald-100 text-emerald-700" :
+                              h.actionType === "Email Scheduled" ? "bg-amber-100 text-amber-700" :
+                              h.actionType === "Sequence Activated" ? "bg-blue-100 text-blue-700" :
+                              h.actionType === "Draft Saved" ? "bg-gray-100 text-gray-700" :
+                              "bg-primary/10 text-primary"
+                            }`}>{h.actionType}</span>
                             <span className="text-xs text-muted-foreground">{format(new Date(h.sentAt), "MMM d, yyyy h:mm a")}</span>
                           </div>
                           {h.templateName && <p className="text-xs text-muted-foreground">Template: {h.templateName}</p>}
@@ -618,6 +943,25 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                           {h.body && <p className="text-xs text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap">{h.body}</p>}
                           {h.assets && <p className="text-xs mt-1"><Paperclip className="h-3 w-3 inline mr-1" />{h.assets}</p>}
                           {h.sender && <p className="text-xs text-muted-foreground mt-1">Sent by: {h.sender}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </DrawerSection>
+
+                <DrawerSection title="Activity Log" icon={<Play className="h-4 w-4" />}
+                  collapsible expanded={showActivities} onToggle={() => setShowActivities(!showActivities)}>
+                  {!activities || activities.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+                      {activities.map((a: any) => (
+                        <div key={a.id} className="flex items-start gap-2 text-xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary/50 mt-1.5 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-muted-foreground">{a.description}</span>
+                          </div>
+                          <span className="text-muted-foreground shrink-0">{format(new Date(a.createdAt), "MMM d")}</span>
                         </div>
                       ))}
                     </div>
@@ -724,8 +1068,14 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                   To <span className="font-medium text-foreground">{lead.companyName}</span>
                 </p>
               </div>
+              {linkedSequence && activateSequence && (
+                <div className="bg-blue-50 rounded-lg p-2 text-xs text-blue-700">
+                  <Link2 className="h-3 w-3 inline mr-1" />
+                  Confirming will also activate {sequenceSteps.length - 1} follow-up emails from "{linkedSequence.name}"
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
-                If yes, the lead will be updated to "Contacted" with a follow-up set for 2 business days. The email will be logged in outreach history.
+                If yes, the lead will be updated to "Contacted" with a follow-up set for 2 business days.
               </p>
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" className="flex-1 rounded-xl" onClick={() => handleConfirmSent(false)}>No</Button>
@@ -806,24 +1156,24 @@ function buildLeadUpdate(lead: any, changes: Record<string, any>) {
   };
 }
 
-function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
+function Field({ label, value, onChange, type = "text" }: any) {
   return (
     <div>
       <label className="text-sm font-medium text-foreground block mb-1.5">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
+      <input type={type} value={value || ""} onChange={(e) => onChange(e.target.value)}
         className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-background focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" />
     </div>
   );
 }
 
-function SelectField({ label, value, options, onChange, allowEmpty }: { label: string; value: string; options: string[]; onChange: (v: string) => void; allowEmpty?: boolean }) {
+function SelectField({ label, value, options, onChange, allowEmpty }: any) {
   return (
     <div>
       <label className="text-sm font-medium text-foreground block mb-1.5">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)}
+      <select value={value || ""} onChange={(e) => onChange(e.target.value)}
         className="w-full px-3 py-2 border border-border rounded-xl text-sm bg-background focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
         {allowEmpty && <option value="">—</option>}
-        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+        {options.map((o: string) => <option key={o} value={o}>{o}</option>)}
       </select>
     </div>
   );

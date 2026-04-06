@@ -12,4 +12,5 @@ export interface TemplateInput {
   subject?: string;
   body: string;
   linkedAssetIds?: string | null;
+  linkedTemplateSetId?: number | null;
 }

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, leadsTable, activityTable, outreachHistoryTable } from "@workspace/db";
+import { db, leadsTable, activityTable, outreachHistoryTable, scheduledEmailsTable } from "@workspace/db";
 import { eq, ilike, or, and, sql, lte, lt, desc } from "drizzle-orm";
 import {
   GetLeadsQueryParams,
@@ -346,6 +346,18 @@ router.post("/leads/:id/history", async (req, res) => {
     }).returning();
 
     res.status(201).json(entry);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.get("/leads/:id/activities", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const activities = await db.select().from(activityTable)
+      .where(eq(activityTable.leadId, id))
+      .orderBy(desc(activityTable.createdAt));
+    res.json(activities);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }

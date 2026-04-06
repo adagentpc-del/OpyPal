@@ -13,6 +13,7 @@ export interface Template {
   subject?: string;
   body: string;
   linkedAssetIds?: string | null;
+  linkedTemplateSetId?: number | null;
   createdAt: string;
   updatedAt: string;
 }
