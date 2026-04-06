@@ -1,0 +1,301 @@
+Build a Smart Follow Up Engine for the A3 Sales OS CRM.
+
+Primary objective:
+Create a rules based engagement engine that changes follow up behavior based on recipient activity.
+If there is no reply, continue the sequence.
+If the email is opened but not replied to, branch the follow up logic.
+If the email is clicked, escalate.
+If the lead replies, stop future follow ups, pause the sequence, and notify me.
+
+This engine must work with:
+- Resend outbound sends
+- reply tracking
+- sequence scheduling
+- lead activity timeline
+- campaign recipient tracking
+- per lead sequence controls
+
+Build the following:
+
+1. Engagement event model
+Track recipient level engagement events for each outbound email.
+
+Support events:
+- sent
+- delivered if available
+- opened
+- clicked
+- replied
+- bounced
+- unsubscribed
+- failed
+- out_of_office optional
+- auto_reply optional
+
+Store event metadata such as:
+- lead_id
+- campaign_id
+- scheduled_email_id
+- template_id
+- sequence_id nullable
+- event type
+- event timestamp
+- provider event id if available
+- raw payload optional
+
+2. Smart follow up engine
+Create a rules engine that evaluates engagement and updates next actions automatically.
+
+Default behavior:
+- if no reply and no negative event, continue normal sequence
+- if opened but not replied, optionally branch to a warmer follow up path
+- if clicked, escalate lead priority and assign a more direct follow up
+- if replied, stop future sequence sends and notify me
+- if unsubscribed, suppress all future outreach
+- if bounced, suppress future outreach to that email and flag it
+- if out of office, optionally delay next touch
+
+3. Branching logic
+Allow sequences to support conditional branching based on engagement.
+
+Add support for sequence branch conditions such as:
+- no_open
+- opened_no_reply
+- clicked_no_reply
+- replied
+- bounced
+- unsubscribed
+- out_of_office
+
+Behavior examples:
+- if email opened but no reply after X days, send softer or more direct follow up
+- if clicked but no reply after X days, move lead to high intent and use higher priority follow up template
+- if no open after X days, use alternate subject line or lighter re entry follow up
+- if replied, stop all future automated messages immediately
+- if bounced, stop outreach and flag record for review
+
+4. Rule configuration
+Create a Smart Follow Up settings area in admin or sequence settings.
+
+Allow configurable defaults such as:
+- auto pause on reply
+- auto suppress on unsubscribe
+- auto suppress on bounce
+- auto escalate on click
+- auto mark warm on open
+- delay next step after out of office
+- notify on reply
+- notify on click optional
+- notify on bounce optional
+
+5. Lead status and score updates
+When engagement events happen, update lead intelligence automatically.
+
+Examples:
+- reply received:
+  - engagement status = engaged
+  - pipeline stage = replied or conversation
+  - increase lead score significantly
+
+- click:
+  - engagement status = interested
+  - increase lead score moderately
+  - optionally create task for manual review
+
+- open:
+  - engagement status = aware
+  - small score increase
+
+- bounce:
+  - mark email as invalid
+  - score impact neutral or negative
+  - suppress future sends
+
+- unsubscribe:
+  - mark as unsubscribed
+  - suppress future sends
+  - log compliance event
+
+6. Smart next step generation
+Create logic that determines the next action per lead.
+
+Possible next actions:
+- continue scheduled sequence
+- switch to warm follow up branch
+- escalate to high intent follow up
+- pause automation and wait for manual action
+- stop all future outreach
+- create manual review task
+- reschedule next send
+
+Show the chosen next action clearly in:
+- lead detail view
+- campaign recipient view
+- upcoming outreach card
+
+7. Sequence branch builder
+Upgrade the Sequence Builder to support optional branching.
+
+For each step or sequence, allow adding conditional rules like:
+- if opened and not replied within 3 days → branch to template B
+- if clicked and not replied within 2 days → branch to template C
+- if no open within 5 days → resend with alternate subject
+- if replied → stop sequence
+- if bounced → end sequence and flag invalid email
+
+Keep this UI clean and optional.
+If full visual branch builder is too heavy, implement rule cards per sequence.
+
+8. Notifications
+Create a notification layer for important events.
+
+Notify me for:
+- reply received
+- lead clicked high intent link
+- bounce detected
+- unsubscribe detected
+- sequence paused due to reply
+- lead moved to engaged stage
+
+Notification destinations:
+- in app notification center
+- optional email alert to my Outlook email
+- optional dashboard alert cards
+
+9. Dashboard intelligence
+Add smart engagement summary cards to dashboard and campaign views.
+
+Show:
+- replied today
+- active conversations
+- clicked but not replied
+- opened but not replied
+- bounced
+- unsubscribed
+- sequences paused by reply
+- high intent leads needing manual follow up
+
+10. Recipient and lead views
+Add engagement intelligence to:
+- lead detail page
+- campaign recipient row
+- contacts table if relevant
+
+Show:
+- last engagement event
+- engagement status
+- next recommended action
+- active sequence state
+- whether automation is paused
+- whether manual follow up is recommended
+
+11. Compliance and suppression behavior
+Implement hard safeguards:
+- if unsubscribed, do not send any future automated emails
+- if bounced, suppress that email from future sends unless manually overridden
+- if replied, pause future automation by default
+- log all suppression reasons
+
+12. Event ingestion support
+Prepare the system to ingest provider events from Resend or connected provider webhooks.
+
+Support inbound event endpoints for:
+- opens
+- clicks
+- bounces
+- delivery events if available
+- unsubscribes
+- replies already built or being built separately
+
+13. Data model support
+
+engagement_events
+- id
+- lead_id nullable
+- contact_id nullable
+- campaign_id nullable
+- scheduled_email_id nullable
+- template_id nullable
+- sequence_id nullable
+- event_type
+- event_timestamp
+- provider_event_id nullable
+- metadata json nullable
+- created_at
+
+lead intelligence fields
+- engagement_status
+- last_engagement_type
+- last_engagement_at
+- last_opened_at nullable
+- last_clicked_at nullable
+- last_replied_at nullable
+- unsubscribed boolean
+- bounced boolean
+- suppression_reason nullable
+
+optional tasks table if not already present
+- id
+- lead_id
+- type
+- title
+- description
+- status
+- due_at nullable
+- created_at
+
+14. UX requirements
+Use a clean premium CRM style consistent with A3 Sales OS.
+
+Requirements:
+- visible engagement badges
+- no clutter
+- clear next step recommendations
+- intuitive rule configuration
+- easy to scan dashboard intelligence
+- strong visual hierarchy
+- responsive views
+
+15. Default smart rules to ship with
+Implement these defaults:
+
+Rule 1:
+If replied
+- pause all future sequence steps
+- mark lead engaged
+- notify me
+
+Rule 2:
+If unsubscribed
+- suppress all future outreach
+- log compliance event
+
+Rule 3:
+If bounced
+- suppress future sends to that email
+- flag for review
+
+Rule 4:
+If clicked and no reply
+- increase score
+- mark high intent
+- recommend manual follow up
+- optionally branch to high intent follow up template
+
+Rule 5:
+If opened and no reply after 3 days
+- continue or branch to warmer follow up
+
+Rule 6:
+If no open after defined wait period
+- allow alternate subject line resend or continue normal cadence
+
+16. Deliverables
+When complete provide:
+- files created
+- files updated
+- routes changed
+- schema or migration changes
+- how smart branching works
+- how engagement changes next actions
+- where to review high intent leads and paused sequences

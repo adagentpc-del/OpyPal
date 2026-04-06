@@ -354,10 +354,48 @@ router.post("/leads/:id/history", async (req, res) => {
 router.get("/leads/:id/activities", async (req, res) => {
   try {
     const id = Number(req.params.id);
+    const conditions: any[] = [eq(activityTable.leadId, id)];
+    if (req.query.type) conditions.push(eq(activityTable.type, String(req.query.type)));
+    if (req.query.category) {
+      const cat = String(req.query.category);
+      const typeMap: Record<string, string[]> = {
+        outreach: ["email_sent", "email_scheduled", "email_canceled", "email_paused", "email_resumed", "email_skipped", "email_rescheduled", "email_edited", "draft_saved", "template_selected"],
+        scheduling: ["email_scheduled", "email_rescheduled", "sequence_activated", "sequence_paused", "sequence_resumed", "sequence_canceled", "sequence_skipped"],
+        status: ["status_changed", "pipeline_changed", "lead_interested", "lead_not_interested", "lead_follow_up_later"],
+        notes: ["note_added", "reply_logged"],
+        system: ["lead_created", "lead_imported", "lead_edited", "lead_duplicated", "lead_deleted"],
+      };
+      if (typeMap[cat]) {
+        conditions.push(sql`${activityTable.type} = ANY(${typeMap[cat]})`);
+      }
+    }
     const activities = await db.select().from(activityTable)
-      .where(eq(activityTable.leadId, id))
+      .where(and(...conditions))
       .orderBy(desc(activityTable.createdAt));
     res.json(activities);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.post("/leads/:id/activities", async (req, res) => {
+  try {
+    const leadId = Number(req.params.id);
+    const { type, description, metadata, relatedTemplateId, relatedSequenceId, relatedScheduledEmailId, createdBy } = req.body;
+    if (!type || !description) return res.status(400).json({ message: "type and description are required" });
+
+    const [activity] = await db.insert(activityTable).values({
+      type,
+      description,
+      leadId,
+      metadata: metadata || null,
+      relatedTemplateId: relatedTemplateId || null,
+      relatedSequenceId: relatedSequenceId || null,
+      relatedScheduledEmailId: relatedScheduledEmailId || null,
+      createdBy: createdBy || "user",
+    }).returning();
+
+    res.status(201).json(activity);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }
