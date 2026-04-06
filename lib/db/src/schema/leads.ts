@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -26,6 +26,17 @@ export const leadsTable = pgTable("leads", {
   closeProbability: numeric("close_probability", { precision: 5, scale: 2 }),
   forecastValue: numeric("forecast_value", { precision: 12, scale: 2 }),
   source: text("source"),
+  engagementStatus: text("engagement_status").default("none"),
+  engagementScore: integer("engagement_score").default(0),
+  lastEngagementType: text("last_engagement_type"),
+  lastEngagementAt: timestamp("last_engagement_at"),
+  lastOpenedAt: timestamp("last_opened_at"),
+  lastClickedAt: timestamp("last_clicked_at"),
+  lastRepliedAt: timestamp("last_replied_at"),
+  isUnsubscribed: boolean("is_unsubscribed").default(false),
+  isBounced: boolean("is_bounced").default(false),
+  suppressionReason: text("suppression_reason"),
+  smartNextAction: text("smart_next_action"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

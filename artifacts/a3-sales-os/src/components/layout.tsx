@@ -1,6 +1,7 @@
 import { ReactNode, useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "wouter";
-import { Bell, Menu, X, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Menu, X, PanelLeftClose, PanelLeft } from "lucide-react";
+import { NotificationCenter } from "@/components/notification-center";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -237,9 +238,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-            </Button>
+            <NotificationCenter />
           </div>
         </header>
 

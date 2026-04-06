@@ -1,0 +1,295 @@
+Build a task and sales alert layer for the A3 Sales OS CRM.
+
+Primary objective:
+Once the Smart Follow Up Engine is live, I need the CRM to create operational next steps automatically so I do not miss warm or hot leads.
+When someone clicks, replies, opens repeatedly, or hits another meaningful engagement threshold, the system should create follow up tasks, priority flags, reminders, and alerts so I can act quickly.
+
+This task and alert layer must integrate with:
+- Smart Follow Up Engine
+- lead activity timeline
+- campaigns
+- sequences
+- scheduled emails
+- engagement events
+- Outlook notifications or reminders if feasible later
+
+Build the following:
+
+1. Task system
+Create a task model and task UI for lead based sales follow up.
+
+Each task should support:
+- task title
+- task type
+  - follow up call
+  - send manual email
+  - review reply
+  - check high intent lead
+  - reschedule outreach
+  - verify bounced email
+  - pipeline review
+  - custom
+- related lead
+- related contact optional
+- related campaign optional
+- related sequence optional
+- priority
+  - low
+  - medium
+  - high
+  - urgent
+- status
+  - open
+  - in progress
+  - completed
+  - dismissed
+- due date and time optional
+- owner
+- notes
+- created by system or user
+- created at
+- completed at nullable
+
+2. Auto task creation rules
+Allow the CRM to create tasks automatically based on engagement and workflow events.
+
+Ship with these default rules:
+
+Rule 1:
+If reply received
+- create task: Review reply and respond
+- priority: high
+- due: as soon as possible or within same day
+
+Rule 2:
+If clicked but no reply
+- create task: High intent lead follow up
+- priority: high
+
+Rule 3:
+If opened multiple times without reply
+- create task: Warm lead manual follow up
+- priority: medium or high
+
+Rule 4:
+If bounce detected
+- create task: Verify email and contact data
+- priority: medium
+
+Rule 5:
+If lead reaches engaged or high intent score threshold
+- create task: Personal outreach recommended
+- priority: high
+
+Rule 6:
+If sequence paused due to reply
+- create task: Continue conversation manually
+- priority: high
+
+3. Alert system
+Create an in app sales alert layer.
+
+Alerts should support:
+- reply received
+- high intent click
+- multiple opens
+- bounce detected
+- unsubscribe detected
+- lead score threshold crossed
+- sequence paused due to reply
+- scheduled send failed
+- manual task overdue
+
+Each alert should include:
+- title
+- short description
+- severity
+  - info
+  - warning
+  - important
+  - urgent
+- related lead
+- related contact optional
+- related campaign optional
+- related task optional
+- created at
+- read or unread state
+
+4. Notification center
+Add a notification center UI in the app shell or top bar.
+
+Show:
+- unread count
+- recent alerts
+- click to open related lead, task, or campaign
+- mark as read
+- mark all as read
+- filter by severity or type
+
+5. Tasks page
+Create a Tasks page in the sidebar or admin area.
+
+Show tasks in:
+- table view
+- optional board or grouped list by status if feasible
+
+Columns:
+- title
+- lead
+- company
+- task type
+- priority
+- due date
+- owner
+- status
+- source
+- created at
+
+Filters:
+- status
+- priority
+- due today
+- overdue
+- owner
+- task type
+- source
+  - system
+  - user
+
+Actions:
+- open lead
+- mark complete
+- dismiss
+- reassign
+- edit due date
+- edit notes
+
+6. Lead level task panel
+Inside each lead detail page or drawer add a Tasks section.
+
+Show:
+- open tasks
+- overdue tasks
+- completed tasks
+- create new task manually
+- complete or dismiss task quickly
+
+7. Dashboard alert cards
+Add dashboard widgets for:
+- urgent replies needing response
+- high intent leads
+- tasks due today
+- overdue tasks
+- bounced contacts to review
+- sequences paused due to reply
+
+8. Reminders and due dates
+Allow due dates and reminder timestamps for tasks.
+
+If feasible add:
+- reminder trigger in app
+- optional future email notification support
+- optional Outlook reminder integration placeholder
+
+9. Priority flagging
+Add lead level priority flags driven by task and engagement behavior.
+
+Examples:
+- if clicked high intent asset and no reply → priority flag high
+- if replied → priority flag urgent until acknowledged
+- if bounced → priority flag review
+
+Show priority badges in:
+- Leads table
+- lead detail
+- Tasks page
+- campaign recipient views
+
+10. Rule configuration
+Create settings for auto task and alert behavior.
+
+Allow configurable rules such as:
+- create task on reply yes or no
+- create task on click yes or no
+- notify on reply yes or no
+- notify on bounce yes or no
+- score threshold for high intent task
+- due date defaults by task type
+- who owns system generated tasks by default
+
+11. Data model support
+
+tasks
+- id
+- title
+- task_type
+- lead_id nullable
+- contact_id nullable
+- campaign_id nullable
+- sequence_id nullable
+- priority
+- status
+- due_at nullable
+- reminder_at nullable
+- owner_id nullable
+- notes nullable
+- source
+- created_by nullable
+- created_at
+- completed_at nullable
+- updated_at
+
+alerts
+- id
+- alert_type
+- title
+- description
+- severity
+- lead_id nullable
+- contact_id nullable
+- campaign_id nullable
+- task_id nullable
+- read boolean
+- created_at
+- updated_at
+
+lead flags if not already present
+- priority_flag nullable
+- next_manual_action nullable
+
+12. Smart engine integration
+Tie task creation into the Smart Follow Up Engine.
+
+Examples:
+- reply event → create alert + create task + pause sequence
+- click event → create alert + update score + optional task
+- multiple opens → create alert + optional warm lead task
+- bounce → create alert + suppression + verification task
+
+13. UX requirements
+Use a premium CRM workflow consistent with A3 Sales OS.
+
+Requirements:
+- clean notification center
+- clear priority and severity badges
+- easy task completion
+- no clutter
+- responsive layout
+- obvious operational next steps
+
+14. Sidebar integration
+Add navigation entry if needed for:
+- Tasks
+- Notifications optional if separate page exists
+
+If notification center is in top bar, still create a full Tasks page in sidebar.
+
+15. Deliverables
+When complete provide:
+- files created
+- files updated
+- routes added or changed
+- schema or migration changes
+- how tasks are auto generated
+- how alerts are surfaced
+- where to review urgent leads and overdue work

@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/layout";
 import { useGetLeads, useCreateLead, useUpdateLead, useDeleteLead, useDuplicateLead, useUpdateLeadStatus, useGetSyncStatus, useGetTemplates, useGetAssets, useGetLeadHistory, useCreateLeadHistory, useGetScheduledEmails, useCreateScheduledEmail, useUpdateScheduledEmail, useGetLeadActivities, useGetTemplateSets, getGetLeadsQueryKey, getGetDashboardQueryKey, getGetLeadHistoryQueryKey, getGetScheduledEmailsQueryKey, getGetLeadActivitiesQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Search, Trash2, Edit2, Building2, Copy, X, Filter, Mail, Check, Clock, Send, FileText, Paperclip, History, ChevronDown, ChevronUp, Calendar, Save, ExternalLink, Loader2, AlertCircle, Link2, Play, Eye, XCircle, RefreshCw } from "lucide-react";
+import { Plus, Search, Trash2, Edit2, Building2, Copy, X, Filter, Mail, Check, Clock, Send, FileText, Paperclip, History, ChevronDown, ChevronUp, Calendar, Save, ExternalLink, Loader2, AlertCircle, Link2, Play, Eye, XCircle, RefreshCw, Zap, TrendingUp, MousePointerClick, MessageSquare, PauseCircle, SkipForward, RotateCcw, Sparkles, StickyNote } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -240,6 +240,14 @@ export default function Leads() {
                             <div className="flex items-center gap-2">
                               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${lead.pipelineType === "Event" ? "bg-primary" : "bg-accent"}`} />
                               <span className="font-medium text-foreground">{lead.companyName}</span>
+                              {lead.engagementScore > 0 && (
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                                  lead.engagementScore >= 20 ? "bg-emerald-100 text-emerald-700" :
+                                  lead.engagementScore >= 10 ? "bg-blue-100 text-blue-700" :
+                                  "bg-gray-100 text-gray-600"
+                                }`}>{lead.engagementScore}</span>
+                              )}
+                              {lead.smartNextAction && <Sparkles className="h-3 w-3 text-primary shrink-0" />}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{lead.contactName}</td>
@@ -372,8 +380,13 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
   const [sentAssetNames, setSentAssetNames] = useState("");
   const [showAdditional, setShowAdditional] = useState(false);
   const [showHistory, setShowHistory] = useState(true);
-  const [showActivities, setShowActivities] = useState(false);
+  const [showActivities, setShowActivities] = useState(true);
   const [showScheduled, setShowScheduled] = useState(true);
+  const [activityFilter, setActivityFilter] = useState("all");
+  const [showNoteInput, setShowNoteInput] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [noteType, setNoteType] = useState<"note" | "reply" | "call">("note");
+  const [showEngagement, setShowEngagement] = useState(true);
 
   const [scheduleMode, setScheduleMode] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
@@ -662,6 +675,63 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
     });
   };
 
+  const API_BASE = import.meta.env.BASE_URL + "api";
+
+  const handleLogNote = async () => {
+    if (!noteText.trim()) return;
+    const typeMap: Record<string, string> = { note: "note_added", reply: "reply_logged", call: "call_logged" };
+    const descMap: Record<string, string> = { note: "Note", reply: "Reply received", call: "Call logged" };
+    try {
+      const res = await fetch(`${API_BASE}/leads/${lead.id}/activities`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: typeMap[noteType], description: `${descMap[noteType]}: ${noteText}`, createdBy: "user" }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      queryClient.invalidateQueries({ queryKey: getGetLeadActivitiesQueryKey(lead.id) });
+      if (noteType === "reply") {
+        const engRes = await fetch(`${API_BASE}/engagement-events`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ leadId: lead.id, eventType: "replied" }),
+        });
+        if (engRes.ok) queryClient.invalidateQueries({ queryKey: getGetLeadsQueryKey() });
+      }
+      setNoteText("");
+      setShowNoteInput(false);
+      toast({ title: `${descMap[noteType]} saved` });
+    } catch {
+      toast({ title: "Failed to save", variant: "destructive" });
+    }
+  };
+
+  const handleBulkSequenceAction = async (action: string, reason?: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/scheduled-emails/bulk-action`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId: lead.id, action, reason }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      queryClient.invalidateQueries({ queryKey: getGetScheduledEmailsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetLeadActivitiesQueryKey(lead.id) });
+      toast({ title: `Sequence ${action}d` });
+    } catch {
+      toast({ title: `Failed to ${action}`, variant: "destructive" });
+    }
+  };
+
+  const filteredActivities = useMemo(() => {
+    if (!activities) return [];
+    if (activityFilter === "all") return activities;
+    const catMap: Record<string, string[]> = {
+      outreach: ["email_sent", "email_delivered", "email_opened", "email_clicked", "email_bounced", "email_failed", "outreach_logged"],
+      scheduling: ["email_scheduled", "email_rescheduled", "email_paused", "email_resumed", "email_canceled", "email_skipped", "sequence_activated", "sequence_paused", "sequence_resumed", "sequence_canceled"],
+      engagement: ["reply_logged", "email_opened", "email_clicked", "lead_unsubscribed"],
+      notes: ["note_added", "call_logged", "reply_logged"],
+      status: ["status_changed", "lead_updated"],
+    };
+    const types = catMap[activityFilter] || [];
+    return activities.filter((a: any) => types.includes(a.type));
+  }, [activities, activityFilter]);
+
   const forecast = ((form.proposalValue || form.dealValueEstimate || 0) * (form.closeProbability || 0)) / 100;
 
   const pendingScheduledEmails = useMemo(() =>
@@ -713,6 +783,59 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                     { label: "Follow-Up", value: lead.nextFollowUpDate ? format(new Date(lead.nextFollowUpDate + "T12:00:00"), "MMM d, yyyy") : "-" },
                     { label: "Source", value: lead.source || "-" },
                   ]} />
+                </DrawerSection>
+
+                <DrawerSection title="Engagement Intelligence" icon={<Zap className="h-4 w-4" />}
+                  collapsible expanded={showEngagement} onToggle={() => setShowEngagement(!showEngagement)}>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-muted/30 rounded-xl p-3 text-center">
+                        <div className="text-2xl font-bold text-primary">{lead.engagementScore || 0}</div>
+                        <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Score</div>
+                      </div>
+                      <div className="bg-muted/30 rounded-xl p-3 text-center">
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full inline-block ${
+                          lead.engagementStatus === "engaged" ? "bg-emerald-100 text-emerald-700" :
+                          lead.engagementStatus === "interested" ? "bg-blue-100 text-blue-700" :
+                          lead.engagementStatus === "aware" ? "bg-amber-100 text-amber-700" :
+                          lead.engagementStatus === "suppressed" ? "bg-red-100 text-red-700" :
+                          lead.engagementStatus === "bounced" ? "bg-red-100 text-red-700" :
+                          "bg-gray-100 text-gray-500"
+                        }`}>{lead.engagementStatus || "none"}</span>
+                        <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mt-1">Status</div>
+                      </div>
+                      <div className="bg-muted/30 rounded-xl p-3 text-center">
+                        <div className="text-xs font-medium text-foreground">{lead.lastEngagementType || "—"}</div>
+                        <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mt-0.5">Last Signal</div>
+                      </div>
+                    </div>
+
+                    {lead.smartNextAction && (
+                      <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 flex items-start gap-2">
+                        <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-xs font-semibold text-primary">Smart Next Action</p>
+                          <p className="text-sm mt-0.5">{lead.smartNextAction}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                      {lead.lastOpenedAt && <div><span className="text-muted-foreground">Last opened:</span> <span className="font-medium">{format(new Date(lead.lastOpenedAt), "MMM d, h:mm a")}</span></div>}
+                      {lead.lastClickedAt && <div><span className="text-muted-foreground">Last clicked:</span> <span className="font-medium">{format(new Date(lead.lastClickedAt), "MMM d, h:mm a")}</span></div>}
+                      {lead.lastRepliedAt && <div><span className="text-muted-foreground">Last replied:</span> <span className="font-medium">{format(new Date(lead.lastRepliedAt), "MMM d, h:mm a")}</span></div>}
+                      {lead.lastEngagementAt && <div><span className="text-muted-foreground">Last activity:</span> <span className="font-medium">{format(new Date(lead.lastEngagementAt), "MMM d, h:mm a")}</span></div>}
+                    </div>
+
+                    {(lead.isUnsubscribed || lead.isBounced) && (
+                      <div className="bg-red-50 border border-red-200 rounded-xl p-2 flex items-center gap-2 text-xs text-red-700">
+                        <AlertCircle className="h-4 w-4" />
+                        {lead.isUnsubscribed && <span>Unsubscribed</span>}
+                        {lead.isBounced && <span>Email bounced</span>}
+                        {lead.suppressionReason && <span className="text-red-500 ml-1">({lead.suppressionReason})</span>}
+                      </div>
+                    )}
+                  </div>
                 </DrawerSection>
 
                 <DrawerSection title="Outreach" icon={<Send className="h-4 w-4" />}>
@@ -918,7 +1041,23 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                 {pendingScheduledEmails.length > 0 && (
                   <DrawerSection title={`Upcoming Emails (${pendingScheduledEmails.length})`} icon={<Calendar className="h-4 w-4" />}
                     collapsible expanded={showScheduled} onToggle={() => setShowScheduled(!showScheduled)}>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
+                      {pendingScheduledEmails.length > 1 && (
+                        <div className="flex flex-wrap gap-1.5 pb-2 border-b border-border/30">
+                          <Button variant="outline" size="sm" className="h-7 text-xs rounded-lg gap-1 text-amber-700 border-amber-300 hover:bg-amber-50" onClick={() => handleBulkSequenceAction("pause", "manual")}>
+                            <PauseCircle className="h-3 w-3" /> Pause All
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-7 text-xs rounded-lg gap-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50" onClick={() => handleBulkSequenceAction("resume")}>
+                            <RotateCcw className="h-3 w-3" /> Resume All
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-7 text-xs rounded-lg gap-1 text-red-700 border-red-300 hover:bg-red-50" onClick={() => { if (confirm("Cancel all scheduled emails for this lead?")) handleBulkSequenceAction("cancel", "manual"); }}>
+                            <XCircle className="h-3 w-3" /> Cancel All
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-7 text-xs rounded-lg gap-1 text-blue-700 border-blue-300 hover:bg-blue-50" onClick={() => handleBulkSequenceAction("skip")}>
+                            <SkipForward className="h-3 w-3" /> Skip Next
+                          </Button>
+                        </div>
+                      )}
                       {pendingScheduledEmails.map((e: any) => (
                         <div key={e.id} className="border border-border/50 rounded-xl p-3 bg-amber-50/50">
                           <div className="flex items-center justify-between mb-1">
@@ -972,23 +1111,84 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                   )}
                 </DrawerSection>
 
-                <DrawerSection title="Activity Log" icon={<Play className="h-4 w-4" />}
+                <DrawerSection title={`Activity Timeline (${activities?.length || 0})`} icon={<TrendingUp className="h-4 w-4" />}
                   collapsible expanded={showActivities} onToggle={() => setShowActivities(!showActivities)}>
-                  {!activities || activities.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
-                  ) : (
-                    <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
-                      {activities.map((a: any) => (
-                        <div key={a.id} className="flex items-start gap-2 text-xs">
-                          <span className="w-1.5 h-1.5 rounded-full bg-primary/50 mt-1.5 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <span className="text-muted-foreground">{a.description}</span>
-                          </div>
-                          <span className="text-muted-foreground shrink-0">{format(new Date(a.createdAt), "MMM d")}</span>
-                        </div>
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { key: "all", label: "All" },
+                        { key: "outreach", label: "Outreach" },
+                        { key: "scheduling", label: "Scheduling" },
+                        { key: "engagement", label: "Engagement" },
+                        { key: "notes", label: "Notes" },
+                        { key: "status", label: "Status" },
+                      ].map((cat) => (
+                        <button key={cat.key} onClick={() => setActivityFilter(cat.key)}
+                          className={`text-[10px] px-2 py-1 rounded-full font-medium transition-colors ${activityFilter === cat.key ? "bg-primary text-white" : "bg-muted/50 text-muted-foreground hover:bg-muted"}`}>
+                          {cat.label}
+                        </button>
                       ))}
                     </div>
-                  )}
+
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="h-7 text-xs rounded-lg gap-1 flex-1" onClick={() => { setShowNoteInput(!showNoteInput); setNoteType("note"); }}>
+                        <StickyNote className="h-3 w-3" /> Add Note
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs rounded-lg gap-1 flex-1" onClick={() => { setShowNoteInput(!showNoteInput); setNoteType("reply"); }}>
+                        <MessageSquare className="h-3 w-3" /> Log Reply
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs rounded-lg gap-1 flex-1" onClick={() => { setShowNoteInput(!showNoteInput); setNoteType("call"); }}>
+                        <Play className="h-3 w-3" /> Log Call
+                      </Button>
+                    </div>
+
+                    {showNoteInput && (
+                      <div className="bg-muted/30 rounded-xl p-3 space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                          {noteType === "note" && <><StickyNote className="h-3 w-3" /> Add Note</>}
+                          {noteType === "reply" && <><MessageSquare className="h-3 w-3" /> Log Reply</>}
+                          {noteType === "call" && <><Play className="h-3 w-3" /> Log Call</>}
+                        </div>
+                        <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)}
+                          placeholder={noteType === "reply" ? "Summary of the reply..." : noteType === "call" ? "Call notes..." : "Add a note..."}
+                          className="w-full p-2 border border-border rounded-lg text-sm bg-background focus:border-primary outline-none min-h-[60px] resize-y" />
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowNoteInput(false)}>Cancel</Button>
+                          <Button size="sm" className="h-7 text-xs bg-primary text-white rounded-lg" onClick={handleLogNote} disabled={!noteText.trim()}>Save</Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {filteredActivities.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-2">No activity recorded yet.</p>
+                    ) : (
+                      <div className="relative pl-4 space-y-0 max-h-[300px] overflow-y-auto">
+                        <div className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
+                        {filteredActivities.map((a: any) => {
+                          const typeColors: Record<string, string> = {
+                            email_sent: "bg-emerald-500", email_delivered: "bg-emerald-400", email_opened: "bg-blue-500",
+                            email_clicked: "bg-violet-500", reply_logged: "bg-primary", email_bounced: "bg-red-500",
+                            email_failed: "bg-red-400", lead_unsubscribed: "bg-red-600", email_scheduled: "bg-amber-500",
+                            email_canceled: "bg-gray-400", email_paused: "bg-amber-400", email_resumed: "bg-emerald-400",
+                            note_added: "bg-blue-400", call_logged: "bg-teal-500", sequence_activated: "bg-blue-600",
+                          };
+                          const dotColor = typeColors[a.type] || "bg-gray-400";
+                          return (
+                            <div key={a.id} className="relative flex items-start gap-3 pb-3">
+                              <div className={`absolute left-[-12px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-card ${dotColor} z-10`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-foreground">{a.description}</p>
+                                {a.createdBy && a.createdBy !== "system" && (
+                                  <span className="text-[10px] text-muted-foreground">by {a.createdBy}</span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">{format(new Date(a.createdAt), "MMM d, h:mm a")}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </DrawerSection>
 
                 <DrawerSection title="Additional Details" icon={<ChevronDown className="h-4 w-4" />}

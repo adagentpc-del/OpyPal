@@ -1,6 +1,6 @@
 # Overview
 
-A3 Sales OS is an internal sales CRM and outbound operating system designed for A3 Visual. Built as a pnpm workspace monorepo using TypeScript, its primary purpose is to streamline sales processes, manage leads, automate outreach, and track engagement. The system aims to enhance sales efficiency, improve lead nurturing, and provide comprehensive analytics for sales performance.
+A3 Sales OS is an internal sales CRM and outbound operating system for A3 Visual. Its primary purpose is to streamline sales processes, manage leads, automate outreach, and track engagement, ultimately enhancing sales efficiency and providing comprehensive analytics. The system supports lead nurturing, campaign management, and personalized outreach.
 
 # User Preferences
 
@@ -14,110 +14,73 @@ The A3 Sales OS is a pnpm workspace monorepo built with Node.js 24 and TypeScrip
 - **API Framework:** Express 5
 - **Database:** PostgreSQL with Drizzle ORM
 - **Frontend:** React, Vite, Tailwind CSS, shadcn/ui
-- **Validation:** Zod (`zod/v4`), `drizzle-zod`
+- **Validation:** Zod, `drizzle-zod`
 - **API Codegen:** Orval (from OpenAPI spec)
-- **Build Tool:** esbuild (CJS bundle)
+- **Build Tool:** esbuild
 
 **Monorepo Structure:**
-- `artifacts/api-server/`: Express API server (port 8080)
-- `artifacts/a3-sales-os/`: React + Vite frontend (port 22440)
+- `artifacts/api-server/`: Express API server
+- `artifacts/a3-sales-os/`: React + Vite frontend
 - `lib/api-spec/`: OpenAPI specification and Orval configuration
-- `lib/api-client-react/`: Generated React Query hooks for API interaction
+- `lib/api-client-react/`: Generated React Query hooks
 - `lib/api-zod/`: Generated Zod schemas
 - `lib/db/`: Drizzle ORM schema and database connection
 
 **UI/UX Design:**
-- **Color Scheme:** A palette of blue, yellow, black, and white, defined as CSS custom properties in HSL format within `artifacts/a3-sales-os/src/index.css`.
-- **Components:** Utilizes shadcn/ui for consistent and accessible UI components.
+- **Color Scheme:** Blue, yellow, black, and white using HSL CSS custom properties.
+- **Components:** shadcn/ui for consistent UI.
 
 **App Shell & Navigation:**
-- **Layout:** `artifacts/a3-sales-os/src/components/layout.tsx` provides the global app shell with persistent left sidebar, top header bar (shows current page title), and mobile slide-out drawer.
-- **Navigation Config:** `artifacts/a3-sales-os/src/lib/navigation.ts` is the centralized navigation definition. All sidebar items, groups, routes, icons, and descriptions are defined here. To add new nav items, edit this file.
-- **Sidebar Structure (4 groups):**
-  - **Main:** Dashboard, Leads, Companies, Contacts, Campaigns, Email Templates, Sequences, CSV Uploads
-  - **Outreach:** Outbox, Scheduled Emails, Follow Ups, Deliverability, Opens and Clicks, Unsubscribes
-  - **Qualification:** Intent Signals, Lead Scoring, Segments, Pipeline
-  - **Admin:** Settings, Team Notes, Activity Log
-- **Collapsible Sidebar:** Desktop sidebar toggles between full width (w-60) and icon-only mode (w-16). State persists in localStorage key `a3-sidebar-collapsed`. Tooltips appear on hover in collapsed mode. Collapse toggle is hidden on mobile.
-- **Legacy Route Aliases:** Old routes (`/outreach`, `/tasks`, `/ob/*`, etc.) remain functional and map to canonical nav items via `legacyRouteAliases` in navigation.ts.
-- **Placeholder Pages:** 9 placeholder pages for future sections (Companies, Deliverability, Opens & Clicks, Intent Signals, Lead Scoring, Segments, Settings, Team Notes, Activity Log) use the reusable `PlaceholderPage` component.
-- **Route Matching:** `isActiveRoute()` supports exact and prefix matching. `resolveCanonicalPath()` maps legacy URLs to new canonical paths for correct active state + title display.
+- **Layout:** Global app shell with persistent left sidebar, top header, and mobile slide-out drawer.
+- **Navigation Config:** Centralized definition in `artifacts/a3-sales-os/src/lib/navigation.ts` for sidebar items, groups, routes, and icons.
+- **Sidebar Structure:** Four main groups: Main (Dashboard, Leads, Companies, Contacts, Campaigns, Email Templates, Sequences, CSV Uploads), Outreach (Outbox, Scheduled Emails, Follow Ups, Deliverability, Opens and Clicks, Unsubscribes), Qualification (Intent Signals, Lead Scoring, Segments, Pipeline), and Admin (Settings, Team Notes, Activity Log).
+- **Collapsible Sidebar:** Desktop sidebar toggles between full and icon-only mode with state persistence.
+- **Route Handling:** Supports legacy route aliases and placeholder pages for future sections.
 
-**Key Features & Technical Implementations:**
+**Key Features:**
 
 1.  **CRM & Lead Management:**
-    *   **Dashboard:** Displays KPIs (Total Leads, Active Leads, Pipeline Value, Meetings Booked, Overdue Follow-ups), pipeline charts, recent activity, and upcoming tasks.
-    *   **Lead Details:** A comprehensive CRM table with a right-side drawer for detailed lead information, organized into sections like Contact Info, CRM Status, Outreach, Outreach History, and Additional Details.
-    *   **Outreach Integration:** Features a template selector with loading/error states and refresh, editable email preview with placeholder substitution, asset attachment, and integration with Outlook for sending. Templates with linked sequences show a blue "Linked Sequence" badge with step preview and activation toggle. Supports email scheduling with date/time picker, sequence activation (auto-schedules follow-up steps), draft saving, and copy-to-clipboard. Post-send confirmation dialog updates lead status to "Contacted" and sets 2-business-day follow-up. Outreach history is logged with colored badges (Email Sent, Email Scheduled, Sequence Activated, Draft Saved). Activity log section tracks all actions chronologically. Upcoming scheduled emails section shows pending emails with cancel option.
-    *   **Lead Status & Pipeline:** Quick status change dropdowns, auto-calculated forecast values, and a Kanban board for pipeline visualization with drag-and-drop functionality that updates lead status and syncs with Google Sheets.
-    *   **Import/Export:** CSV import with smart header matching, duplicate detection, and auto-inference of pipeline type. Export leads and tasks to CSV.
+    *   **Dashboard:** Displays KPIs, pipeline charts, and activity.
+    *   **Lead Details:** Comprehensive CRM table with detailed lead information in a side drawer (Contact Info, CRM Status, Outreach, Outreach History, Additional Details).
+    *   **Outreach Integration:** Template selector, editable email preview with placeholder substitution, asset attachment, Outlook integration, email scheduling, sequence activation, and draft saving. Logs outreach history and tracks scheduled emails.
+    *   **Lead Status & Pipeline:** Quick status changes, forecast values, and a Kanban board with drag-and-drop functionality and Google Sheets sync.
+    *   **Import/Export:** CSV import with smart header matching and duplicate detection; CSV export for leads and tasks.
 
-2.  **Outreach Queue:**
-    *   A dedicated workspace for daily outbound activities, offering views for New Imports, Due Today, Overdue, and Awaiting Reply.
-    *   Features smart lead cards, draft generation from templates with placeholder substitution, batch actions, and filtering/sorting capabilities.
+2.  **Outreach Queue:** Dedicated workspace for daily outbound activities (New Imports, Due Today, Overdue, Awaiting Reply) with smart lead cards, draft generation, and batch actions.
 
-3.  **Tasks & Follow-Ups:**
-    *   Local task manager linked to leads, supporting various task types (Follow-up, Call, Send Deck). Tasks can be filtered by due date and marked as complete.
+3.  **Tasks & Follow-Ups:** Local task manager linked to leads, supporting various task types.
 
-4.  **Templates & Assets:**
-    *   Libraries for outreach templates (Cold Email, Follow-Up Email, LinkedIn Message, SMS, Referral/Partner Outreach) and sales assets (Brochure, Capabilities Deck). Templates can be linked to assets, with automatic selection and placeholder replacement during outreach.
-    *   **Enhanced Templates Page:** Table/card view toggle, search, multi-filter (category, type, active status), preview slide-out panel, duplicate, archive/activate, linked sequence display. Template types: one_off, intro, follow_up, reactivation, event, custom. New fields: type, description, is_active, audience_tags, linked_sequence_id.
-    *   **Sequence Builder:** Upgraded with delay_unit support (days/weeks/months), month-based delay presets (same day, +3 days, +1 week, +2 weeks, +1 month, +3 months, +6 months), step reordering (up/down arrows), step labels, channel selection (email/linkedin/call), category and default use case for sequences. Starter sequences seeded: Hospitality Intro, Event Prospecting, Re-engagement, Long Term Nurture.
-    *   **Scheduled Emails Page:** Summary cards (Scheduled/Overdue/Sent/Errors), search, status filters, preview slide-out, cancel/delete actions. Merges data from both scheduled_emails and sequence_queue tables.
-    *   **Lead Drawer Quick Schedule:** Quick-schedule preset chips (Tomorrow, +3 days, +1 week, +2 weeks, +1 month, +3 months, +6 months) for fast email scheduling.
+4.  **Templates & Assets:** Libraries for outreach templates and sales assets.
+    *   **Enhanced Templates Page:** Table/card view, search, multi-filter, preview, duplicate, archive/activate, linked sequence display.
+    *   **Sequence Builder:** Upgraded with delay unit support, step reordering, channel selection, categories, and default use cases.
+    *   **Scheduled Emails Page:** Summary, search, status filters, preview, and actions for scheduled emails.
+    *   **Lead Drawer Quick Schedule:** Preset chips for fast email scheduling.
 
-5.  **Outbound Sequence Engine (Phase 2):**
-    *   **Automated Sequences:** Supports 7-step automated email sequences (Day 0, 3, 7, 14, 30, 120, 180) with business day calculation, daily send caps, and configurable send windows.
-    *   **Contact Lifecycle:** Manages contact statuses (pending, active, completed, paused, paused_replied, dnc) with actions like enroll, pause, resume, skip step, force send, mark replied, and mark DNC.
-    *   **CSV Upload:** Enhanced CSV upload for contacts, with options for campaign, sequence selection, and auto-enrollment. Includes email validation and deduplication.
-    *   **Frontend Pages:** Dedicated pages for CSV upload, contact management, campaign and sequence definition, queue processing, replies, and analytics.
-    *   **Settings:** Configurable settings for `daily_send_cap`, `send_window_start`, `send_window_end`, and `business_days_only`.
+5.  **Outbound Sequence Engine:** Automated 7-step email sequences with business day calculation, daily send caps, and configurable send windows. Manages contact lifecycle statuses and provides enhanced CSV upload with validation and deduplication.
 
-6.  **Engagement Scoring (Phase 3):**
-    *   Calculates an engagement score based on email events (open, click, reply, bounce) and assigns contacts to tiers (cold, warm, hot).
-    *   **Template Engine:** Supports variable substitution (`{{first_name}}`, `{{company}}`) and conditional helpers (`{{greeting}}`, `{{intent_line}}`) for personalized outreach.
+6.  **Engagement Scoring:** Calculates engagement scores based on email events (open, click, reply, bounce) and assigns contacts to tiers (cold, warm, hot).
 
-7.  **AI Personalization Layer:**
-    *   **OpenAI Integration:** Uses Replit AI Integrations proxy (`AI_INTEGRATIONS_OPENAI_BASE_URL` + `AI_INTEGRATIONS_OPENAI_API_KEY`). Lazy-initialized, non-fatal if not configured — falls back to fallback pool.
-    *   **Personalization Service** (`artifacts/api-server/src/lib/personalization.ts`): 3 modes (off/safe/enhanced), segment-aware prompts, title hints, data quality assessment (high/medium/low), validation (max length, no em dashes, no placeholders), fallback pool of generalized lines.
-    *   **API Endpoints:** `POST /personalization/generate/:id`, `POST /personalization/bulk-generate`, `PUT /contacts/:id/custom-line`, `POST /personalization/bulk-clear`, `GET /personalization/analytics`.
-    *   **Frontend Controls:** Personalization mode + timing selector on CSV Upload, custom line column with filter on Contacts page, edit/regenerate/lock in contact detail panel, AI Personalization stats card + settings in Analytics.
-    *   **Admin Settings:** `personalization_mode`, `personalization_max_length`, `personalization_regenerate_on_reenroll`, `personalization_lock_manual_default`, `personalization_step_scope`, `personalization_require_title_or_company`.
-    *   **Contact Fields:** `customLine`, `customLineStatus` (not_generated/generated_safe/generated_enhanced/manual/failed), `customLineSource` (ai/fallback/manual), `customLineGeneratedAt`, `customLineLocked`.
-    *   **Personalization Logs Table:** Tracks every generation attempt with mode, input fields, output, status, and errors.
+7.  **AI Personalization Layer:** Integrates with OpenAI (via Replit AI Integrations proxy) for personalized outreach lines. Features personalization service with different modes, segment-aware prompts, data quality assessment, and fallback options. Provides API endpoints and frontend controls for generation, bulk generation, and analytics.
 
 8.  **Offer Routing & Conversion Logic:**
-    *   **Routing Engine** (`artifacts/api-server/src/lib/routing-engine.ts`): Auto-classifies contacts into routing states (standard_nurture, warm_followup, hot_priority, awaiting_manual_outreach, meeting_candidate, qualified_opportunity, reactivation_pool, closed_won, closed_lost, disqualified). Triggered on track/open and track/click events.
-    *   **Routing Logic:** Bounced/unsub/DNC → disqualified; reply → awaiting_manual_outreach; hot tier (score ≥8) or 3+ clicks → hot_priority + book_call; warm tier (score ≥3) → warm_followup + segment-aware action; completed sequence + low score → reactivation_pool. Respects routingLocked flag.
-    *   **Contact Fields:** `routingState`, `routingLocked`, `recommendedNextAction`, `qualifiedStatus` (unreviewed/candidate/qualified/disqualified), `manualPriority`.
-    *   **API Endpoints:** `GET /routing/queue/:state`, `GET /routing/recommendations/:id`, `PUT /contacts/:id/routing`, `POST /routing/bulk-update`, `GET /routing/analytics`, `GET /routing/logs/:id`, `POST /routing/evaluate/:id`, CRUD for `next-actions` and `cta-library`.
-    *   **Frontend:** Routing page (ob-routing.tsx) with 4 tabs: Routing Queues (filterable by state), Next Actions CRUD, CTA Library CRUD, Routing Analytics. Contact detail routing panel in ob-contacts.tsx. Routing stats in ob-analytics.tsx.
-    *   **Admin Controls:** Manual state override, lock/unlock routing, flag priority, bulk update, re-evaluate routing.
-    *   **Seed Data:** 10 next actions (segment-aware) and 6 CTA library entries.
+    *   **Routing Engine:** Auto-classifies contacts into various routing states (e.g., standard_nurture, hot_priority, qualified_opportunity) based on engagement.
+    *   **Routing Logic:** Defines rules for state transitions based on engagement events (bounced, unsubscribed, replied, clicked).
+    *   **Frontend:** Dedicated routing page with queues, next actions, CTA library management, and analytics.
+
+9.  **Smart Follow-Up Engine:**
+    *   **Engagement Intelligence:** Tracks detailed lead engagement fields (score, status, last engagement type/time).
+    *   **Rules Engine:** Processes inbound engagement events through configurable rules to trigger actions (pause/cancel sequences, suppress lead, update engagement, create notifications).
+    *   **Notifications System:** In-app notifications with a dedicated UI and polling for unread counts.
+    *   **Enhanced Lead Drawer:** Displays engagement intelligence, activity timeline, and bulk sequence actions. Lead table shows engagement score badges and smart next actions.
 
 **Database Schema (Drizzle ORM):**
-Key tables include:
--   `leads`: CRM lead records.
--   `tasks`: Local tasks/follow-ups linked to leads.
--   `templates`: Local outreach templates.
--   `assets`: Local sales assets.
--   `activity`: Dashboard activity log.
--   `outreach_history`: Log of sent emails per lead.
--   `scheduled_emails`: Scheduled emails per lead with status (scheduled/sent/canceled), optional sequence linkage.
--   `contacts`, `campaigns`, `template_sets`, `sequence_enrollments`, `sequence_steps`, `send_logs`, `email_events`, `suppression_list`, `imports`, `settings`: Tables for the Outbound Sequence Engine and analytics.
--   `personalization_logs`: Tracks AI personalization generation attempts with mode, input fields, output text, status, and errors.
--   `routing_logs`: Tracks routing state changes per contact with previous/new state and reason.
--   `next_actions`: Library of recommended next actions with tier and segment targeting.
--   `cta_library`: Library of CTA texts with tier and segment targeting.
-
-**TypeScript & Composite Projects:**
-The monorepo leverages TypeScript composite projects, with all packages extending `tsconfig.base.json`. Type checking is performed from the root, emitting only `.d.ts` files. Project references are configured for inter-package dependencies.
+Key tables include `leads` (with engagement intelligence), `tasks`, `templates`, `assets`, `activity`, `outreach_history`, `scheduled_emails`, `notifications`, `lead_engagement_events`, `contacts`, `campaigns`, `sequence_enrollments`, `personalization_logs`, `routing_logs`, `next_actions`, and `cta_library`.
 
 # External Dependencies
 
--   **Google Sheets:** Bi-directional sync for lead CRM data with a **MASTER CRM** tab. Utilizes `googleapis` and the Replit Google Sheets connector.
--   **Outlook:** Used for sending emails during outreach.
--   **Recharts:** For data visualization on the dashboard (charts).
--   **@hello-pangea/dnd:** For drag-and-drop functionality in the Kanban pipeline.
--   **react-hook-form:** For form management and validation.
--   **@hookform/resolvers:** Integrates form validation with Zod.
+-   **Google Sheets:** Bi-directional sync for lead CRM data with a **MASTER CRM** tab.
+-   **Outlook:** Used for sending emails.
+-   **Recharts:** For data visualization.
+-   **@hello-pangea/dnd:** For drag-and-drop functionality.
+-   **react-hook-form:** For form management.
+-   **@hookform/resolvers:** For integrating form validation with Zod.
