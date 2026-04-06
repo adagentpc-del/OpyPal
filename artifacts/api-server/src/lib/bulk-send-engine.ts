@@ -1,14 +1,8 @@
 import { db, leadsTable, scheduledEmailsTable, activityTable, bulkSendCampaignsTable } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
-import { sendEmail } from "./resend";
+import { startQueueProcessor } from "./send-queue";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const BATCH_SIZE = 10;
-const BATCH_DELAY_MS = 1000;
-
-function sleep(ms: number) {
-  return new Promise(r => setTimeout(r, ms));
-}
 
 interface BulkRecipient {
   leadId: number;
@@ -37,6 +31,10 @@ interface BulkSendRequest {
   campaignName?: string;
   senderEmail?: string;
   senderName?: string;
+  replyTo?: string;
+  sendsPerHour?: number;
+  delayBetweenSendsMs?: number;
+  batchSize?: number;
   totalSkipped?: number;
 }
 
@@ -72,7 +70,7 @@ export async function validateRecipients(
       .from(scheduledEmailsTable)
       .where(and(
         eq(scheduledEmailsTable.sequenceId, sequenceId),
-        inArray(scheduledEmailsTable.status, ["scheduled", "paused"])
+        inArray(scheduledEmailsTable.status, ["scheduled", "paused", "queued"])
       ));
     activeEnrollments = new Set(existing.map(e => e.leadId));
   }
@@ -115,17 +113,6 @@ function personalize(template: string, lead: BulkRecipient): string {
     .replace(/\{\{company_line\}\}/gi, "");
 }
 
-function textToHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/\n/g, "<br>")
-    .replace(/^/, "<p>")
-    .replace(/$/, "</p>");
-}
-
 function addBusinessDaysToDate(startDate: Date, days: number): Date {
   const d = new Date(startDate);
   let added = 0;
@@ -135,14 +122,19 @@ function addBusinessDaysToDate(startDate: Date, days: number): Date {
 
 export interface BulkSendResult {
   campaignId: number;
-  totalSent: number;
+  totalQueued: number;
   totalScheduled: number;
-  totalFailed: number;
   totalSkipped: number;
-  results: { leadId: number; companyName: string; status: string; error?: string; resendId?: string }[];
+  mode: string;
+  queueConfig: { sendsPerHour: number; delayBetweenSendsMs: number; batchSize: number };
+  recipients: { leadId: number; companyName: string; status: string; queuePosition?: number }[];
 }
 
 export async function executeBulkSend(req: BulkSendRequest): Promise<BulkSendResult> {
+  const sendsPerHour = req.sendsPerHour || 50;
+  const delayBetweenSendsMs = req.delayBetweenSendsMs || 5000;
+  const batchSize = req.batchSize || 5;
+
   const [campaign] = await db.insert(bulkSendCampaignsTable).values({
     name: req.campaignName || `Bulk send ${new Date().toLocaleDateString()}`,
     templateId: req.templateId,
@@ -151,149 +143,128 @@ export async function executeBulkSend(req: BulkSendRequest): Promise<BulkSendRes
     sequenceName: req.sequenceName,
     sender: req.senderName || "Alyssa",
     senderEmail: req.senderEmail,
-    totalSelected: req.recipients.length,
-    status: "processing",
+    replyTo: req.replyTo,
+    sendsPerHour,
+    delayBetweenSendsMs,
+    batchSize,
+    totalSelected: req.recipients.length + (req.totalSkipped || 0),
+    totalSkipped: req.totalSkipped || 0,
+    status: req.mode === "send_now" ? "queued" : "scheduled",
   }).returning();
 
-  const results: BulkSendResult["results"] = [];
-  let totalSent = 0, totalScheduled = 0, totalFailed = 0;
+  const recipientResults: BulkSendResult["recipients"] = [];
+  let totalQueued = 0;
+  let totalScheduled = 0;
 
-  const batches: BulkRecipient[][] = [];
-  for (let i = 0; i < req.recipients.length; i += BATCH_SIZE) {
-    batches.push(req.recipients.slice(i, i + BATCH_SIZE));
-  }
+  for (let i = 0; i < req.recipients.length; i++) {
+    const lead = req.recipients[i];
+    const personalizedSubject = personalize(req.subject, lead);
+    const personalizedBody = personalize(req.body, lead);
+    const queuePosition = i + 1;
 
-  for (let bi = 0; bi < batches.length; bi++) {
-    if (bi > 0) await sleep(BATCH_DELAY_MS);
+    if (req.mode === "send_now") {
+      await db.insert(scheduledEmailsTable).values({
+        leadId: lead.leadId,
+        templateId: req.templateId,
+        subject: personalizedSubject,
+        body: personalizedBody,
+        scheduledFor: new Date(),
+        status: "queued",
+        sequenceId: req.sequenceId,
+        sequenceStepNumber: 1,
+        source: "bulk_send",
+        campaignId: campaign.id,
+        queuedAt: new Date(),
+        queuePosition,
+        fromEmail: req.senderEmail,
+        replyTo: req.replyTo,
+        retryCount: 0,
+        maxRetries: 3,
+      });
+      totalQueued++;
+      recipientResults.push({ leadId: lead.leadId, companyName: lead.companyName, status: "queued", queuePosition });
+    } else {
+      const schedDate = req.scheduledFor ? new Date(req.scheduledFor) : new Date();
+      await db.insert(scheduledEmailsTable).values({
+        leadId: lead.leadId,
+        templateId: req.templateId,
+        subject: personalizedSubject,
+        body: personalizedBody,
+        scheduledFor: schedDate,
+        status: "scheduled",
+        sequenceId: req.sequenceId,
+        sequenceStepNumber: 1,
+        source: "bulk_send",
+        campaignId: campaign.id,
+        fromEmail: req.senderEmail,
+        replyTo: req.replyTo,
+      });
 
-    const batch = batches[bi];
-    const batchPromises = batch.map(async (lead) => {
-      const personalizedSubject = personalize(req.subject, lead);
-      const personalizedBody = personalize(req.body, lead);
-      const htmlBody = textToHtml(personalizedBody);
+      await db.insert(activityTable).values({
+        type: "bulk_email_scheduled",
+        description: `Bulk email scheduled: "${personalizedSubject}"`,
+        leadId: lead.leadId,
+        metadata: { campaignId: campaign.id },
+        relatedTemplateId: req.templateId,
+        relatedSequenceId: req.sequenceId,
+        createdBy: "system",
+      });
 
-      if (req.mode === "send_now") {
-        const sendResult = await sendEmail({
-          to: lead.email,
-          from: req.senderEmail,
-          subject: personalizedSubject,
-          html: htmlBody,
-          text: personalizedBody,
-        });
+      totalScheduled++;
+      recipientResults.push({ leadId: lead.leadId, companyName: lead.companyName, status: "scheduled" });
+    }
 
-        const [scheduledRow] = await db.insert(scheduledEmailsTable).values({
-          leadId: lead.leadId,
-          templateId: req.templateId,
-          subject: personalizedSubject,
-          body: personalizedBody,
-          scheduledFor: new Date(),
-          status: sendResult.success ? "sent" : "failed",
-          sequenceId: req.sequenceId,
-          sequenceStepNumber: 1,
-          source: "bulk_send",
-          campaignId: campaign.id,
-          resendMessageId: sendResult.id || undefined,
-          sentAt: sendResult.success ? new Date() : undefined,
-        }).returning();
-
-        await db.insert(activityTable).values({
-          type: sendResult.success ? "bulk_email_sent" : "bulk_email_failed",
-          description: sendResult.success
-            ? `Bulk email sent: "${personalizedSubject}"`
-            : `Bulk email failed: ${sendResult.error}`,
-          leadId: lead.leadId,
-          metadata: { campaignId: campaign.id, resendId: sendResult.id },
-          relatedTemplateId: req.templateId,
-          relatedSequenceId: req.sequenceId,
-          createdBy: "system",
-        });
-
-        if (sendResult.success) {
-          totalSent++;
-          results.push({ leadId: lead.leadId, companyName: lead.companyName, status: "sent", resendId: sendResult.id });
-        } else {
-          totalFailed++;
-          results.push({ leadId: lead.leadId, companyName: lead.companyName, status: "failed", error: sendResult.error });
-        }
-      } else {
-        const schedDate = req.scheduledFor ? new Date(req.scheduledFor) : new Date();
+    if (req.activateSequence && req.sequenceSteps && req.sequenceSteps.length > 1) {
+      const startDate = req.mode === "schedule" && req.scheduledFor ? new Date(req.scheduledFor) : new Date();
+      for (const step of req.sequenceSteps.slice(1)) {
+        const delayDays = step.delayDays || 0;
+        const stepDate = addBusinessDaysToDate(startDate, delayDays);
+        const stepSubject = personalize(step.subject || `Follow-up Step ${step.stepNumber}`, lead);
+        const stepBody = personalize(step.body || "", lead);
         await db.insert(scheduledEmailsTable).values({
           leadId: lead.leadId,
-          templateId: req.templateId,
-          subject: personalizedSubject,
-          body: personalizedBody,
-          scheduledFor: schedDate,
+          subject: stepSubject,
+          body: stepBody,
+          scheduledFor: stepDate,
           status: "scheduled",
           sequenceId: req.sequenceId,
-          sequenceStepNumber: 1,
-          source: "bulk_send",
+          sequenceStepNumber: step.stepNumber,
+          source: "bulk_sequence",
           campaignId: campaign.id,
-        });
-
-        await db.insert(activityTable).values({
-          type: "bulk_email_scheduled",
-          description: `Bulk email scheduled: "${personalizedSubject}"`,
-          leadId: lead.leadId,
-          metadata: { campaignId: campaign.id },
-          relatedTemplateId: req.templateId,
-          relatedSequenceId: req.sequenceId,
-          createdBy: "system",
-        });
-
-        totalScheduled++;
-        results.push({ leadId: lead.leadId, companyName: lead.companyName, status: "scheduled" });
-      }
-
-      if (req.activateSequence && req.sequenceSteps && req.sequenceSteps.length > 1) {
-        const startDate = req.mode === "schedule" && req.scheduledFor ? new Date(req.scheduledFor) : new Date();
-        for (const step of req.sequenceSteps.slice(1)) {
-          const delayDays = step.delayDays || 0;
-          const stepDate = addBusinessDaysToDate(startDate, delayDays);
-          const stepSubject = personalize(step.subject || `Follow-up Step ${step.stepNumber}`, lead);
-          const stepBody = personalize(step.body || "", lead);
-          await db.insert(scheduledEmailsTable).values({
-            leadId: lead.leadId,
-            subject: stepSubject,
-            body: stepBody,
-            scheduledFor: stepDate,
-            status: "scheduled",
-            sequenceId: req.sequenceId,
-            sequenceStepNumber: step.stepNumber,
-            source: "bulk_sequence",
-            campaignId: campaign.id,
-          });
-        }
-
-        await db.insert(activityTable).values({
-          type: "bulk_sequence_enrolled",
-          description: `Enrolled in sequence: ${req.sequenceName || "Unnamed"} (${req.sequenceSteps.length} steps)`,
-          leadId: lead.leadId,
-          metadata: { campaignId: campaign.id, sequenceId: req.sequenceId },
-          relatedSequenceId: req.sequenceId,
-          createdBy: "system",
+          fromEmail: req.senderEmail,
+          replyTo: req.replyTo,
         });
       }
 
-      await db.update(leadsTable).set({
-        lastContactDate: new Date().toISOString().split("T")[0],
-        status: "Contacted",
-        updatedAt: new Date(),
-      }).where(eq(leadsTable.id, lead.leadId));
-    });
-
-    await Promise.allSettled(batchPromises);
+      await db.insert(activityTable).values({
+        type: "bulk_sequence_enrolled",
+        description: `Enrolled in sequence: ${req.sequenceName || "Unnamed"} (${req.sequenceSteps.length} steps)`,
+        leadId: lead.leadId,
+        metadata: { campaignId: campaign.id, sequenceId: req.sequenceId },
+        relatedSequenceId: req.sequenceId,
+        createdBy: "system",
+      });
+    }
   }
 
-  const skippedCount = req.totalSkipped || 0;
-
   await db.update(bulkSendCampaignsTable).set({
-    totalSent,
+    totalQueued,
     totalScheduled,
-    totalFailed,
-    totalSkipped: skippedCount,
-    status: totalFailed > 0 && totalSent === 0 ? "failed" : "completed",
     updatedAt: new Date(),
   }).where(eq(bulkSendCampaignsTable.id, campaign.id));
 
-  return { campaignId: campaign.id, totalSent, totalScheduled, totalFailed, totalSkipped: skippedCount, results };
+  if (req.mode === "send_now" && totalQueued > 0) {
+    startQueueProcessor(campaign.id, { sendsPerHour, delayBetweenSendsMs, batchSize })
+      .catch(err => console.error(`[BulkSendEngine] Queue processor error for campaign ${campaign.id}:`, err));
+  }
+
+  return {
+    campaignId: campaign.id,
+    totalQueued,
+    totalScheduled,
+    totalSkipped: req.totalSkipped || 0,
+    mode: req.mode,
+    queueConfig: { sendsPerHour, delayBetweenSendsMs, batchSize },
+    recipients: recipientResults,
+  };
 }

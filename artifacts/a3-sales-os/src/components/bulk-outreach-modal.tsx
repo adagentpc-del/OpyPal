@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { X, Mail, AlertTriangle, CheckCircle, Loader2, Users, Send, Clock, ChevronDown, ChevronUp, Shield, Ban, MailWarning, Eye, ArrowLeft, ArrowRight, Search } from "lucide-react";
+import { X, Mail, AlertTriangle, CheckCircle, Loader2, Users, Send, Clock, ChevronDown, ChevronUp, Shield, Ban, MailWarning, Eye, ArrowLeft, ArrowRight, Search, Settings2, ListOrdered, Reply } from "lucide-react";
 import { useGetTemplates, useGetTemplateSets } from "@workspace/api-client-react";
 
 const API_BASE = import.meta.env.BASE_URL + "api";
@@ -59,6 +59,12 @@ export function BulkOutreachModal({ selectedLeads, onClose, onComplete }: BulkOu
   const [previewIndex, setPreviewIndex] = useState(0);
   const [showSuppressed, setShowSuppressed] = useState(false);
   const [resendConnected, setResendConnected] = useState<boolean | null>(null);
+  const [replyTo, setReplyTo] = useState("");
+  const [fromEmail, setFromEmail] = useState("");
+  const [sendsPerHour, setSendsPerHour] = useState(50);
+  const [delayBetweenSendsMs, setDelayBetweenSendsMs] = useState(5000);
+  const [batchSize, setBatchSize] = useState(5);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const { data: allTemplates } = useGetTemplates();
   const { data: templateSets } = useGetTemplateSets();
@@ -89,9 +95,16 @@ export function BulkOutreachModal({ selectedLeads, onClose, onComplete }: BulkOu
   );
 
   useEffect(() => {
-    fetch(`${API_BASE}/bulk-send/check-connection`)
+    fetch(`${API_BASE}/bulk-send/sender-config`)
       .then(r => r.json())
-      .then(d => setResendConnected(d.connected))
+      .then(d => {
+        setResendConnected(d.connected === true);
+        setReplyTo(d.defaultReplyTo || "");
+        setFromEmail(d.fromEmail || "");
+        setSendsPerHour(d.sendsPerHour || 50);
+        setDelayBetweenSendsMs(d.delayBetweenSendsMs || 5000);
+        setBatchSize(d.batchSize || 5);
+      })
       .catch(() => setResendConnected(false));
   }, []);
 
@@ -142,6 +155,11 @@ export function BulkOutreachModal({ selectedLeads, onClose, onComplete }: BulkOu
           mode,
           scheduledFor: mode === "schedule" ? scheduledFor : undefined,
           campaignName,
+          replyTo,
+          senderEmail: fromEmail || undefined,
+          sendsPerHour,
+          delayBetweenSendsMs,
+          batchSize,
         }),
       });
       if (!res.ok) {
@@ -165,6 +183,8 @@ export function BulkOutreachModal({ selectedLeads, onClose, onComplete }: BulkOu
   const previewRecipient = validationResult?.readyRecipients?.[previewIndex] || recipients[previewIndex];
   const personalizedSubject = previewRecipient ? personalize(subject, previewRecipient) : subject;
   const personalizedBody = previewRecipient ? personalize(body, previewRecipient) : body;
+
+  const estDuration = readyCount > 0 ? Math.ceil((readyCount * delayBetweenSendsMs) / 60000) : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-4 sm:pt-8 px-4">
@@ -203,6 +223,12 @@ export function BulkOutreachModal({ selectedLeads, onClose, onComplete }: BulkOu
               campaignName={campaignName} setCampaignName={setCampaignName}
               resendConnected={resendConnected}
               recipientCount={recipients.length}
+              replyTo={replyTo} setReplyTo={setReplyTo}
+              fromEmail={fromEmail}
+              sendsPerHour={sendsPerHour} setSendsPerHour={setSendsPerHour}
+              delayBetweenSendsMs={delayBetweenSendsMs} setDelayBetweenSendsMs={setDelayBetweenSendsMs}
+              batchSize={batchSize} setBatchSize={setBatchSize}
+              showAdvanced={showAdvanced} setShowAdvanced={setShowAdvanced}
             />
           )}
 
@@ -219,6 +245,8 @@ export function BulkOutreachModal({ selectedLeads, onClose, onComplete }: BulkOu
               showSuppressed={showSuppressed}
               setShowSuppressed={setShowSuppressed}
               mode={mode}
+              replyTo={replyTo}
+              fromEmail={fromEmail}
             />
           )}
 
@@ -231,6 +259,10 @@ export function BulkOutreachModal({ selectedLeads, onClose, onComplete }: BulkOu
               subject={subject}
               campaignName={campaignName}
               templateName={selectedTemplate?.name}
+              replyTo={replyTo}
+              sendsPerHour={sendsPerHour}
+              delayBetweenSendsMs={delayBetweenSendsMs}
+              estDuration={estDuration}
             />
           )}
 
@@ -276,8 +308,8 @@ export function BulkOutreachModal({ selectedLeads, onClose, onComplete }: BulkOu
                 onClick={handleSend}
                 disabled={sending}
               >
-                {mode === "send_now" ? <Send className="h-4 w-4 mr-2" /> : <Clock className="h-4 w-4 mr-2" />}
-                {mode === "send_now" ? `Send to ${readyCount} recipients` : `Schedule for ${readyCount} recipients`}
+                {mode === "send_now" ? <ListOrdered className="h-4 w-4 mr-2" /> : <Clock className="h-4 w-4 mr-2" />}
+                {mode === "send_now" ? `Queue ${readyCount} emails` : `Schedule ${readyCount} emails`}
               </Button>
             )}
             {step === "results" && (
@@ -297,7 +329,7 @@ function StepIndicator({ currentStep }: { currentStep: Step }) {
     { key: "setup", label: "Setup" },
     { key: "preview", label: "Preview" },
     { key: "confirm", label: "Confirm" },
-    { key: "sending", label: "Sending" },
+    { key: "sending", label: "Queuing" },
     { key: "results", label: "Results" },
   ];
   const currentIdx = steps.findIndex(s => s.key === currentStep);
@@ -314,7 +346,7 @@ function StepIndicator({ currentStep }: { currentStep: Step }) {
   );
 }
 
-function SetupStep({ subject, setSubject, body, setBody, mode, setMode, scheduledFor, setScheduledFor, selectedTemplateId, emailTemplates, templateSets, onTemplateSelect, campaignName, setCampaignName, resendConnected, recipientCount }: any) {
+function SetupStep({ subject, setSubject, body, setBody, mode, setMode, scheduledFor, setScheduledFor, selectedTemplateId, emailTemplates, templateSets, onTemplateSelect, campaignName, setCampaignName, resendConnected, recipientCount, replyTo, setReplyTo, fromEmail, sendsPerHour, setSendsPerHour, delayBetweenSendsMs, setDelayBetweenSendsMs, batchSize, setBatchSize, showAdvanced, setShowAdvanced }: any) {
   const [templateSearch, setTemplateSearch] = useState("");
 
   const filteredTemplates = useMemo(() => {
@@ -340,21 +372,40 @@ function SetupStep({ subject, setSubject, body, setBody, mode, setMode, schedule
       {resendConnected === true && (
         <div className="flex items-center gap-2 p-2 px-3 rounded-xl bg-emerald-50 border border-emerald-200">
           <CheckCircle className="h-4 w-4 text-emerald-600" />
-          <span className="text-xs font-medium text-emerald-700">Resend connected — ready to send</span>
+          <span className="text-xs font-medium text-emerald-700">Resend connected — queue-based sending enabled</span>
         </div>
       )}
 
       <div>
         <label className="text-sm font-medium mb-1.5 block">Campaign Name</label>
-        <input value={campaignName} onChange={e => setCampaignName(e.target.value)}
+        <input value={campaignName} onChange={(e: any) => setCampaignName(e.target.value)}
           className="w-full px-3 py-2 rounded-xl border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm bg-background" />
+      </div>
+
+      <div className="rounded-xl border border-border p-3 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Reply className="h-4 w-4 text-primary" />
+          <label className="text-sm font-medium">Sender Configuration</label>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">From Email</label>
+          <input value={fromEmail} disabled
+            className="w-full px-3 py-1.5 rounded-lg border border-border text-xs bg-muted/50 text-muted-foreground" />
+          <p className="text-[10px] text-muted-foreground mt-0.5">Set by Resend integration</p>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Reply-To Email (replies go here)</label>
+          <input value={replyTo} onChange={(e: any) => setReplyTo(e.target.value)} placeholder="your-email@outlook.com"
+            className="w-full px-3 py-1.5 rounded-lg border border-border text-xs bg-background focus:border-primary outline-none" />
+          <p className="text-[10px] text-muted-foreground mt-0.5">Replies will be delivered to this inbox (your Outlook)</p>
+        </div>
       </div>
 
       <div>
         <label className="text-sm font-medium mb-1.5 block">Choose Template</label>
         <div className="relative mb-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <input type="text" placeholder="Search templates..." value={templateSearch} onChange={e => setTemplateSearch(e.target.value)}
+          <input type="text" placeholder="Search templates..." value={templateSearch} onChange={(e: any) => setTemplateSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-1.5 rounded-lg border border-border text-xs bg-background" />
         </div>
         <div className="max-h-40 overflow-y-auto rounded-xl border border-border divide-y divide-border/50">
@@ -374,14 +425,14 @@ function SetupStep({ subject, setSubject, body, setBody, mode, setMode, schedule
 
       <div>
         <label className="text-sm font-medium mb-1.5 block">Subject Line</label>
-        <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Enter subject..."
+        <input value={subject} onChange={(e: any) => setSubject(e.target.value)} placeholder="Enter subject..."
           className="w-full px-3 py-2 rounded-xl border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm bg-background" />
         <p className="text-[10px] text-muted-foreground mt-1">Use [First Name], [Company Name], etc. for personalization</p>
       </div>
 
       <div>
         <label className="text-sm font-medium mb-1.5 block">Email Body</label>
-        <textarea value={body} onChange={e => setBody(e.target.value)} rows={8} placeholder="Write your email..."
+        <textarea value={body} onChange={(e: any) => setBody(e.target.value)} rows={8} placeholder="Write your email..."
           className="w-full px-3 py-2 rounded-xl border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm bg-background resize-none font-mono" />
       </div>
 
@@ -390,10 +441,10 @@ function SetupStep({ subject, setSubject, body, setBody, mode, setMode, schedule
         <div className="flex gap-3">
           <button onClick={() => setMode("send_now")}
             className={`flex-1 flex items-center gap-2 p-3 rounded-xl border-2 transition-colors ${mode === "send_now" ? "border-primary bg-primary/5" : "border-border hover:border-border/80"}`}>
-            <Send className={`h-4 w-4 ${mode === "send_now" ? "text-primary" : "text-muted-foreground"}`} />
+            <ListOrdered className={`h-4 w-4 ${mode === "send_now" ? "text-primary" : "text-muted-foreground"}`} />
             <div className="text-left">
-              <p className={`text-sm font-medium ${mode === "send_now" ? "text-primary" : ""}`}>Send Now</p>
-              <p className="text-[10px] text-muted-foreground">Deliver immediately via Resend</p>
+              <p className={`text-sm font-medium ${mode === "send_now" ? "text-primary" : ""}`}>Queue & Send</p>
+              <p className="text-[10px] text-muted-foreground">Rate-limited delivery via send queue</p>
             </div>
           </button>
           <button onClick={() => setMode("schedule")}
@@ -406,28 +457,61 @@ function SetupStep({ subject, setSubject, body, setBody, mode, setMode, schedule
           </button>
         </div>
         {mode === "schedule" && (
-          <input type="datetime-local" value={scheduledFor} onChange={e => setScheduledFor(e.target.value)}
+          <input type="datetime-local" value={scheduledFor} onChange={(e: any) => setScheduledFor(e.target.value)}
             className="mt-2 w-full px-3 py-2 rounded-xl border border-border text-sm bg-background" />
+        )}
+      </div>
+
+      <div>
+        <button onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+          <Settings2 className="h-4 w-4" />
+          Rate Limiting & Queue Settings
+          {showAdvanced ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        </button>
+        {showAdvanced && (
+          <div className="mt-3 p-3 rounded-xl border border-border bg-muted/30 space-y-3">
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Sends / hour</label>
+                <input type="number" value={sendsPerHour} onChange={(e: any) => setSendsPerHour(Number(e.target.value) || 50)} min={1} max={500}
+                  className="w-full px-2 py-1.5 rounded-lg border border-border text-xs bg-background" />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Delay (seconds)</label>
+                <input type="number" value={delayBetweenSendsMs / 1000} onChange={(e: any) => setDelayBetweenSendsMs((Number(e.target.value) || 5) * 1000)} min={1} max={300}
+                  className="w-full px-2 py-1.5 rounded-lg border border-border text-xs bg-background" />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Batch size</label>
+                <input type="number" value={batchSize} onChange={(e: any) => setBatchSize(Number(e.target.value) || 5)} min={1} max={20}
+                  className="w-full px-2 py-1.5 rounded-lg border border-border text-xs bg-background" />
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Emails are sent one at a time within each batch, with the configured delay between each send. Failed sends are retried up to 3 times with exponential backoff.
+            </p>
+          </div>
         )}
       </div>
 
       <div className="p-3 rounded-xl bg-muted/50 flex items-center gap-2">
         <Users className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm text-muted-foreground">
-          <strong className="text-foreground">{recipientCount}</strong> recipients will be validated for suppressions before sending
+          <strong className="text-foreground">{recipientCount}</strong> recipients will be validated for suppressions before queuing
         </span>
       </div>
     </div>
   );
 }
 
-function PreviewStep({ validationResult, readyCount, totalSkipped, previewRecipient, previewIndex, setPreviewIndex, personalizedSubject, personalizedBody, showSuppressed, setShowSuppressed, mode }: any) {
+function PreviewStep({ validationResult, readyCount, totalSkipped, previewRecipient, previewIndex, setPreviewIndex, personalizedSubject, personalizedBody, showSuppressed, setShowSuppressed, mode, replyTo, fromEmail }: any) {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
           <p className="text-2xl font-bold text-emerald-700">{readyCount}</p>
-          <p className="text-xs text-emerald-600">Ready to {mode === "send_now" ? "send" : "schedule"}</p>
+          <p className="text-xs text-emerald-600">Ready to {mode === "send_now" ? "queue" : "schedule"}</p>
         </div>
         <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-center">
           <p className="text-2xl font-bold text-amber-700">{totalSkipped}</p>
@@ -498,11 +582,10 @@ function PreviewStep({ validationResult, readyCount, totalSkipped, previewRecipi
           </div>
 
           <div className="rounded-xl border border-border overflow-hidden">
-            <div className="bg-muted/50 px-4 py-2 border-b border-border/50 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">To: <span className="text-foreground font-medium">{previewRecipient.contactName}</span> &lt;{previewRecipient.email}&gt;</p>
-                <p className="text-xs text-muted-foreground">Company: {previewRecipient.companyName}</p>
-              </div>
+            <div className="bg-muted/50 px-4 py-2 border-b border-border/50">
+              <p className="text-xs text-muted-foreground">From: <span className="text-foreground">{fromEmail}</span></p>
+              <p className="text-xs text-muted-foreground">To: <span className="text-foreground font-medium">{previewRecipient.contactName}</span> &lt;{previewRecipient.email}&gt;</p>
+              <p className="text-xs text-muted-foreground">Reply-To: <span className="text-foreground">{replyTo}</span></p>
             </div>
             <div className="px-4 py-3">
               <p className="text-sm font-semibold mb-2">{personalizedSubject}</p>
@@ -538,15 +621,15 @@ function SuppressionRow({ icon, label, count, details }: { icon: React.ReactNode
   );
 }
 
-function ConfirmStep({ readyCount, totalSkipped, mode, scheduledFor, subject, campaignName, templateName }: any) {
+function ConfirmStep({ readyCount, totalSkipped, mode, scheduledFor, subject, campaignName, templateName, replyTo, sendsPerHour, delayBetweenSendsMs, estDuration }: any) {
   return (
     <div className="space-y-5">
       <div className="text-center py-4">
         <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-          {mode === "send_now" ? <Send className="h-8 w-8 text-primary" /> : <Clock className="h-8 w-8 text-primary" />}
+          {mode === "send_now" ? <ListOrdered className="h-8 w-8 text-primary" /> : <Clock className="h-8 w-8 text-primary" />}
         </div>
         <h3 className="text-xl font-bold">
-          {mode === "send_now" ? "Ready to send" : "Ready to schedule"}
+          {mode === "send_now" ? "Ready to queue" : "Ready to schedule"}
         </h3>
         <p className="text-muted-foreground mt-1">Please review the details below</p>
       </div>
@@ -577,18 +660,24 @@ function ConfirmStep({ readyCount, totalSkipped, mode, scheduledFor, subject, ca
           </div>
         )}
         <div className="px-4 py-3 flex justify-between">
+          <span className="text-sm text-muted-foreground">Reply-To</span>
+          <span className="text-sm font-medium">{replyTo || "—"}</span>
+        </div>
+        <div className="px-4 py-3 flex justify-between">
           <span className="text-sm text-muted-foreground">Delivery</span>
           <span className="text-sm font-medium">
-            {mode === "send_now" ? "Immediately via Resend" : `Scheduled: ${scheduledFor ? new Date(scheduledFor).toLocaleString() : "—"}`}
+            {mode === "send_now"
+              ? `Queue — ${sendsPerHour}/hr, ~${estDuration} min`
+              : `Scheduled: ${scheduledFor ? new Date(scheduledFor).toLocaleString() : "—"}`}
           </span>
         </div>
       </div>
 
-      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2">
-        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-700">
+      <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-start gap-2">
+        <ListOrdered className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+        <p className="text-xs text-blue-700">
           {mode === "send_now"
-            ? "Emails will be sent immediately and cannot be recalled. Delivery is throttled at 10 emails per second."
+            ? `Emails will be queued and sent one-by-one with ${delayBetweenSendsMs / 1000}s delay between each send. Failed sends will be retried up to 3 times. You can pause the queue from the campaign details.`
             : "Emails will be queued for the selected date/time. You can cancel them from the Scheduled Emails page."}
         </p>
       </div>
@@ -600,8 +689,8 @@ function SendingStep({ mode, readyCount }: { mode: string; readyCount: number })
   return (
     <div className="flex flex-col items-center justify-center py-12">
       <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
-      <h3 className="text-lg font-bold">{mode === "send_now" ? "Sending emails..." : "Scheduling emails..."}</h3>
-      <p className="text-sm text-muted-foreground mt-1">Processing {readyCount} recipients. Please don't close this window.</p>
+      <h3 className="text-lg font-bold">{mode === "send_now" ? "Queuing emails..." : "Scheduling emails..."}</h3>
+      <p className="text-sm text-muted-foreground mt-1">Adding {readyCount} emails to the send queue...</p>
     </div>
   );
 }
@@ -613,7 +702,7 @@ function ResultsStep({ sendResult, mode }: { sendResult: any; mode: string }) {
         <div className="h-14 w-14 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
           <AlertTriangle className="h-7 w-7 text-destructive" />
         </div>
-        <h3 className="text-lg font-bold text-destructive">Send failed</h3>
+        <h3 className="text-lg font-bold text-destructive">Failed</h3>
         <p className="text-sm text-muted-foreground mt-1">{sendResult.error}</p>
       </div>
     );
@@ -626,15 +715,18 @@ function ResultsStep({ sendResult, mode }: { sendResult: any; mode: string }) {
           <CheckCircle className="h-7 w-7 text-emerald-600" />
         </div>
         <h3 className="text-lg font-bold">
-          {mode === "send_now" ? "Emails sent!" : "Emails scheduled!"}
+          {mode === "send_now" ? "Emails queued!" : "Emails scheduled!"}
         </h3>
+        {mode === "send_now" && (
+          <p className="text-sm text-muted-foreground mt-1">The send queue is processing in the background</p>
+        )}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        {sendResult?.totalSent > 0 && (
-          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
-            <p className="text-2xl font-bold text-emerald-700">{sendResult.totalSent}</p>
-            <p className="text-xs text-emerald-600">Sent</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {sendResult?.totalQueued > 0 && (
+          <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-center">
+            <p className="text-2xl font-bold text-blue-700">{sendResult.totalQueued}</p>
+            <p className="text-xs text-blue-600">Queued</p>
           </div>
         )}
         {sendResult?.totalScheduled > 0 && (
@@ -643,26 +735,38 @@ function ResultsStep({ sendResult, mode }: { sendResult: any; mode: string }) {
             <p className="text-xs text-blue-600">Scheduled</p>
           </div>
         )}
-        {sendResult?.totalFailed > 0 && (
-          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-center">
-            <p className="text-2xl font-bold text-red-700">{sendResult.totalFailed}</p>
-            <p className="text-xs text-red-600">Failed</p>
+        {sendResult?.totalSkipped > 0 && (
+          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-center">
+            <p className="text-2xl font-bold text-amber-700">{sendResult.totalSkipped}</p>
+            <p className="text-xs text-amber-600">Skipped</p>
           </div>
         )}
       </div>
 
-      {sendResult?.results?.length > 0 && (
+      {sendResult?.queueConfig && mode === "send_now" && (
+        <div className="p-3 rounded-xl bg-muted/50 border border-border space-y-1">
+          <p className="text-xs font-medium">Queue Settings</p>
+          <p className="text-xs text-muted-foreground">Rate: {sendResult.queueConfig.sendsPerHour} sends/hour</p>
+          <p className="text-xs text-muted-foreground">Delay: {sendResult.queueConfig.delayBetweenSendsMs / 1000}s between sends</p>
+          <p className="text-xs text-muted-foreground">Batch: {sendResult.queueConfig.batchSize} per batch</p>
+        </div>
+      )}
+
+      {sendResult?.recipients?.length > 0 && (
         <div>
-          <p className="text-sm font-medium mb-2">Results by recipient</p>
+          <p className="text-sm font-medium mb-2">Recipients ({sendResult.recipients.length})</p>
           <div className="max-h-48 overflow-y-auto rounded-xl border border-border divide-y divide-border/50">
-            {sendResult.results.map((r: any, i: number) => (
+            {sendResult.recipients.map((r: any, i: number) => (
               <div key={i} className="px-3 py-2 flex items-center justify-between text-sm">
-                <span className="text-foreground">{r.companyName}</span>
+                <div className="flex items-center gap-2">
+                  {r.queuePosition && <span className="text-[10px] text-muted-foreground font-mono">#{r.queuePosition}</span>}
+                  <span className="text-foreground">{r.companyName}</span>
+                </div>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                  r.status === "sent" ? "bg-emerald-100 text-emerald-700" :
+                  r.status === "queued" ? "bg-blue-100 text-blue-700" :
                   r.status === "scheduled" ? "bg-blue-100 text-blue-700" :
-                  "bg-red-100 text-red-700"
-                }`}>{r.status}{r.error ? `: ${r.error}` : ""}</span>
+                  "bg-gray-100 text-gray-600"
+                }`}>{r.status}</span>
               </div>
             ))}
           </div>

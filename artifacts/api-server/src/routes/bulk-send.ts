@@ -1,17 +1,38 @@
 import { Router, type IRouter } from "express";
-import { db, bulkSendCampaignsTable } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
+import { db, bulkSendCampaignsTable, scheduledEmailsTable } from "@workspace/db";
+import { desc, eq, and } from "drizzle-orm";
 import { validateRecipients, executeBulkSend } from "../lib/bulk-send-engine";
 import { checkResendConnection } from "../lib/resend";
+import { getQueueStatus, abortQueue, getGlobalQueueStatus, startQueueProcessor } from "../lib/send-queue";
+
+const DEFAULT_REPLY_TO = "alyssa@a3visual.com";
 
 const router: IRouter = Router();
 
 router.get("/bulk-send/check-connection", async (_req, res) => {
   try {
     const status = await checkResendConnection();
-    res.json(status);
+    res.json({ ...status, defaultReplyTo: DEFAULT_REPLY_TO });
   } catch (err: any) {
     res.status(500).json({ connected: false, error: err.message });
+  }
+});
+
+router.get("/bulk-send/sender-config", async (_req, res) => {
+  try {
+    const connStatus = await checkResendConnection();
+    res.json({
+      connected: connStatus.connected,
+      fromEmail: connStatus.fromEmail || "",
+      defaultReplyTo: DEFAULT_REPLY_TO,
+      sendsPerHour: 50,
+      delayBetweenSendsMs: 5000,
+      batchSize: 5,
+      maxRetries: 3,
+      error: connStatus.error,
+    });
+  } catch (err: any) {
+    res.status(500).json({ connected: false, message: err.message });
   }
 });
 
@@ -46,7 +67,7 @@ router.post("/bulk-send/validate", async (req, res) => {
 
 router.post("/bulk-send/execute", async (req, res) => {
   try {
-    const { recipients, templateId, templateName, subject, body, sequenceId, sequenceName, sequenceSteps, activateSequence, mode, scheduledFor, campaignName, senderEmail, senderName } = req.body;
+    const { recipients, templateId, templateName, subject, body, sequenceId, sequenceName, sequenceSteps, activateSequence, mode, scheduledFor, campaignName, senderEmail, senderName, replyTo, sendsPerHour, delayBetweenSendsMs, batchSize } = req.body;
     if (!recipients?.length) return res.status(400).json({ message: "No recipients" });
     if (!subject || !body) return res.status(400).json({ message: "Subject and body required" });
 
@@ -69,6 +90,10 @@ router.post("/bulk-send/execute", async (req, res) => {
       sequenceId, sequenceName, sequenceSteps, activateSequence,
       mode: mode || "send_now", scheduledFor, campaignName,
       senderEmail, senderName,
+      replyTo: replyTo || DEFAULT_REPLY_TO,
+      sendsPerHour: sendsPerHour || 50,
+      delayBetweenSendsMs: delayBetweenSendsMs || 5000,
+      batchSize: batchSize || 5,
       totalSkipped,
     });
 
@@ -94,9 +119,88 @@ router.get("/bulk-send/campaigns/:id", async (req, res) => {
     const [campaign] = await db.select().from(bulkSendCampaignsTable)
       .where(eq(bulkSendCampaignsTable.id, Number(req.params.id)));
     if (!campaign) return res.status(404).json({ message: "Campaign not found" });
-    res.json(campaign);
+
+    const queueStatus = getQueueStatus(campaign.id);
+    res.json({ ...campaign, queueActive: queueStatus.active });
   } catch (err: any) {
     res.status(400).json({ message: err.message });
+  }
+});
+
+router.get("/bulk-send/campaigns/:id/progress", async (req, res) => {
+  try {
+    const campaignId = Number(req.params.id);
+    const [campaign] = await db.select().from(bulkSendCampaignsTable)
+      .where(eq(bulkSendCampaignsTable.id, campaignId));
+    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+    const queueStatus = getQueueStatus(campaignId);
+
+    const sentEmails = await db.select({
+      id: scheduledEmailsTable.id,
+      leadId: scheduledEmailsTable.leadId,
+      subject: scheduledEmailsTable.subject,
+      status: scheduledEmailsTable.status,
+      sentAt: scheduledEmailsTable.sentAt,
+      sendError: scheduledEmailsTable.sendError,
+      retryCount: scheduledEmailsTable.retryCount,
+      queuePosition: scheduledEmailsTable.queuePosition,
+    }).from(scheduledEmailsTable)
+      .where(eq(scheduledEmailsTable.campaignId, campaignId))
+      .orderBy(scheduledEmailsTable.queuePosition);
+
+    res.json({
+      campaign: { ...campaign, queueActive: queueStatus.active },
+      emails: sentEmails,
+    });
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.post("/bulk-send/campaigns/:id/pause", async (req, res) => {
+  try {
+    const campaignId = Number(req.params.id);
+    const aborted = abortQueue(campaignId);
+
+    if (!aborted) {
+      await db.update(bulkSendCampaignsTable).set({
+        status: "paused",
+        updatedAt: new Date(),
+      }).where(eq(bulkSendCampaignsTable.id, campaignId));
+    }
+
+    res.json({ paused: true });
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.post("/bulk-send/campaigns/:id/resume", async (req, res) => {
+  try {
+    const campaignId = Number(req.params.id);
+    const [campaign] = await db.select().from(bulkSendCampaignsTable)
+      .where(eq(bulkSendCampaignsTable.id, campaignId));
+    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+    startQueueProcessor(campaignId, {
+      sendsPerHour: campaign.sendsPerHour || 50,
+      delayBetweenSendsMs: campaign.delayBetweenSendsMs || 5000,
+      batchSize: campaign.batchSize || 5,
+    }).catch(err => console.error(`Resume error:`, err));
+
+    res.json({ resumed: true });
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.get("/bulk-send/queue-status", async (_req, res) => {
+  try {
+    const status = await getGlobalQueueStatus();
+    res.json(status);
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
   }
 });
 
