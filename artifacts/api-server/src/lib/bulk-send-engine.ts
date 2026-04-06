@@ -37,6 +37,7 @@ interface BulkSendRequest {
   campaignName?: string;
   senderEmail?: string;
   senderName?: string;
+  totalSkipped?: number;
 }
 
 export interface SuppressionReport {
@@ -283,14 +284,16 @@ export async function executeBulkSend(req: BulkSendRequest): Promise<BulkSendRes
     await Promise.allSettled(batchPromises);
   }
 
+  const skippedCount = req.totalSkipped || 0;
+
   await db.update(bulkSendCampaignsTable).set({
     totalSent,
     totalScheduled,
     totalFailed,
-    totalSkipped: 0,
+    totalSkipped: skippedCount,
     status: totalFailed > 0 && totalSent === 0 ? "failed" : "completed",
     updatedAt: new Date(),
   }).where(eq(bulkSendCampaignsTable.id, campaign.id));
 
-  return { campaignId: campaign.id, totalSent, totalScheduled, totalFailed, totalSkipped: 0, results };
+  return { campaignId: campaign.id, totalSent, totalScheduled, totalFailed, totalSkipped: skippedCount, results };
 }

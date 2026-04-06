@@ -55,11 +55,21 @@ router.post("/bulk-send/execute", async (req, res) => {
       if (!connCheck.connected) return res.status(400).json({ message: `Resend not configured: ${connCheck.error}` });
     }
 
+    const report = await validateRecipients(recipients, sequenceId);
+    const totalSkipped = report.skippedNoEmail.length + report.skippedInvalidEmail.length +
+      report.skippedUnsubscribed.length + report.skippedBounced.length +
+      report.skippedDuplicateEmail.length + report.skippedDuplicateEnrollment.length;
+
+    if (report.ready.length === 0) {
+      return res.status(400).json({ message: "All recipients were suppressed. No emails to send.", totalSkipped });
+    }
+
     const result = await executeBulkSend({
-      recipients, templateId, templateName, subject, body,
+      recipients: report.ready, templateId, templateName, subject, body,
       sequenceId, sequenceName, sequenceSteps, activateSequence,
       mode: mode || "send_now", scheduledFor, campaignName,
       senderEmail, senderName,
+      totalSkipped,
     });
 
     res.json(result);

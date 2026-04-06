@@ -73,13 +73,22 @@ The A3 Sales OS is a pnpm workspace monorepo built with Node.js 24 and TypeScrip
     *   **Notifications System:** In-app notifications with a dedicated UI and polling for unread counts.
     *   **Enhanced Lead Drawer:** Displays engagement intelligence, activity timeline, and bulk sequence actions. Lead table shows engagement score badges and smart next actions.
 
+10. **Bulk Outreach with Resend:**
+    *   **Resend Integration:** Email delivery via Resend connector (`artifacts/api-server/src/lib/resend.ts`). Uses Replit connector credentials pattern (never cached client).
+    *   **Bulk Send Engine:** (`artifacts/api-server/src/lib/bulk-send-engine.ts`) handles recipient validation/suppression (no email, invalid email, unsubscribed, bounced, duplicate email, duplicate enrollment), per-recipient personalization, throttled batch sending (10/sec), activity logging, and campaign tracking.
+    *   **Campaign Tracking:** `bulk_send_campaigns` table tracks name, template, sequence, sender, totals (selected/sent/scheduled/skipped/failed), status.
+    *   **API Routes:** `POST /bulk-send/validate` (suppression preview), `POST /bulk-send/execute` (server-side re-validation + send/schedule), `GET /bulk-send/check-connection`, `GET /bulk-send/campaigns`.
+    *   **Frontend:** Multi-select checkboxes on leads table with select-all, bulk action bar, and `BulkOutreachModal` component with 5-step wizard (Setup → Preview → Confirm → Sending → Results). Template search, personalization preview with per-recipient cycling, suppression summary with expandable details, send now vs schedule modes.
+    *   **Deliverability Safeguards:** Server-side suppression enforcement on execute (not just client-side), throttled batching, campaign accounting with accurate skipped counts.
+
 **Database Schema (Drizzle ORM):**
-Key tables include `leads` (with engagement intelligence), `tasks`, `templates`, `assets`, `activity`, `outreach_history`, `scheduled_emails`, `notifications`, `lead_engagement_events`, `contacts`, `campaigns`, `sequence_enrollments`, `personalization_logs`, `routing_logs`, `next_actions`, and `cta_library`.
+Key tables include `leads` (with engagement intelligence), `tasks`, `templates`, `assets`, `activity`, `outreach_history`, `scheduled_emails` (with `campaignId`, `resendMessageId`), `notifications`, `lead_engagement_events`, `contacts`, `campaigns`, `sequence_enrollments`, `personalization_logs`, `routing_logs`, `next_actions`, `cta_library`, and `bulk_send_campaigns`.
 
 # External Dependencies
 
 -   **Google Sheets:** Bi-directional sync for lead CRM data with a **MASTER CRM** tab.
--   **Outlook:** Used for sending emails.
+-   **Resend:** Email delivery service for bulk outreach (connected via Replit integration, sender: admin@universalaestheticawards.com).
+-   **Outlook:** Used for individual email sending.
 -   **Recharts:** For data visualization.
 -   **@hello-pangea/dnd:** For drag-and-drop functionality.
 -   **react-hook-form:** For form management.
