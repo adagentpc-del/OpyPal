@@ -857,6 +857,29 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                             Cancel
                           </Button>
                         </div>
+                        <div className="flex flex-wrap gap-1.5 mb-1">
+                          <span className="text-xs text-amber-700 self-center mr-0.5">Quick:</span>
+                          {[
+                            { label: "Tomorrow", days: 1 },
+                            { label: "+3 days", days: 3 },
+                            { label: "+1 week", days: 7 },
+                            { label: "+2 weeks", days: 14 },
+                            { label: "+1 month", days: 30 },
+                            { label: "+3 months", days: 90 },
+                            { label: "+6 months", days: 180 },
+                          ].map((preset) => {
+                            const d = new Date();
+                            d.setDate(d.getDate() + preset.days);
+                            const val = d.toISOString().split("T")[0];
+                            return (
+                              <button key={preset.label} type="button"
+                                className={`text-xs px-2 py-1 rounded-full border transition-colors ${scheduleDate === val ? "bg-amber-600 text-white border-amber-600" : "border-amber-300 text-amber-700 hover:bg-amber-100"}`}
+                                onClick={() => setScheduleDate(val)}>
+                                {preset.label}
+                              </button>
+                            );
+                          })}
+                        </div>
                         <div className="flex gap-2">
                           <input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)}
                             min={new Date().toISOString().split("T")[0]}

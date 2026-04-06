@@ -60,7 +60,11 @@ The A3 Sales OS is a pnpm workspace monorepo built with Node.js 24 and TypeScrip
     *   Local task manager linked to leads, supporting various task types (Follow-up, Call, Send Deck). Tasks can be filtered by due date and marked as complete.
 
 4.  **Templates & Assets:**
-    *   Libraries for outreach templates (Cold Email, Follow-Up Email) and sales assets (Brochure, Capabilities Deck). Templates can be linked to assets, with automatic selection and placeholder replacement during outreach.
+    *   Libraries for outreach templates (Cold Email, Follow-Up Email, LinkedIn Message, SMS, Referral/Partner Outreach) and sales assets (Brochure, Capabilities Deck). Templates can be linked to assets, with automatic selection and placeholder replacement during outreach.
+    *   **Enhanced Templates Page:** Table/card view toggle, search, multi-filter (category, type, active status), preview slide-out panel, duplicate, archive/activate, linked sequence display. Template types: one_off, intro, follow_up, reactivation, event, custom. New fields: type, description, is_active, audience_tags, linked_sequence_id.
+    *   **Sequence Builder:** Upgraded with delay_unit support (days/weeks/months), month-based delay presets (same day, +3 days, +1 week, +2 weeks, +1 month, +3 months, +6 months), step reordering (up/down arrows), step labels, channel selection (email/linkedin/call), category and default use case for sequences. Starter sequences seeded: Hospitality Intro, Event Prospecting, Re-engagement, Long Term Nurture.
+    *   **Scheduled Emails Page:** Summary cards (Scheduled/Overdue/Sent/Errors), search, status filters, preview slide-out, cancel/delete actions. Merges data from both scheduled_emails and sequence_queue tables.
+    *   **Lead Drawer Quick Schedule:** Quick-schedule preset chips (Tomorrow, +3 days, +1 week, +2 weeks, +1 month, +3 months, +6 months) for fast email scheduling.
 
 5.  **Outbound Sequence Engine (Phase 2):**
     *   **Automated Sequences:** Supports 7-step automated email sequences (Day 0, 3, 7, 14, 30, 120, 180) with business day calculation, daily send caps, and configurable send windows.

@@ -1,0 +1,150 @@
+Build reply tracking, Outlook integration, and automatic sequence control into the A3 Sales OS CRM.
+
+Primary objective:
+When a contact replies to an email sent through the system, the CRM must detect the reply, attach it to the correct lead, display it in the timeline, and automatically pause any active sequences for that lead.
+
+Build the following:
+
+1. Reply tracking architecture
+Implement a system to track replies to outbound emails.
+
+Requirements:
+- Every outbound email must include a unique identifier tied to:
+  - lead_id
+  - scheduled_email_id
+  - campaign_id
+- Use reply_to tagging format:
+  - example: alyssa+lead_{lead_id}@domain.com
+- Ensure reply_to is included in every Resend email send
+
+2. Inbound email webhook
+Create an API endpoint to receive inbound email events.
+
+Requirements:
+- endpoint: /api/inbound-email
+- accept POST requests from email provider or forwarding service
+- parse:
+  - sender email
+  - recipient email
+  - subject
+  - body text
+  - message headers
+  - timestamp
+
+3. Lead matching logic
+Match incoming replies to the correct lead using:
+
+Priority:
+1. reply_to tag (lead_id embedded in email)
+2. message headers (in_reply_to or references if available)
+3. fallback match by sender email address
+
+If no match:
+- log as unmatched reply
+- store for manual review
+
+4. Reply processing
+When a reply is successfully matched:
+
+- create lead activity:
+  type: reply_received
+  include:
+    - message content
+    - subject
+    - timestamp
+
+- update lead record:
+  - mark as engaged
+  - optionally update pipeline stage
+
+- mark related scheduled email as replied
+
+5. Auto pause sequences
+When a reply is detected:
+
+- find all future scheduled emails for that lead
+- if they belong to a sequence:
+  - pause all future unsent steps
+- update sequence status for that lead to paused
+- log activity:
+  - "sequence paused due to reply"
+
+Add a config flag:
+- auto_pause_on_reply true by default
+
+6. Outlook compatibility
+Ensure replies still go to Outlook inbox.
+
+Requirements:
+- reply_to must be set to Outlook email or alias
+- system should not intercept or block delivery
+- inbound webhook should run in parallel (copy or forward)
+
+7. Email forwarding setup support
+Document and support:
+- forwarding emails from Outlook or domain inbox to webhook endpoint
+- or using provider inbound parsing
+
+8. Lead timeline integration
+Display replies in the lead activity timeline.
+
+Include:
+- reply badge
+- preview of message
+- timestamp
+- sender email
+- expandable full message view
+
+9. Conversation thread view
+Add a basic conversation thread inside lead view.
+
+Show:
+- outbound emails
+- inbound replies
+- chronological order
+
+10. Manual reply logging fallback
+Allow manual logging of replies in case webhook fails.
+
+11. Data model updates
+
+inbound_emails
+- id
+- lead_id nullable
+- sender_email
+- recipient_email
+- subject
+- body
+- raw_headers optional
+- matched boolean
+- created_at
+
+scheduled_emails update:
+- replied_at nullable
+- reply_detected boolean
+
+lead update:
+- last_replied_at nullable
+- engagement_status
+
+12. UI indicators
+Add visual indicators:
+- replied badge on lead
+- replied badge on campaign recipient
+- sequence paused badge
+- next step disabled if paused
+
+13. Edge cases
+Handle:
+- multiple replies from same lead
+- replies after sequence paused
+- replies from forwarded emails
+- out of office replies (mark separately if possible)
+
+14. Deliverables
+Provide:
+- files created
+- webhook setup instructions
+- how reply_to tagging is implemented
+- how to connect Outlook or domain forwarding
+- where replies appear in UI

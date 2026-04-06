@@ -13,6 +13,8 @@ export const scheduledEmailsTable = pgTable("scheduled_emails", {
   status: text("status").notNull().default("scheduled"),
   sequenceId: integer("sequence_id"),
   sequenceStepNumber: integer("sequence_step_number"),
+  sequenceStepId: integer("sequence_step_id"),
+  source: text("source").default("manual"),
   sentAt: timestamp("sent_at"),
   canceledAt: timestamp("canceled_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

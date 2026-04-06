@@ -1,0 +1,173 @@
+Build bulk outreach and bulk sequence enrollment into the A3 Sales OS CRM using Resend as the email delivery layer.
+
+Primary objective:
+I need to be able to select multiple contacts or leads at once, send the initial email in bulk, and automatically enroll them into a drip sequence instead of sending each initial email manually one by one.
+
+Build the following:
+
+1. Multi select in Leads and Contacts tables
+Add row checkboxes to both Leads and Contacts tables.
+
+Support:
+- select individual rows
+- select all on current page
+- select all filtered results if feasible
+- persistent selected count in a bulk action bar
+- clear selection action
+
+2. Bulk action bar
+When one or more records are selected, show a bulk action bar with:
+- Send Initial Email
+- Schedule Initial Email
+- Enroll in Sequence
+- Send and Enroll in Sequence
+- Add Tag
+- Update Pipeline
+- Pause Active Sequences
+- Cancel Active Sequences
+
+3. Bulk outreach modal or drawer
+When user clicks Send Initial Email or Send and Enroll in Sequence, open a bulk outreach workflow.
+
+Include:
+- selected count
+- selected recipients preview
+- template dropdown
+- linked sequence display if template has one
+- optional sequence dropdown override
+- subject preview
+- email body preview
+- personalization token preview
+- send now option
+- schedule option
+- quick schedule presets
+  - 1 month
+  - 3 months
+  - 6 months
+- activate sequence toggle
+- confirmation screen before sending
+
+4. Resend integration for bulk sends
+Use Resend to send one email per selected contact, not one mass email with many recipients grouped together.
+
+Requirements:
+- each selected lead/contact gets an individual outbound email
+- personalize subject and body per recipient using merge fields
+- create separate send status for each contact
+- create separate activity log entry for each lead
+- support queued sending for larger batches
+- capture send result per recipient
+- handle failed sends gracefully without breaking the whole batch
+
+5. Drip and sequence auto enrollment
+If user selects Send and Enroll in Sequence:
+- send or schedule the first email
+- create all future scheduled follow up records for each selected lead
+- use the chosen sequence or linked sequence
+- preserve sequence linkage per lead
+- log enrollment and each scheduled step
+- prevent duplicate active enrollment unless user explicitly overrides
+
+6. Duplicate and suppression checks
+Before confirming a bulk send, automatically exclude or flag:
+- contacts without email
+- invalid email format
+- unsubscribed contacts
+- contacts already enrolled in the same active sequence
+- duplicate email addresses within the selected batch
+- contacts already sent the same initial template recently if applicable
+
+Show summary counts such as:
+- ready to send
+- skipped due to unsubscribe
+- skipped due to missing email
+- skipped due to duplicate enrollment
+- skipped due to duplicate recipient
+
+7. Bulk scheduling and cadence behavior
+Support:
+- send now
+- schedule first touch for a future date and time
+- quick preset scheduling
+  - 1 month
+  - 3 months
+  - 6 months
+- if sequence is activated, allow preview of all future drip steps for the selected contacts
+- create scheduled email records for each recipient independently
+
+8. Activity logging
+For each selected lead/contact, create activity records such as:
+- bulk template selected
+- bulk email sent
+- bulk email scheduled
+- bulk sequence enrolled
+- scheduled follow up created
+- skipped due to suppression or duplicate protection
+- send failed if delivery failed
+
+9. Campaign tracking
+Create a bulk send campaign record if needed so the send can be reviewed later.
+
+Campaign data should include:
+- campaign name optional
+- template used
+- sequence used if any
+- sender identity
+- total selected
+- total sent
+- total scheduled
+- total skipped
+- total failed
+- created at
+- status
+
+10. Personalization logic
+Support merge fields like:
+- first_name
+- company
+- title
+- location
+- intent_signal
+
+Requirements:
+- missing first name should not break greeting
+- missing intent signal should remove or skip that block cleanly
+- show preview examples before confirming
+
+11. Deliverability and send safety
+Add safeguards for real usage:
+- throttle sends in batches if volume is high
+- use queue based processing if needed
+- verify sender domain or sender email is configured
+- handle Resend API errors gracefully
+- retry temporary failures only when appropriate
+- do not send to unsubscribed recipients
+
+12. Scheduled Emails and Sequence Management integration
+All bulk created sends and follow ups must appear in:
+- Scheduled Emails page
+- lead activity timeline
+- per lead sequence management view
+- campaign reporting view if built
+
+13. UX requirements
+Use a premium CRM workflow.
+
+Requirements:
+- clean bulk selection experience
+- clear confirmation screen
+- visible exclusions and skip reasons
+- recipient preview
+- no clutter
+- easy to review before sending
+- success and error summaries after completion
+
+14. Deliverables
+When complete provide:
+- files created
+- files updated
+- routes changed
+- schema or migration changes
+- how Resend is used for per recipient delivery
+- how duplicate and unsubscribe protection works
+- where bulk send and bulk sequence enrollment can be triggered in the UI

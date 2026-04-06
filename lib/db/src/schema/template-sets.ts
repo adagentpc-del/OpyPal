@@ -7,6 +7,8 @@ export const templateSetsTable = pgTable("template_sets", {
   name: text("name").notNull(),
   segmentType: text("segment_type"),
   description: text("description"),
+  category: text("category"),
+  defaultUseCase: text("default_use_case"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
