@@ -83,8 +83,20 @@ The A3 Sales OS is a pnpm workspace monorepo built with Node.js 24 and TypeScrip
     *   **Frontend:** BulkOutreachModal with sender config (reply-to field, from email display), rate limiting controls (sends/hr, delay, batch size), queue-aware results (shows "queued" status with queue position and config summary). Send mode labeled "Queue & Send" for send_now.
     *   **Deliverability Safeguards:** Server-side suppression enforcement, queue-based rate limiting, exponential backoff retry, campaign-level pause/resume.
 
+11. **Reply Tracking & Inbound Email Processing:**
+    *   **Reply-To Tagging:** Every outbound email includes a tagged reply-to: `adeltorre+lead_{leadId}_email_{emailId}@a3visual.com`. Actual reply delivery goes to Outlook (adeltorre@a3visual.com). Tags are generated in `send-queue.ts` via `generateTaggedReplyTo()`.
+    *   **Inbound Email Webhook:** `POST /api/inbound-email` accepts inbound email data from forwarding service or email provider. Flexible field parsing supports multiple provider formats (Resend, SendGrid, Mailgun, etc.).
+    *   **Lead Matching:** Three-tier matching: (1) reply-to tag parsing, (2) In-Reply-To header matching against resendMessageId, (3) sender email fallback against lead email. Unmatched emails stored for manual review.
+    *   **Reply Processor:** (`artifacts/api-server/src/lib/reply-processor.ts`) Processes inbound emails: creates activity, updates lead engagement (lastRepliedAt, engagementStatus="engaged"), marks scheduled email as replied (repliedAt, replyDetected), creates notification.
+    *   **Auto-Pause Sequences:** When a non-auto-reply is detected, all future scheduled/queued emails for that lead are paused with reason "reply_received". Activity logged: "Sequence paused — reply received".
+    *   **Auto-Reply Detection:** Detects out-of-office/auto-replies via subject/body pattern matching. Auto-replies create activity but do NOT pause sequences or update engagement status.
+    *   **Conversation Thread:** `GET /api/leads/:leadId/conversation` returns chronological thread of outbound (sent) and inbound (reply) messages. Displayed in lead drawer as expandable cards with sent/reply badges.
+    *   **Data Model:** `inbound_emails` table (senderEmail, recipientEmail, subject, bodyText, bodyHtml, rawHeaders, inReplyTo, references, matched, matchMethod, isAutoReply). `scheduled_emails` has repliedAt, replyDetected fields.
+    *   **UI Indicators:** Green "Replied" badge on lead table rows, "Paused — Reply" badge on scheduled email cards, reply_received/auto_reply_received/sequence_paused activity types in timeline, Conversation section in lead drawer with outbound/inbound cards.
+    *   **Manual Reply Logging:** Existing manual "Log Reply" button in activity timeline still works for cases where webhook is not set up.
+
 **Database Schema (Drizzle ORM):**
-Key tables include `leads` (with engagement intelligence), `tasks`, `templates`, `assets`, `activity`, `outreach_history`, `scheduled_emails` (with `campaignId`, `resendMessageId`), `notifications`, `lead_engagement_events`, `contacts`, `campaigns`, `sequence_enrollments`, `personalization_logs`, `routing_logs`, `next_actions`, `cta_library`, and `bulk_send_campaigns`.
+Key tables include `leads` (with engagement intelligence, lastRepliedAt), `tasks`, `templates`, `assets`, `activity`, `outreach_history`, `scheduled_emails` (with campaignId, resendMessageId, repliedAt, replyDetected, retryCount, queuePosition, fromEmail, replyTo), `notifications`, `lead_engagement_events`, `contacts`, `campaigns`, `sequence_enrollments`, `personalization_logs`, `routing_logs`, `next_actions`, `cta_library`, `bulk_send_campaigns`, and `inbound_emails`.
 
 # External Dependencies
 

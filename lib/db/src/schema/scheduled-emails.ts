@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { leadsTable } from "./leads";
@@ -32,6 +32,8 @@ export const scheduledEmailsTable = pgTable("scheduled_emails", {
   queuePosition: integer("queue_position"),
   fromEmail: text("from_email"),
   replyTo: text("reply_to"),
+  repliedAt: timestamp("replied_at"),
+  replyDetected: boolean("reply_detected").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -290,7 +290,12 @@ export default function Leads() {
                             <div className="flex items-center gap-2">
                               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${lead.pipelineType === "Event" ? "bg-primary" : "bg-accent"}`} />
                               <span className="font-medium text-foreground">{lead.companyName}</span>
-                              {lead.engagementScore > 0 && (
+                              {lead.lastRepliedAt && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0 flex items-center gap-0.5">
+                                  <MessageSquare className="h-2.5 w-2.5" /> Replied
+                                </span>
+                              )}
+                              {lead.engagementScore > 0 && !lead.lastRepliedAt && (
                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
                                   lead.engagementScore >= 20 ? "bg-emerald-100 text-emerald-700" :
                                   lead.engagementScore >= 10 ? "bg-blue-100 text-blue-700" :
@@ -445,6 +450,10 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
   const [noteText, setNoteText] = useState("");
   const [noteType, setNoteType] = useState<"note" | "reply" | "call">("note");
   const [showEngagement, setShowEngagement] = useState(true);
+  const [showConversation, setShowConversation] = useState(true);
+  const [conversationThread, setConversationThread] = useState<any[]>([]);
+  const [conversationLoading, setConversationLoading] = useState(false);
+  const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
 
   const [scheduleMode, setScheduleMode] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
@@ -735,6 +744,17 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
 
   const API_BASE = import.meta.env.BASE_URL + "api";
 
+  const fetchConversation = useCallback(async () => {
+    setConversationLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/leads/${lead.id}/conversation`);
+      if (res.ok) setConversationThread(await res.json());
+    } catch { /* ignore */ }
+    setConversationLoading(false);
+  }, [lead.id]);
+
+  useEffect(() => { fetchConversation(); }, [fetchConversation]);
+
   const handleLogNote = async () => {
     if (!noteText.trim()) return;
     const typeMap: Record<string, string> = { note: "note_added", reply: "reply_logged", call: "call_logged" };
@@ -782,7 +802,7 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
     const catMap: Record<string, string[]> = {
       outreach: ["email_sent", "email_delivered", "email_opened", "email_clicked", "email_bounced", "email_failed", "outreach_logged"],
       scheduling: ["email_scheduled", "email_rescheduled", "email_paused", "email_resumed", "email_canceled", "email_skipped", "sequence_activated", "sequence_paused", "sequence_resumed", "sequence_canceled"],
-      engagement: ["reply_logged", "email_opened", "email_clicked", "lead_unsubscribed"],
+      engagement: ["reply_logged", "reply_received", "auto_reply_received", "email_opened", "email_clicked", "lead_unsubscribed"],
       notes: ["note_added", "call_logged", "reply_logged"],
       status: ["status_changed", "lead_updated"],
     };
@@ -793,7 +813,7 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
   const forecast = ((form.proposalValue || form.dealValueEstimate || 0) * (form.closeProbability || 0)) / 100;
 
   const pendingScheduledEmails = useMemo(() =>
-    (scheduledEmails || []).filter((e: any) => e.status === "scheduled"),
+    (scheduledEmails || []).filter((e: any) => ["scheduled", "paused", "queued"].includes(e.status)),
     [scheduledEmails]
   );
 
@@ -1117,15 +1137,27 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                         </div>
                       )}
                       {pendingScheduledEmails.map((e: any) => (
-                        <div key={e.id} className="border border-border/50 rounded-xl p-3 bg-amber-50/50">
+                        <div key={e.id} className={`border rounded-xl p-3 ${e.status === "paused" ? "border-amber-300 bg-amber-50/80" : "border-border/50 bg-amber-50/50"}`}>
                           <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-2">
-                              <Clock className="h-3.5 w-3.5 text-amber-600" />
+                              {e.status === "paused" ? (
+                                <PauseCircle className="h-3.5 w-3.5 text-amber-600" />
+                              ) : (
+                                <Clock className="h-3.5 w-3.5 text-amber-600" />
+                              )}
                               <span className="text-xs font-semibold text-amber-700">
                                 {format(new Date(e.scheduledFor), "MMM d, yyyy h:mm a")}
                               </span>
                               {e.sequenceStepNumber && (
                                 <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">Step {e.sequenceStepNumber}</span>
+                              )}
+                              {e.status === "paused" && e.pauseReason === "reply_received" && (
+                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                  <MessageSquare className="h-2.5 w-2.5" /> Paused — Reply
+                                </span>
+                              )}
+                              {e.status === "paused" && e.pauseReason !== "reply_received" && (
+                                <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Paused</span>
                               )}
                             </div>
                             <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-destructive" onClick={() => handleCancelScheduled(e.id)}>
@@ -1167,6 +1199,65 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                       ))}
                     </div>
                   )}
+                </DrawerSection>
+
+                <DrawerSection title={`Conversation (${conversationThread.length})`} icon={<MessageSquare className="h-4 w-4" />}
+                  collapsible expanded={showConversation} onToggle={() => setShowConversation(!showConversation)}>
+                  {conversationLoading ? (
+                    <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                  ) : conversationThread.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-2">No messages yet</p>
+                  ) : (
+                    <div className="space-y-2 max-h-[350px] overflow-y-auto">
+                      {conversationThread.map((msg: any, idx: number) => {
+                        const msgKey = `${msg.type}-${msg.id}`;
+                        const isExpanded = expandedMessageId === msgKey;
+                        const isInbound = msg.type === "inbound";
+                        return (
+                          <div key={msgKey}
+                            className={`rounded-xl border p-3 cursor-pointer transition-colors ${
+                              isInbound
+                                ? "bg-emerald-50 border-emerald-200 ml-2"
+                                : "bg-muted/30 border-border mr-2"
+                            }`}
+                            onClick={() => setExpandedMessageId(isExpanded ? null : msgKey)}>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                {isInbound ? (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-0.5">
+                                    <MessageSquare className="h-2.5 w-2.5" /> Reply
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 flex items-center gap-0.5">
+                                    <Send className="h-2.5 w-2.5" /> Sent
+                                  </span>
+                                )}
+                                {isInbound && msg.isAutoReply && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Auto-reply</span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">
+                                {msg.timestamp ? format(new Date(msg.timestamp), "MMM d, h:mm a") : "—"}
+                              </span>
+                            </div>
+                            <p className="text-xs font-medium">{msg.subject || "(no subject)"}</p>
+                            <p className="text-[10px] text-muted-foreground">From: {msg.from || "—"}</p>
+                            {isExpanded && msg.body && (
+                              <div className="mt-2 pt-2 border-t border-border/50">
+                                <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{msg.body}</p>
+                              </div>
+                            )}
+                            {!isExpanded && msg.body && (
+                              <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{msg.body}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <Button variant="outline" size="sm" className="h-7 text-xs rounded-lg gap-1 mt-2 w-full" onClick={fetchConversation}>
+                    <RefreshCw className="h-3 w-3" /> Refresh
+                  </Button>
                 </DrawerSection>
 
                 <DrawerSection title={`Activity Timeline (${activities?.length || 0})`} icon={<TrendingUp className="h-4 w-4" />}
@@ -1225,7 +1316,9 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                         {filteredActivities.map((a: any) => {
                           const typeColors: Record<string, string> = {
                             email_sent: "bg-emerald-500", email_delivered: "bg-emerald-400", email_opened: "bg-blue-500",
-                            email_clicked: "bg-violet-500", reply_logged: "bg-primary", email_bounced: "bg-red-500",
+                            email_clicked: "bg-violet-500", reply_logged: "bg-primary", reply_received: "bg-emerald-600",
+                            auto_reply_received: "bg-amber-500", sequence_paused: "bg-amber-600",
+                            email_bounced: "bg-red-500",
                             email_failed: "bg-red-400", lead_unsubscribed: "bg-red-600", email_scheduled: "bg-amber-500",
                             email_canceled: "bg-gray-400", email_paused: "bg-amber-400", email_resumed: "bg-emerald-400",
                             note_added: "bg-blue-400", call_logged: "bg-teal-500", sequence_activated: "bg-blue-600",

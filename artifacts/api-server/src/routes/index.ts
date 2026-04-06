@@ -15,6 +15,7 @@ import scheduledEmailsRouter from "./scheduled-emails";
 import notificationsRouter from "./notifications";
 import engagementEventsRouter from "./engagement-events";
 import bulkSendRouter from "./bulk-send";
+import inboundEmailRouter from "./inbound-email";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(scheduledEmailsRouter);
 router.use(notificationsRouter);
 router.use(engagementEventsRouter);
 router.use(bulkSendRouter);
+router.use(inboundEmailRouter);
 
 export default router;

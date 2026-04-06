@@ -23,3 +23,4 @@ export * from "./scheduled-emails";
 export * from "./notifications";
 export * from "./lead-engagement-events";
 export * from "./bulk-send-campaigns";
+export * from "./inbound-emails";

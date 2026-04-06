@@ -5,7 +5,7 @@ import { validateRecipients, executeBulkSend } from "../lib/bulk-send-engine";
 import { checkResendConnection } from "../lib/resend";
 import { getQueueStatus, abortQueue, getGlobalQueueStatus, startQueueProcessor } from "../lib/send-queue";
 
-const DEFAULT_REPLY_TO = "alyssa@a3visual.com";
+const DEFAULT_REPLY_TO = "adeltorre@a3visual.com";
 
 const router: IRouter = Router();
 

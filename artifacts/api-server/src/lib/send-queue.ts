@@ -1,6 +1,7 @@
 import { db, scheduledEmailsTable, activityTable, bulkSendCampaignsTable, leadsTable } from "@workspace/db";
 import { eq, and, inArray, asc, lte, or, sql } from "drizzle-orm";
 import { sendEmail } from "./resend";
+import { generateTaggedReplyTo } from "./reply-processor";
 
 const DEFAULT_SENDS_PER_HOUR = 50;
 const DEFAULT_DELAY_BETWEEN_SENDS_MS = 5000;
@@ -184,13 +185,14 @@ export async function startQueueProcessor(
           .replace(/^/, "<p>")
           .replace(/$/, "</p>");
 
+        const taggedReplyTo = generateTaggedReplyTo(email.leadId, email.id);
         const result = await sendEmail({
           to: (await getLeadEmail(email.leadId)),
           from: email.fromEmail || undefined,
           subject: email.subject,
           html: htmlBody,
           text: textBody,
-          replyTo: email.replyTo || undefined,
+          replyTo: taggedReplyTo,
         });
 
         if (result.success) {
