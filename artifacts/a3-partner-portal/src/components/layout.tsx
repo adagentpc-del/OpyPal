@@ -1,7 +1,8 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useLocation } from "wouter";
-import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
+import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger } from "@/components/ui/sidebar";
 import { LayoutDashboard, Users, FileText, Image as ImageIcon, DollarSign, LogOut } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { ReactNode } from "react";
 
 export function AdminLayout({ children }: { children: ReactNode }) {
@@ -72,7 +73,9 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           </SidebarContent>
         </Sidebar>
         <main className="flex-1 flex flex-col h-screen overflow-hidden">
-          <header className="h-16 flex-shrink-0 bg-white border-b border-gray-200 flex items-center px-8">
+          <header className="h-16 flex-shrink-0 bg-white border-b border-gray-200 flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 !h-4" />
             <h1 className="text-xl font-semibold">Partner Portal Admin</h1>
           </header>
           <div className="flex-1 overflow-auto p-8">
