@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/a3-partner-portal/"
+title = "A3 Partner Portal"
+version = "1.0.0"
+id = "artifacts/a3-partner-portal"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/a3-partner-portal/" ]
+localPort = 20989
+
+[services.development]
+run = "pnpm --filter @workspace/a3-partner-portal run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/a3-partner-portal", "run", "build" ]
+publicDir = "artifacts/a3-partner-portal/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20989"
+BASE_PATH = "/a3-partner-portal/"

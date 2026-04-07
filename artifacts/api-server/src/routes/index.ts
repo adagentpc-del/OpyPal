@@ -16,6 +16,9 @@ import notificationsRouter from "./notifications";
 import engagementEventsRouter from "./engagement-events";
 import bulkSendRouter from "./bulk-send";
 import inboundEmailRouter from "./inbound-email";
+import partnersRouter from "./partners";
+import partnerRequestsRouter from "./partner-requests";
+import pricingRulesRouter from "./pricing-rules";
 
 const router: IRouter = Router();
 
@@ -36,5 +39,8 @@ router.use(notificationsRouter);
 router.use(engagementEventsRouter);
 router.use(bulkSendRouter);
 router.use(inboundEmailRouter);
+router.use(partnersRouter);
+router.use(partnerRequestsRouter);
+router.use(pricingRulesRouter);
 
 export default router;

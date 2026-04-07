@@ -24,3 +24,6 @@ export * from "./notifications";
 export * from "./lead-engagement-events";
 export * from "./bulk-send-campaigns";
 export * from "./inbound-emails";
+export * from "./partners";
+export * from "./partner-requests";
+export * from "./pricing-rules";

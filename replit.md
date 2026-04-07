@@ -20,7 +20,8 @@ The A3 Sales OS is a pnpm workspace monorepo built with Node.js 24 and TypeScrip
 
 **Monorepo Structure:**
 - `artifacts/api-server/`: Express API server
-- `artifacts/a3-sales-os/`: React + Vite frontend
+- `artifacts/a3-sales-os/`: React + Vite frontend (Sales OS)
+- `artifacts/a3-partner-portal/`: React + Vite frontend (Partner Portal)
 - `lib/api-spec/`: OpenAPI specification and Orval configuration
 - `lib/api-client-react/`: Generated React Query hooks
 - `lib/api-zod/`: Generated Zod schemas
@@ -104,6 +105,27 @@ The A3 Sales OS is a pnpm workspace monorepo built with Node.js 24 and TypeScrip
 
 **Database Schema (Drizzle ORM):**
 Key tables include `leads` (with engagement intelligence, lastRepliedAt), `tasks`, `templates`, `assets`, `activity`, `outreach_history`, `scheduled_emails` (with campaignId, resendMessageId, repliedAt, replyDetected, retryCount, queuePosition, fromEmail, replyTo), `notifications`, `lead_engagement_events`, `contacts`, `campaigns`, `sequence_enrollments`, `personalization_logs`, `routing_logs`, `next_actions`, `cta_library`, `bulk_send_campaigns`, and `inbound_emails`.
+
+12. **A3 Partner Portal:**
+    *   **Purpose:** Partner intake and internal request management portal for A3 Visual. Enables partners/clients to submit event production requests through branded portal pages, and internal team to manage requests, partners, and pricing.
+    *   **Artifact:** `artifacts/a3-partner-portal/` at `/a3-partner-portal/` path, port 20989.
+    *   **Admin Side (auth required):**
+        - Login: Simple email/password auth (admin@a3visual.com / a3visual2024), stored in localStorage via Zustand.
+        - Dashboard: Request summary stats, recent requests, partner list.
+        - Partners CRUD: Create/edit partners with slug-based portal URLs, branding options, pricing display toggles.
+        - Requests: Searchable/filterable list, detail view with AI summary, internal summary, upsell recommendations, status management, internal notes.
+        - Pricing Rules: CRUD table grouped by 6 categories (Printing, Rentals, Design and artwork, Custom fabrication, Immersive experiences, Promotional items).
+        - Assets: Library grouped by partner.
+    *   **Public Side (no auth):**
+        - `/partner/:slug` — Branded portal page with partner intro, YouTube sizzle reel, starting-at pricing, and multi-step intake form (5 steps: Contact & Event, Industry & Use Case, Services, Uploads, Review & Submit).
+        - Conditional logic: custom fab/immersive/design warnings, artwork upload reminder.
+        - Submission triggers: AI summary via Anthropic (claude-sonnet-4-6), internal summary generation, upsell recommendations, scope estimation, admin email notification via Resend.
+    *   **API Routes:** `GET/POST/PUT/DELETE /api/partners`, `GET /api/partners/slug/:slug`, `GET/POST /api/partner-requests`, `PATCH /api/partner-requests/:id/status`, `POST /api/partner-requests/:id/notes`, `GET /api/partner-requests/dashboard/summary`, `GET/POST/PUT/DELETE /api/pricing-rules`.
+    *   **Database Tables:** `partners`, `partner_requests`, `request_items`, `request_uploads`, `admin_notes`, `pricing_rules`.
+    *   **AI Integration:** Anthropic AI via Replit AI Integrations proxy (env vars: AI_INTEGRATIONS_ANTHROPIC_BASE_URL, AI_INTEGRATIONS_ANTHROPIC_API_KEY). Uses `@anthropic-ai/sdk` directly in `partner-ai.ts`.
+    *   **Frontend:** React + Vite + Tailwind + shadcn/ui. Uses direct fetch calls (not generated API hooks) since no changes to api-spec allowed. Zustand for auth state. wouter for routing. framer-motion for transitions.
+    *   **Request Statuses:** New, Reviewing, Waiting for files, Waiting for dimensions, Quote prep, Quote sent, Follow up, Closed won, Closed lost.
+    *   **Scope Levels:** Small, Medium, High (auto-estimated based on items/categories).
 
 # External Dependencies
 
