@@ -1,4 +1,4 @@
-import { db, scheduledEmailsTable, leadsTable, activityTable, settingsTable, mailboxConnectionsTable } from "@workspace/db";
+import { db, scheduledEmailsTable, leadsTable, activityTable, settingsTable, mailboxConnectionsTable, suppressionListTable } from "@workspace/db";
 import { eq, and, lte, inArray, asc, sql, or } from "drizzle-orm";
 import { sendEmail } from "./resend";
 import { sendViaOutlook, getPrimaryConnection, syncInbox, isOutlookConfigured } from "./outlook-graph";
@@ -77,6 +77,21 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
           status: "canceled",
           canceledAt: new Date(),
           canceledReason: `auto_stop: ${lead.isUnsubscribed ? "unsubscribed" : lead.isBounced ? "bounced" : lead.status}`,
+          updatedAt: new Date(),
+        }).where(eq(scheduledEmailsTable.id, email.id));
+        skipped++;
+        continue;
+      }
+
+      const [suppressed] = await db.select({ id: suppressionListTable.id })
+        .from(suppressionListTable)
+        .where(eq(suppressionListTable.email, lead.email.toLowerCase()))
+        .limit(1);
+      if (suppressed) {
+        await db.update(scheduledEmailsTable).set({
+          status: "canceled",
+          canceledAt: new Date(),
+          canceledReason: "auto_stop: suppression_list",
           updatedAt: new Date(),
         }).where(eq(scheduledEmailsTable.id, email.id));
         skipped++;

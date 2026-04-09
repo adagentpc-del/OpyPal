@@ -194,6 +194,21 @@ router.post("/imports/upload", async (req, res) => {
           if (!c) continue;
           const now = new Date();
 
+          const contactEmail = c.email?.toLowerCase();
+          if (contactEmail) {
+            const [isSuppressed] = await db.select({ id: suppressionListTable.id })
+              .from(suppressionListTable)
+              .where(eq(suppressionListTable.email, contactEmail))
+              .limit(1);
+            if (isSuppressed) {
+              await db.update(contactsTable).set({
+                sequenceStatus: "suppressed",
+                updatedAt: now,
+              }).where(eq(contactsTable.id, contactId));
+              continue;
+            }
+          }
+
           await db.delete(sequenceStepsTable).where(eq(sequenceStepsTable.contactId, contactId));
 
           const [enrollment] = await db.insert(sequenceEnrollmentsTable).values({

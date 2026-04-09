@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { adminAuth } from "../middleware/admin-auth";
 import healthRouter from "./health";
 import leadsRouter from "./leads";
 import tasksRouter from "./tasks";
@@ -23,6 +24,7 @@ import outlookRouter from "./outlook";
 import companiesRouter from "./companies";
 import replyReviewRouter from "./reply-review";
 import settingsRouter from "./settings";
+import seedRouter from "./seed-templates";
 
 const router: IRouter = Router();
 
@@ -46,9 +48,11 @@ router.use(inboundEmailRouter);
 router.use(partnersRouter);
 router.use(partnerRequestsRouter);
 router.use(pricingRulesRouter);
-router.use(outlookRouter);
-router.use(companiesRouter);
-router.use(replyReviewRouter);
-router.use(settingsRouter);
+
+router.use(adminAuth, outlookRouter);
+router.use(adminAuth, companiesRouter);
+router.use(adminAuth, replyReviewRouter);
+router.use(adminAuth, settingsRouter);
+router.use(adminAuth, seedRouter);
 
 export default router;
