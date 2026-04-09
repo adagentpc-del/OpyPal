@@ -34,6 +34,10 @@ export const scheduledEmailsTable = pgTable("scheduled_emails", {
   replyTo: text("reply_to"),
   repliedAt: timestamp("replied_at"),
   replyDetected: boolean("reply_detected").default(false),
+  sendVia: text("send_via").default("resend"),
+  outlookMessageId: text("outlook_message_id"),
+  outlookConversationId: text("outlook_conversation_id"),
+  outlookInternetMessageId: text("outlook_internet_message_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

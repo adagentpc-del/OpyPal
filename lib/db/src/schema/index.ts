@@ -27,3 +27,6 @@ export * from "./inbound-emails";
 export * from "./partners";
 export * from "./partner-requests";
 export * from "./pricing-rules";
+export * from "./mailbox-connections";
+export * from "./companies";
+export * from "./reply-review-queue";

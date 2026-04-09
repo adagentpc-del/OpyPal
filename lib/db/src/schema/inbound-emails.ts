@@ -21,6 +21,10 @@ export const inboundEmailsTable = pgTable("inbound_emails", {
   matchMethod: text("match_method"),
   isAutoReply: boolean("is_auto_reply").default(false),
   processedAt: timestamp("processed_at"),
+  outlookMessageId: text("outlook_message_id"),
+  confidenceScore: integer("confidence_score"),
+  classification: text("classification"),
+  reviewStatus: text("review_status").default("auto_classified"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

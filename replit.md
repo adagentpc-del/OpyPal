@@ -48,7 +48,14 @@ The A3 Sales OS is built as a pnpm workspace monorepo utilizing Node.js 24 and T
     *   **Admin Side:** Features authentication, dashboard, CRUD operations for partners and pricing rules, request management with AI summaries, and internal notes.
     *   **Public Side:** Branded partner portal pages with multi-step intake forms, conditional logic, and submission triggers that generate AI summaries and send notifications.
 
-**Database Schema:** Key tables include `leads`, `tasks`, `templates`, `activity`, `outreach_history`, `scheduled_emails`, `notifications`, `contacts`, `campaigns`, `bulk_send_campaigns`, `inbound_emails`, `partners`, `partner_requests`, and `pricing_rules`.
+12. **Microsoft Outlook / Graph Integration:** Full OAuth2 connection flow for Microsoft 365 mailboxes, send via Outlook or Resend (configurable), inbox sync for inbound and sent folders, thread tracking via conversation IDs.
+13. **Background Scheduler:** Automatic follow-up processing (every 60s) and Outlook inbox sync (every 120s), with business-hours enforcement and configurable send windows.
+14. **Reply Intelligence & Review Queue:** Confidence-scored reply classification (human_reply / auto_reply / uncertain), uncertain replies routed to manual review queue with full thread context and one-click decisions that pause/resume sequences.
+15. **Companies Management:** Company records auto-synced from lead data, with industry tracking, associated leads, and pipeline value aggregation.
+16. **Real Settings Page:** Configurable email provider, send windows, throttling, reply intelligence toggles, scheduler start/stop, and Outlook connection management.
+17. **Activity Log:** Full system event timeline with type filtering, search, and color-coded event badges.
+
+**Database Schema:** Key tables include `leads`, `tasks`, `templates`, `activity`, `outreach_history`, `scheduled_emails`, `notifications`, `contacts`, `campaigns`, `bulk_send_campaigns`, `inbound_emails`, `partners`, `partner_requests`, `pricing_rules`, `mailbox_connections`, `companies`, and `reply_review_queue`.
 
 # External Dependencies
 

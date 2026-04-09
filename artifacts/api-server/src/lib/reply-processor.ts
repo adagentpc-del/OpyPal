@@ -1,4 +1,4 @@
-import { db, leadsTable, scheduledEmailsTable, activityTable, inboundEmailsTable, notificationsTable } from "@workspace/db";
+import { db, leadsTable, scheduledEmailsTable, activityTable, inboundEmailsTable, notificationsTable, replyReviewQueueTable } from "@workspace/db";
 import { eq, and, inArray, desc } from "drizzle-orm";
 
 const REPLY_TO_DOMAIN = "a3visual.com";
@@ -34,9 +34,75 @@ export function parseReplyToTag(email: string): { leadId: number; scheduledEmail
   return null;
 }
 
-function isAutoReply(subject: string, body: string, headers?: string): boolean {
+const HUMAN_REPLY_PATTERNS = [
+  /^(yes|yep|yeah|sure|ok|okay|sounds good|interested|send info|send me|tell me more|let's|let us|can you|please|thanks|thank you)[\s.,!?]*$/i,
+  /not interested/i,
+  /remove me/i,
+  /unsubscribe/i,
+  /who is this/i,
+  /what is this about/i,
+  /schedule a call/i,
+  /let's connect/i,
+  /forwarded message/i,
+  /can we/i,
+  /when are you/i,
+  /what time/i,
+  /i('d| would) like/i,
+];
+
+function classifyReply(subject: string, body: string, headers?: string): { isAuto: boolean; confidence: number; classification: "human_reply" | "auto_reply" | "uncertain" } {
   const text = `${subject || ""} ${body || ""} ${headers || ""}`;
-  return AUTO_REPLY_PATTERNS.some(p => p.test(text));
+
+  let autoScore = 0;
+  let humanScore = 0;
+
+  for (const p of AUTO_REPLY_PATTERNS) {
+    if (p.test(text)) autoScore += 15;
+  }
+
+  if (/x-auto-response-suppress/i.test(headers || "")) autoScore += 30;
+  if (/auto-submitted:\s*auto/i.test(headers || "")) autoScore += 30;
+  if (/precedence:\s*(bulk|junk|auto_reply)/i.test(headers || "")) autoScore += 20;
+  if (/x-autoreply/i.test(headers || "")) autoScore += 25;
+
+  for (const p of HUMAN_REPLY_PATTERNS) {
+    if (p.test(body || "")) humanScore += 15;
+  }
+
+  const bodyLen = (body || "").trim().length;
+  if (bodyLen > 50 && bodyLen < 5000 && autoScore === 0) humanScore += 10;
+  if (bodyLen > 200 && autoScore === 0) humanScore += 10;
+
+  if (/\?/.test(body || "")) humanScore += 5;
+  if (/attached|attachment/i.test(body || "")) humanScore += 10;
+
+  const totalSignals = autoScore + humanScore;
+  if (totalSignals === 0) {
+    return { isAuto: false, confidence: 50, classification: "uncertain" };
+  }
+
+  if (autoScore > 20 && humanScore === 0) {
+    return { isAuto: true, confidence: Math.min(95, 60 + autoScore), classification: "auto_reply" };
+  }
+
+  if (humanScore > 20 && autoScore === 0) {
+    return { isAuto: false, confidence: Math.min(95, 60 + humanScore), classification: "human_reply" };
+  }
+
+  if (autoScore > humanScore * 2) {
+    return { isAuto: true, confidence: Math.min(80, 50 + autoScore - humanScore), classification: "auto_reply" };
+  }
+
+  if (humanScore > autoScore * 2) {
+    return { isAuto: false, confidence: Math.min(80, 50 + humanScore - autoScore), classification: "human_reply" };
+  }
+
+  return { isAuto: false, confidence: 40, classification: "uncertain" };
+}
+
+function isAutoReply(subject: string, body: string, headers?: string): boolean {
+  const result = classifyReply(subject, body, headers);
+  return result.isAuto;
 }
 
 interface InboundEmailData {
@@ -49,6 +115,7 @@ interface InboundEmailData {
   inReplyTo?: string;
   references?: string;
   messageId?: string;
+  outlookMessageId?: string;
 }
 
 interface ProcessResult {
@@ -78,7 +145,8 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
     }
   }
 
-  const autoReply = isAutoReply(data.subject || "", data.bodyText || "", data.rawHeaders);
+  const replyClassification = classifyReply(data.subject || "", data.bodyText || "", data.rawHeaders);
+  const autoReply = replyClassification.isAuto;
   let leadId: number | null = null;
   let scheduledEmailId: number | null = null;
   let matchMethod: string | null = null;
@@ -148,10 +216,37 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
     matched: !!leadId,
     matchMethod,
     isAutoReply: autoReply,
+    outlookMessageId: data.outlookMessageId || null,
+    confidenceScore: replyClassification.confidence,
+    classification: replyClassification.classification,
+    reviewStatus: replyClassification.classification === "uncertain" ? "pending_review" : "auto_classified",
     processedAt: new Date(),
   }).returning();
 
   let sequencesPaused = 0;
+
+  if (replyClassification.classification === "uncertain" && leadId) {
+    await db.insert(replyReviewQueueTable).values({
+      leadId,
+      inboundEmailId: inboundRecord.id,
+      senderEmail: data.senderEmail,
+      subject: data.subject || null,
+      bodyPreview: (data.bodyText || "").substring(0, 500),
+      classification: "uncertain",
+      confidenceScore: replyClassification.confidence.toString(),
+      recommendedAction: "review",
+      status: "pending",
+    });
+
+    await db.insert(notificationsTable).values({
+      type: "review_needed",
+      title: "Uncertain reply needs review",
+      description: `Reply from ${data.senderEmail}: "${(data.subject || "").substring(0, 100)}"`,
+      severity: "warning",
+      priority: "high",
+      leadId,
+    });
+  }
 
   if (leadId) {
     const replyType = autoReply ? "auto_reply_received" : "reply_received";
@@ -173,7 +268,7 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
       createdBy: "system",
     });
 
-    if (!autoReply) {
+    if (replyClassification.classification === "human_reply") {
       await db.update(leadsTable).set({
         lastRepliedAt: new Date(),
         engagementStatus: "engaged",
@@ -213,9 +308,17 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
       await db.insert(notificationsTable).values({
         type: "reply_received",
         title: `Reply from ${data.senderEmail}`,
-        message: `${data.subject || "(no subject)"}: ${(data.bodyText || "").substring(0, 200)}`,
+        description: `${data.subject || "(no subject)"}: ${(data.bodyText || "").substring(0, 200)}`,
         leadId,
         metadata: { inboundEmailId: inboundRecord.id },
+      });
+    } else if (replyClassification.classification === "uncertain") {
+      await db.insert(notificationsTable).values({
+        type: "reply_received",
+        title: `Uncertain reply from ${data.senderEmail}`,
+        description: `Queued for review: "${data.subject || "(no subject)"}"`,
+        leadId,
+        metadata: { inboundEmailId: inboundRecord.id, needsReview: true },
       });
     }
   }

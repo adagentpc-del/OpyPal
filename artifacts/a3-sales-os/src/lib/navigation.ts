@@ -20,6 +20,7 @@ import {
   Settings,
   StickyNote,
   Activity,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -73,6 +74,7 @@ export const navigationConfig: NavGroup[] = [
     label: "Admin",
     items: [
       { name: "Settings", href: "/settings", icon: Settings, description: "Application settings" },
+      { name: "Reply Review", href: "/reply-review", icon: MessageCircle, description: "Review uncertain email replies" },
       { name: "Team Notes", href: "/team-notes", icon: StickyNote, description: "Shared notes and documentation" },
       { name: "Activity Log", href: "/activity-log", icon: Activity, description: "System activity history" },
     ],

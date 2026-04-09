@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { testConnection, seedFromSheetIfEmpty } from "./lib/sheets-sync";
 import { db, leadsTable } from "@workspace/db";
+import { startScheduler } from "./lib/background-scheduler";
 
 const rawPort = process.env["PORT"];
 
@@ -67,5 +68,12 @@ app.listen(port, async () => {
     }
   } catch (err: any) {
     logger.warn({ err: err.message }, "Google Sheets init check failed - sync features will be unavailable");
+  }
+
+  try {
+    startScheduler();
+    logger.info("Background scheduler started");
+  } catch (err: any) {
+    logger.warn({ err: err.message }, "Background scheduler failed to start");
   }
 });

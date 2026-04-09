@@ -19,6 +19,10 @@ import inboundEmailRouter from "./inbound-email";
 import partnersRouter from "./partners";
 import partnerRequestsRouter from "./partner-requests";
 import pricingRulesRouter from "./pricing-rules";
+import outlookRouter from "./outlook";
+import companiesRouter from "./companies";
+import replyReviewRouter from "./reply-review";
+import settingsRouter from "./settings";
 
 const router: IRouter = Router();
 
@@ -42,5 +46,9 @@ router.use(inboundEmailRouter);
 router.use(partnersRouter);
 router.use(partnerRequestsRouter);
 router.use(pricingRulesRouter);
+router.use(outlookRouter);
+router.use(companiesRouter);
+router.use(replyReviewRouter);
+router.use(settingsRouter);
 
 export default router;

@@ -31,6 +31,7 @@ import Segments from "./pages/segments";
 import SettingsPage from "./pages/settings";
 import TeamNotes from "./pages/team-notes";
 import ActivityLog from "./pages/activity-log";
+import ReplyReview from "./pages/reply-review";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -70,6 +71,7 @@ function Router() {
 
       {/* Admin */}
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/reply-review" component={ReplyReview} />
       <Route path="/team-notes" component={TeamNotes} />
       <Route path="/activity-log" component={ActivityLog} />
 
