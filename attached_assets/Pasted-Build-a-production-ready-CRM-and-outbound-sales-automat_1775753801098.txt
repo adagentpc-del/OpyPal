@@ -1,0 +1,957 @@
+Build a production ready CRM and outbound sales automation platform for A3 Visual focused on cold outreach, follow up automation, reply detection, template management, queue based sending, and lightweight pipeline management.
+
+The system must be clean, fast, simple to use, easy to edit, and optimized for minimal admin work. The goal is that the user can select contacts, choose an initial email template, approve the first send, and let the system intelligently manage follow up unless a real response is detected or the user manually changes the lead.
+
+This is being built for one primary user first, but the architecture should support future multi user and team expansion.
+
+CORE GOAL
+
+Create an outbound sales CRM that does all of the following:
+
+1. Stores contacts, companies, templates, follow up sequences, message history, lead status, and automation states
+2. Connects to Outlook so the system can send, thread, detect replies, and stop automation when a real reply occurs
+3. Allows the user to choose an initial template and associated follow up sequence
+4. Automatically schedules follow ups at:
+   - 3 days
+   - 7 days
+   - 14 days
+   - 1 month
+   - 3 months
+   - 6 months
+   - 1 year
+5. Sends early follow ups in the same thread
+6. Allows longer term follow ups to become reactivation style messaging
+7. Stops automation if a real inbound reply is detected or if the lead status is manually changed
+8. Ignores out of office and other auto replies
+9. Supports queue based throttled sending to protect domain health
+10. Makes everything editable globally and at the contact level
+11. Provides clear dashboards for active, paused, stopped, replied, and performance by template and sequence
+12. Keeps the UI simple and not bloated
+
+PRODUCT POSITIONING
+
+This is not just a CRM.
+It is an A3 Sales OS with outbound automation, reply intelligence, and follow up orchestration.
+
+It should feel like:
+- easy enough for a non technical sales operator
+- structured enough to scale later
+- intelligent enough to reduce admin and manual tracking
+- safe enough for deliverability and outreach quality
+
+TECH STACK
+
+Use a Replit friendly modern stack.
+
+Frontend
+- React
+- TypeScript
+- Tailwind CSS
+- Shadcn UI components or equivalent clean component library
+- Responsive layout with desktop priority
+
+Backend
+- Node.js
+- Express or Next.js API routes
+- TypeScript preferred throughout
+- PostgreSQL via Supabase or Neon
+- Prisma ORM preferred for schema management
+- Background job scheduler for queued follow up sending
+- Cron or queue worker for scheduled automation processing
+
+Auth
+- Secure login system
+- Single admin user first
+- Architecture should support future team accounts and role permissions
+
+Integrations
+- Microsoft Outlook / Microsoft 365 via Microsoft Graph API
+- OAuth connection flow for mailbox authorization
+- Store mailbox tokens securely and refresh as needed
+
+Email / Messaging
+- Outlook is the primary send and sync source
+- Maintain thread awareness
+- Store message IDs, internet message IDs, conversation IDs, recipient, sender, timestamp, template used, and automation step
+
+DATABASE SCHEMA
+
+Create relational database models for the following:
+
+Users
+- id
+- name
+- email
+- role
+- timezone
+- createdAt
+- updatedAt
+
+MailboxConnections
+- id
+- userId
+- provider
+- emailAddress
+- accessTokenEncrypted
+- refreshTokenEncrypted
+- tokenExpiresAt
+- isActive
+- webhookSubscriptionId
+- lastSyncedAt
+- createdAt
+- updatedAt
+
+Companies
+- id
+- name
+- website
+- industry
+- subIndustry
+- city
+- state
+- country
+- notes
+- createdAt
+- updatedAt
+
+Contacts
+- id
+- companyId
+- firstName
+- lastName
+- fullName
+- email
+- phone
+- title
+- department
+- city
+- state
+- linkedinUrl
+- source
+- tags
+- notes
+- ownerUserId
+- statusId
+- doNotContact
+- unsubscribed
+- bounceFlag
+- lastOutboundAt
+- lastInboundAt
+- lastHumanReplyAt
+- createdAt
+- updatedAt
+
+LeadStatuses
+Create seeded statuses:
+- New
+- Ready to Send
+- Initial Sent
+- Follow Up Active
+- Replied
+- Interested
+- Meeting Booked
+- Proposal Sent
+- In Negotiation
+- Closed Won
+- Closed Lost
+- Nurture
+- Do Not Contact
+- Paused
+
+Fields:
+- id
+- name
+- category
+- stopsAutomation boolean
+- pausesAutomation boolean
+- displayOrder
+
+TemplateCategories
+- id
+- name
+- vertical
+- serviceLine
+- salesStage
+- createdAt
+- updatedAt
+
+EmailTemplates
+- id
+- name
+- categoryId
+- vertical
+- serviceLine
+- salesStage
+- templateType
+- subjectTemplate
+- bodyTemplate
+- isInitialTemplate boolean
+- defaultSequenceId nullable
+- isActive
+- createdByUserId
+- createdAt
+- updatedAt
+
+FollowUpSequences
+- id
+- name
+- description
+- vertical
+- serviceLine
+- salesStage
+- isDefault
+- isActive
+- createdAt
+- updatedAt
+
+FollowUpSteps
+- id
+- sequenceId
+- stepNumber
+- delayType
+- delayValue
+- stepLabel
+- subjectMode
+- subjectTemplate
+- bodyTemplate
+- sendAsReply boolean
+- isReactivationStyle boolean
+- requiresApproval boolean default false
+- createdAt
+- updatedAt
+
+Delay examples:
+- days 3
+- days 7
+- days 14
+- months 1
+- months 3
+- months 6
+- months 12
+
+ContactSequences
+Tracks which contact is currently in which automation sequence
+
+- id
+- contactId
+- sequenceId
+- initialTemplateId
+- state
+- currentStepNumber
+- startedAt
+- stoppedAt
+- stopReason
+- pausedAt
+- pausedReason
+- nextScheduledSendAt
+- lastProcessedAt
+- accountLevelPause boolean
+- manualOverride boolean
+- createdAt
+- updatedAt
+
+States:
+- draft
+- active
+- paused
+- stopped
+- completed
+- review_required
+
+EmailMessages
+Store sent and received mail metadata
+
+- id
+- contactId
+- companyId
+- userId
+- mailboxConnectionId
+- direction inbound or outbound
+- messageType
+- subject
+- bodyText
+- bodyHtml
+- threadId
+- conversationId
+- internetMessageId
+- replyToMessageId
+- providerMessageId
+- providerRawMetadata json
+- templateId nullable
+- sequenceId nullable
+- stepNumber nullable
+- sentAt
+- receivedAt
+- detectedAsAutoReply boolean
+- detectedAsHumanReply boolean
+- createdAt
+- updatedAt
+
+ScheduledEmails
+Represents queued or planned future sends
+
+- id
+- contactId
+- sequenceId
+- stepNumber
+- templateSourceType
+- subjectFinal
+- bodyFinal
+- scheduledFor
+- sendWindowStart
+- sendWindowEnd
+- sendAsReply boolean
+- threadId
+- status
+- failureReason
+- lastAttemptAt
+- sentAt
+- requiresReview boolean
+- editedAtContactLevel boolean
+- createdAt
+- updatedAt
+
+Statuses:
+- queued
+- ready
+- sending
+- sent
+- paused
+- skipped
+- cancelled
+- failed
+- review_required
+
+ReplyReviewQueue
+For uncertain replies
+
+- id
+- contactId
+- emailMessageId
+- classification
+- confidenceScore
+- recommendedAction
+- reviewedByUserId nullable
+- reviewDecision nullable
+- reviewedAt nullable
+- createdAt
+- updatedAt
+
+ActivityLog
+- id
+- contactId
+- companyId
+- userId
+- activityType
+- description
+- metadata json
+- createdAt
+
+Settings
+Global account level settings
+
+- id
+- userId
+- weekdaySendingOnly
+- sendingStartHour
+- sendingEndHour
+- defaultTimezone
+- throttlePerDay
+- throttlePerHour
+- minDelayBetweenEmailsSeconds
+- maxDelayBetweenEmailsSeconds
+- domainThrottleEnabled
+- autoStopOnHumanReply
+- ignoreAutoReplies
+- reviewUncertainReplies
+- applySequenceEditsToQueuedEmailsByDefault
+- createdAt
+- updatedAt
+
+CORE BUSINESS LOGIC
+
+Initial Send Workflow
+
+When user selects one or more contacts and chooses an initial template:
+
+1. Show preview of the initial email
+2. Allow user to edit subject and body before approval
+3. Once approved, send the initial email via Outlook
+4. Save full metadata including thread/conversation identifiers
+5. Automatically attach the contact to the selected follow up sequence
+6. Generate the future scheduled follow up emails
+7. Mark contact status as:
+   - Initial Sent
+   - then Follow Up Active if sequence is active
+8. Show next scheduled follow up date in contact record
+
+Follow Up Schedule Rules
+
+Default cadence for every active sequence:
+- Step 1 = 3 days
+- Step 2 = 7 days
+- Step 3 = 14 days
+- Step 4 = 1 month
+- Step 5 = 3 months
+- Step 6 = 6 months
+- Step 7 = 1 year
+
+Threading behavior
+- 3 day, 7 day, 14 day, 1 month follow ups should send as replies in the same thread
+- 3 month, 6 month, 1 year follow ups may either reply in thread or start a reactivation style message depending on sequence configuration
+- Default best practice:
+  - 3 day, 7 day, 14 day, 1 month = same thread
+  - 3 month, 6 month, 1 year = reactivation style and allowed to use updated subject line
+
+Stop Conditions
+
+Automation must stop automatically when:
+- a real human inbound reply is detected
+- contact status changes to a status with stopsAutomation = true
+- user manually clicks stop sequence
+- contact is marked Do Not Contact
+- contact is marked unsubscribed
+- contact is marked bounced
+- contact is marked Meeting Booked
+- contact is marked Closed Won
+- contact is marked Closed Lost
+
+Automation may pause when:
+- user clicks pause
+- contact status is Paused
+- system flags uncertain reply needing review
+- account level pause is enabled manually
+
+Auto Reply Detection
+
+The system must not count these as a real reply:
+- out of office
+- automatic replies
+- calendar auto responses
+- read receipts
+- delivery confirmations
+- spam filter notifications
+- mailbox full errors
+- exchange auto acknowledgements
+- vacation responders
+
+The system should count these as real replies:
+- human written replies
+- short replies such as “yes” or “send info”
+- “not interested”
+- forwarded human replies
+- meeting confirmations
+- question based responses
+- replies with attachments or custom text
+
+Reply classification behavior
+Build a reply classification layer that uses:
+- email headers where available
+- common auto reply patterns
+- subject line patterns
+- body pattern detection
+- provider metadata
+- heuristic classification
+- optional lightweight AI classification if needed
+
+If confidence is high that the reply is auto generated, do not stop automation.
+
+If confidence is high that the reply is human, stop automation.
+
+If confidence is uncertain, place it in Reply Review Queue and pause further follow up until reviewed.
+
+Manual Override and Contact Level Controls
+
+In each contact record, allow the user to:
+- view full message history
+- see current sequence and current step
+- see next scheduled send
+- edit next send date
+- skip next step
+- send next step now
+- rewrite one queued email only
+- swap contact into a different sequence
+- pause sequence
+- stop sequence
+- resume sequence
+- convert queued email to draft only
+- update lead status
+- add notes
+- manually mark as replied or not interested if needed
+
+This is important because the user wants flexibility, but minimal admin.
+The system should automatically track as much as possible from Outlook so the user does not have to manually update every field.
+
+Global Template Editing
+
+User must be able to:
+- create initial templates
+- create follow up sequences
+- create multiple sequences per vertical
+- assign a default sequence to each initial template
+- edit subject lines and body copy
+- use merge tokens
+- duplicate templates
+- archive templates
+- activate or deactivate templates
+- preview templates with sample contact data
+
+When editing templates or sequences, provide option:
+- apply changes only going forward
+- apply changes to already queued unsent emails
+
+MERGE FIELDS
+
+Support merge tokens such as:
+- {{firstName}}
+- {{lastName}}
+- {{fullName}}
+- {{companyName}}
+- {{title}}
+- {{industry}}
+- {{city}}
+- {{state}}
+- {{serviceLine}}
+- {{senderName}}
+- {{senderTitle}}
+- {{calendarLink}}
+- {{customNote}}
+- {{dateFirstSent}}
+
+If data is missing, fail gracefully with sensible fallback values.
+
+SENDING AND DELIVERABILITY RULES
+
+This is important. The system must send in a controlled queue.
+
+Sending windows
+Default settings:
+- weekdays only
+- local business hours
+- default window 8:15 AM to 4:45 PM
+- use contact timezone when available
+- otherwise use user timezone
+
+Throttling
+- never blast all selected contacts at once
+- stagger sends gradually
+- minimum delay between sends should be configurable
+- randomize within a small range for more natural sending
+- respect per day and per hour send caps
+- optional domain level throttling
+- prevent duplicate sends to same contact
+- prevent multiple active sequences on same contact unless explicitly allowed
+
+Queue behavior
+If a user selects a group, queue them for controlled sending rather than instant bulk send.
+
+Each scheduled email should move through:
+- queued
+- ready
+- sending
+- sent
+or
+- paused
+- skipped
+- failed
+- review_required
+
+OUTLOOK INTEGRATION REQUIREMENTS
+
+Use Microsoft Graph API to connect Outlook / Microsoft 365 mailbox.
+
+Required behaviors
+- OAuth connect mailbox
+- send outbound emails from connected Outlook mailbox
+- preserve thread and conversation metadata
+- periodically sync inbound and outbound email activity
+- detect replies
+- log messages in CRM
+- stop or pause automation based on reply classification
+- connect messages to correct contact by email address and thread/conversation where possible
+
+Sync behavior
+- maintain webhook subscription if feasible
+- also support fallback scheduled sync polling
+- update contact lastInboundAt and lastOutboundAt
+- detect if the user manually sent an email from Outlook outside the system and log it
+- if user manually emailed the contact from Outlook, preserve visibility in CRM
+- optionally allow a setting later for whether manual outbound should pause automation
+
+For now:
+- log manual outbound from Outlook when detected
+- do not auto stop unless user chooses later
+- let user manually pause if needed
+
+DASHBOARD REQUIREMENTS
+
+Create a dashboard with clean cards, tables, filters, and quick actions.
+
+Main metrics
+- active sequences
+- paused sequences
+- stopped sequences
+- contacts awaiting review
+- replies detected
+- meetings booked
+- emails sent today
+- emails scheduled today
+- failed sends
+- bounce flagged contacts
+
+Performance reporting
+- replies by initial template
+- replies by follow up step
+- replies by sequence
+- best performing subject lines
+- meetings booked by template
+- stopped reasons breakdown
+- auto reply vs human reply counts
+- active contacts by vertical
+- sequence completion rates
+
+Views needed
+- All Contacts
+- Companies
+- Templates
+- Sequences
+- Scheduled Queue
+- Reply Review Queue
+- Activity Log
+- Dashboard / Analytics
+- Settings
+- Mailbox Connection
+
+UI REQUIREMENTS
+
+Design a premium, minimal, modern interface.
+
+Style direction:
+- clean white and dark neutral surfaces
+- high readability
+- elegant spacing
+- fast navigation
+- no clutter
+- sidebar navigation
+- sticky top actions where useful
+- filterable tables
+- slide over drawer or modal for quick edits
+- clear status chips for sequence state and lead status
+
+Contact list page
+Columns:
+- Name
+- Company
+- Title
+- Email
+- Status
+- Active Sequence
+- Current Step
+- Next Send
+- Last Outbound
+- Last Inbound
+- Owner
+- Quick Actions
+
+Bulk actions:
+- assign template
+- assign sequence
+- start outreach
+- pause sequence
+- stop sequence
+- change status
+- tag contacts
+
+Contact detail page
+Sections:
+- contact info
+- company info
+- status and sequence state
+- full email timeline
+- queued future sends
+- notes
+- activity log
+- quick edit actions
+
+Templates page
+- filter by vertical
+- filter by service line
+- filter by sales stage
+- view initial templates
+- view follow up sequences
+- edit or duplicate
+- preview with sample data
+
+Queue page
+Show:
+- scheduled date
+- contact
+- company
+- sequence
+- step
+- subject preview
+- status
+- send as reply or reactivation
+- quick edit
+- send now
+- skip
+- pause
+
+Review queue page
+Show uncertain replies needing human decision:
+- contact
+- subject
+- snippet
+- confidence score
+- recommended action
+- buttons:
+  - mark as human reply and stop
+  - mark as auto reply and continue
+  - pause contact
+  - open thread
+
+STARTER TEMPLATE LIBRARY
+
+Preload starter template families with 2 to 3 templates per vertical and corresponding follow up sequences.
+
+Vertical families
+
+A3 core
+- Hospitality
+- Events and Experiential
+- Agencies and Brand Marketing
+- Commercial Real Estate and Developers
+- Sports and Entertainment
+- Venues and Convention Centers
+- Production Partners and Printers
+- Fabrication and Install
+- Projection Mapping
+- General Intro
+- Reactivation
+- Referral / Partner
+
+Medical
+- Hospitals
+- Med Spas
+- Plastic Surgeons
+- Surgery Centers
+- Functional Medicine Clinics
+- Chiropractic Clinics
+- Dental and Cosmetic Dental
+- Multi Location Practices
+- Health and Wellness Brands
+- Medical Conferences and Events
+
+Template types per vertical
+Create starter templates such as:
+1. Direct intro
+2. Value driven consultative intro
+3. Event / activation angle
+
+Also include at least one reactivation sequence structure.
+
+Sequence styles
+For each vertical, support multiple possible sequences such as:
+- soft consultative follow up
+- direct follow up
+- event urgency follow up
+- long term reactivation
+
+Each initial template can have a default sequence, but user can swap sequence before launch.
+
+SEEDED FOLLOW UP LOGIC
+
+Generate default follow up step templates for every sequence with editable content.
+
+Example sequence structure
+
+Step 1
+- delay: 3 days
+- same thread: yes
+- style: light bump
+
+Step 2
+- delay: 7 days
+- same thread: yes
+- style: value reminder
+
+Step 3
+- delay: 14 days
+- same thread: yes
+- style: credibility and low pressure CTA
+
+Step 4
+- delay: 1 month
+- same thread: yes
+- style: check in with angle shift
+
+Step 5
+- delay: 3 months
+- same thread: optional
+- style: reactivation
+
+Step 6
+- delay: 6 months
+- same thread: optional
+- style: reactivation with fresh use case
+
+Step 7
+- delay: 1 year
+- same thread: optional
+- style: long term reconnect
+
+AUTOMATION ENGINE REQUIREMENTS
+
+Build a background processor that:
+1. checks scheduled emails regularly
+2. validates contact is still eligible
+3. confirms no stop conditions triggered
+4. confirms send window is valid
+5. applies throttling logic
+6. sends via Outlook
+7. logs message metadata
+8. updates contact sequence state
+9. schedules next step if applicable
+
+Before any scheduled send, check:
+- contact is not marked replied
+- no human reply has been detected
+- no stop status applied
+- no bounce or unsubscribe flag
+- sequence is active
+- review queue does not block this contact
+
+SMART DEFAULTS FOR MINIMAL ADMIN
+
+Because the user wants the system to do most of the work automatically, implement these defaults:
+- auto track inbound and outbound from Outlook where possible
+- auto classify replies
+- auto stop when human reply is confidently detected
+- auto pause when reply is uncertain
+- auto log manual Outlook activity if detected
+- auto advance sequence state
+- auto surface only exceptions that need attention
+- keep manual admin optional, not required
+
+The system should reduce busywork, not create more.
+
+PERMISSIONS AND FUTURE TEAM READINESS
+
+Even though this is for one user first, structure data model for future roles such as:
+- admin
+- sales rep
+- manager
+
+Later support can include:
+- owner assignment
+- approval layers
+- team mailbox routing
+- team reporting
+
+But do not overcomplicate phase 1 UI.
+
+PHASE 1 BUILD SCOPE
+
+Build now:
+- contact and company CRM
+- template library
+- follow up sequences
+- Outlook mailbox connection
+- initial send flow
+- automated follow up queue
+- reply detection
+- review queue for uncertain replies
+- pause and stop logic
+- dashboard reporting
+- contact level manual overrides
+- clean settings page
+
+PHASE 2 READY ARCHITECTURE
+
+Prepare architecture for future:
+- AI suggested personalization
+- AI rewrite assistant
+- sequence optimization recommendations
+- team seats
+- account level pause rules
+- meeting calendar integration
+- deliverability monitoring
+- open tracking if compliant and desired
+- campaign testing
+- multi mailbox sending
+- vertical specific analytics
+
+QA AND EDGE CASES
+
+Make sure the system handles:
+- duplicate contacts
+- same email across multiple companies
+- missing first name
+- missing company
+- reply comes from alternate email
+- out of office loops
+- bounced emails
+- contact manually moved to Closed Lost while queue exists
+- template edited after scheduling
+- user changes sequence midstream
+- skipped steps
+- send window falls on weekend
+- timezones unavailable
+- Outlook token refresh failures
+- webhook failure fallback to polling
+
+FINAL DELIVERABLES INSIDE THE APP
+
+The app should launch with:
+1. seeded statuses
+2. seeded settings defaults
+3. seeded starter template categories
+4. seeded starter sequences
+5. sample dashboard cards
+6. mailbox connection flow
+7. functional CRM views
+8. queue processing logic
+9. reply review queue
+10. contact level editing controls
+
+IMPORTANT UX PRIORITY
+
+Do not make this feel like enterprise software bloat.
+It should feel like a sharp, premium sales operating system.
+
+The user should be able to:
+- import or add contacts
+- select a group
+- choose a template
+- approve send
+- let the system run
+- only step in when there is a true reply, uncertain reply, or an exception
+
+That is the product standard.
+
+BUILD NOTES FOR REPLIT
+
+Please generate:
+- full app structure
+- database schema
+- migrations
+- seeded data
+- API routes
+- background job logic
+- Outlook integration scaffolding
+- UI pages
+- reusable components
+- queue engine
+- reply classifier scaffolding
+- environment variable list
+- setup instructions
+- admin test data
+
+Also generate a clean README with:
+- setup steps
+- Outlook app registration requirements
+- environment variables
+- how queue processing works
+- how reply detection works
+- how to seed starter templates
+- what to do if Outlook webhook sync is unavailable
