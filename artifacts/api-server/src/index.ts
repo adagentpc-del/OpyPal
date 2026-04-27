@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { testConnection, seedFromSheetIfEmpty } from "./lib/sheets-sync";
 import { db, leadsTable } from "@workspace/db";
 import { startScheduler } from "./lib/background-scheduler";
+import { seedTemplatesIfEmpty } from "./lib/seed-templates-on-boot";
 
 const rawPort = process.env["PORT"];
 
@@ -68,6 +69,15 @@ app.listen(port, async () => {
     }
   } catch (err: any) {
     logger.warn({ err: err.message }, "Google Sheets init check failed - sync features will be unavailable");
+  }
+
+  try {
+    const seedResult = await seedTemplatesIfEmpty();
+    if (seedResult.templates > 0 || seedResult.sets > 0) {
+      logger.info({ ...seedResult }, "Auto-seeded templates and sequences on empty DB");
+    }
+  } catch (err: any) {
+    logger.warn({ err: err.message }, "Template auto-seed failed");
   }
 
   try {
