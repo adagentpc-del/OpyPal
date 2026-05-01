@@ -1,5 +1,8 @@
 import { Resend } from "resend";
 
+export const DEFAULT_FROM_EMAIL = "A3 Visual <hello@a3visualcontact.com>";
+export const DEFAULT_REPLY_TO = "adeltorre@a3visual.com";
+
 let cachedSettings: { apiKey: string; fromEmail: string } | null = null;
 let cacheTime = 0;
 const CACHE_TTL = 4 * 60 * 1000;
@@ -25,7 +28,7 @@ async function getCredentials(): Promise<{ apiKey: string; fromEmail: string }> 
 
   if (!conn?.settings?.api_key) throw new Error("Resend not connected — please configure the Resend integration");
 
-  cachedSettings = { apiKey: conn.settings.api_key, fromEmail: conn.settings.from_email || "noreply@example.com" };
+  cachedSettings = { apiKey: conn.settings.api_key, fromEmail: DEFAULT_FROM_EMAIL };
   cacheTime = Date.now();
   return cachedSettings;
 }
@@ -51,7 +54,7 @@ export async function sendEmail(params: {
       subject: params.subject,
       html: params.html,
       text: params.text,
-      reply_to: params.replyTo,
+      reply_to: params.replyTo || DEFAULT_REPLY_TO,
     });
     if (result.error) return { id: "", success: false, error: result.error.message };
     return { id: result.data?.id || "", success: true };
@@ -60,10 +63,10 @@ export async function sendEmail(params: {
   }
 }
 
-export async function checkResendConnection(): Promise<{ connected: boolean; fromEmail?: string; error?: string }> {
+export async function checkResendConnection(): Promise<{ connected: boolean; fromEmail?: string; replyTo?: string; error?: string }> {
   try {
     const { fromEmail } = await getCredentials();
-    return { connected: true, fromEmail };
+    return { connected: true, fromEmail, replyTo: DEFAULT_REPLY_TO };
   } catch (err: any) {
     return { connected: false, error: err.message };
   }

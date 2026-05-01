@@ -2,10 +2,8 @@ import { Router, type IRouter } from "express";
 import { db, bulkSendCampaignsTable, scheduledEmailsTable } from "@workspace/db";
 import { desc, eq, and } from "drizzle-orm";
 import { validateRecipients, executeBulkSend } from "../lib/bulk-send-engine";
-import { checkResendConnection } from "../lib/resend";
+import { checkResendConnection, DEFAULT_REPLY_TO, DEFAULT_FROM_EMAIL } from "../lib/resend";
 import { getQueueStatus, abortQueue, getGlobalQueueStatus, startQueueProcessor } from "../lib/send-queue";
-
-const DEFAULT_REPLY_TO = "adeltorre@a3visual.com";
 
 const router: IRouter = Router();
 
@@ -23,7 +21,7 @@ router.get("/bulk-send/sender-config", async (_req, res) => {
     const connStatus = await checkResendConnection();
     res.json({
       connected: connStatus.connected,
-      fromEmail: connStatus.fromEmail || "",
+      fromEmail: connStatus.fromEmail || DEFAULT_FROM_EMAIL,
       defaultReplyTo: DEFAULT_REPLY_TO,
       sendsPerHour: 50,
       delayBetweenSendsMs: 5000,
