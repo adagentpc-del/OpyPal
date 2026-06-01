@@ -1,2 +1,3 @@
 - [OpyPal product scope](opypal-scope.md) — OpyPal IS the CRM (artifacts/a3-sales-os); partner portal is OUT of scope, deferred to a future super-admin tab.
 - [Stale lib/db/dist typecheck errors](db-stale-dist-typecheck.md) — `tsc` "no exported member 'xTable'" is pre-existing stale dist/codegen drift, not your change; runtime (tsx/vite) is unaffected.
+- [OpyPal workspace seeding](opypal-workspace-seed.md) — boot seeders for workspace categories/templates/sequences; idempotency + edit-safety rules (bounded delete, link-repair pass).

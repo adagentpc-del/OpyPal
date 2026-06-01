@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const templatesTable = pgTable("templates", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id"),
   name: text("name").notNull(),
   category: text("category").notNull(),
   type: text("type").default("custom"),

@@ -1,0 +1,285 @@
+Seed workspace-specific template categories, starter templates, and follow-up sequences for the Opypal workspaces Move Mi and StrataLogic.
+
+Do this in the Sales OS / Opypal codebase only.
+
+Create workspace-specific categories, initial templates, and default follow-up sequences for:
+
+1. Move Mi
+2. StrataLogic
+
+Use tenant/workspace-aware seed data. These should be editable in the Templates and Sequences modules after seeding.
+
+==================================================
+WORKSPACE 1: MOVE MI
+==================================================
+
+Workspace:
+Move Mi
+
+Business type:
+Moving platform, relocation support, local partnerships, referral relationships, residential and B2B local growth
+
+Primary use cases:
+- realtor outreach
+- property manager outreach
+- apartment / condo building outreach
+- referral partner outreach
+- local business partnership outreach
+- reactivation
+
+Create these template categories for Move Mi:
+- Realtors
+- Property Managers
+- Apartment Buildings
+- Condo Associations
+- Luxury Residential
+- Referral Partners
+- Local Brand Partners
+- Reactivation
+
+For Move Mi, seed 2 initial templates per category:
+1. Direct intro
+2. Value-driven partnership intro
+
+Tone:
+- professional
+- warm
+- clear
+- local
+- easy to read
+- low pressure
+- not corporate jargon heavy
+
+Core positioning themes for Move Mi templates:
+- trusted moving support
+- easier client experience
+- less stress for residents/clients
+- reliable coordination
+- cleaner handoff process
+- partnership and referral value
+- local relationship building
+
+Use merge tokens where relevant:
+- {{firstName}}
+- {{companyName}}
+- {{city}}
+- {{senderName}}
+- {{senderTitle}}
+- {{calendarLink}}
+
+Seed one default follow-up sequence per category with these steps:
+- 3 days
+- 7 days
+- 14 days
+- 1 month
+- 3 months
+- 6 months
+- 1 year
+
+Move Mi follow-up style:
+- Step 1: light bump
+- Step 2: value reminder
+- Step 3: partnership angle
+- Step 4: soft check-in
+- Step 5: reactivation
+- Step 6: reactivation with local/seasonal angle
+- Step 7: annual reconnect
+
+Suggested category-specific positioning:
+
+Realtors
+- help clients transition smoothly
+- reduce stress around move timing
+- become a trusted local moving resource
+
+Property Managers
+- support tenant move-ins / move-outs
+- reduce friction during transitions
+- offer a reliable partner for residents
+
+Apartment Buildings
+- resident move support
+- smoother logistics
+- optional building partnership relationship
+
+Condo Associations
+- organized moving coordination
+- easier communication
+- better resident experience
+
+Luxury Residential
+- elevated service
+- cleaner client experience
+- discretion and professionalism
+
+Referral Partners
+- reciprocal referrals
+- easy introductions
+- relationship-first approach
+
+Local Brand Partners
+- cross-promotion
+- neighborhood partnerships
+- co-marketing or resident value add
+
+Reactivation
+- checking back in
+- seeing if timing is better now
+- restarting the relationship
+
+==================================================
+WORKSPACE 2: STRATALOGIC
+==================================================
+
+Workspace:
+StrataLogic
+
+Business type:
+Clinical SaaS, provider workflow, longevity/functional medicine decision support, clinic partnerships, demos and pilots
+
+Primary use cases:
+- clinic outreach
+- provider outreach
+- longevity / wellness clinic outreach
+- pilot partnership outreach
+- demo booking
+- conference follow-up
+- reactivation
+
+Create these template categories for StrataLogic:
+- Functional Medicine Clinics
+- Longevity Clinics
+- Wellness Clinics
+- Med Spas
+- Provider Groups
+- Pilot Partnerships
+- Conference Follow-Up
+- Reactivation
+
+For StrataLogic, seed 2 initial templates per category:
+1. Direct intro
+2. Consultative value intro
+
+Tone:
+- credible
+- clear
+- professional
+- not overhyped
+- modern healthcare / B2B tone
+- concise and intelligent
+
+Core positioning themes for StrataLogic templates:
+- decision support
+- workflow efficiency
+- structured protocol support
+- clinic usability
+- operational clarity
+- provider support
+- scalable infrastructure
+- safer, cleaner systems thinking
+
+Use merge tokens where relevant:
+- {{firstName}}
+- {{companyName}}
+- {{senderName}}
+- {{senderTitle}}
+- {{calendarLink}}
+- {{customNote}}
+
+Seed one default follow-up sequence per category with these steps:
+- 3 days
+- 7 days
+- 14 days
+- 1 month
+- 3 months
+- 6 months
+- 1 year
+
+StrataLogic follow-up style:
+- Step 1: light follow-up
+- Step 2: value and use-case reminder
+- Step 3: operational clarity / workflow angle
+- Step 4: soft check-in
+- Step 5: pilot / reactivation angle
+- Step 6: reactivation with updated relevance
+- Step 7: annual reconnect
+
+Suggested category-specific positioning:
+
+Functional Medicine Clinics
+- cleaner supplement / protocol workflow
+- structured clinical decision support
+- better operational visibility
+
+Longevity Clinics
+- support for complex protocols and modern longevity workflows
+- operational consistency
+- scalable clinic systems
+
+Wellness Clinics
+- streamlined practitioner support
+- improved workflow clarity
+- easier operational adoption
+
+Med Spas
+- operational support for more advanced wellness offerings
+- clearer internal process
+- scalable systems
+
+Provider Groups
+- standardization
+- visibility
+- operational coordination across team members
+
+Pilot Partnerships
+- low-friction pilot conversation
+- evaluate fit
+- practical implementation path
+
+Conference Follow-Up
+- reconnect after event
+- continue the conversation
+- propose short intro/demo
+
+Reactivation
+- revisiting timing
+- seeing whether priorities have shifted
+- re-opening the conversation
+
+==================================================
+COPY REQUIREMENTS
+==================================================
+
+For all seeded templates:
+- keep body copy concise
+- avoid walls of text
+- keep intros personalized and low pressure
+- use realistic business language
+- do not sound spammy
+- avoid excessive exclamation points
+- avoid generic AI buzzwords
+- optimize for reply and meeting booking, not hard close
+
+For all follow-up templates:
+- keep each step short
+- do not repeat the exact same wording
+- make later steps feel like natural re-engagement, not repetitive nagging
+- 3 month, 6 month, and 1 year should feel like reactivation messages, not identical thread bumps
+
+==================================================
+DATA + IMPLEMENTATION REQUIREMENTS
+==================================================
+
+Implement as real seed data in the Opypal codebase:
+- workspace-aware template categories
+- workspace-aware initial templates
+- workspace-aware follow-up sequences
+- workspace-aware follow-up steps
+- assign default sequence to each initial template where appropriate
+
+After implementation, provide:
+1. exact files changed
+2. template categories created for each workspace
+3. number of starter templates created per workspace
+4. number of sequences created per workspace
+5. any remaining manual setup needed

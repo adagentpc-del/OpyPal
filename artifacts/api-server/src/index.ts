@@ -5,6 +5,7 @@ import { db, leadsTable } from "@workspace/db";
 import { startScheduler } from "./lib/background-scheduler";
 import { seedTemplatesIfEmpty } from "./lib/seed-templates-on-boot";
 import { seedWorkspacesIfNeeded } from "./lib/seed-workspaces-on-boot";
+import { seedWorkspaceTemplatesIfNeeded } from "./lib/seed-workspace-templates-on-boot";
 
 const rawPort = process.env["PORT"];
 
@@ -85,6 +86,12 @@ app.listen(port, async () => {
     await seedWorkspacesIfNeeded();
   } catch (err: any) {
     logger.warn({ err: err.message }, "Workspace seed failed");
+  }
+
+  try {
+    await seedWorkspaceTemplatesIfNeeded();
+  } catch (err: any) {
+    logger.warn({ err: err.message }, "Workspace template seed failed");
   }
 
   try {

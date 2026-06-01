@@ -1,9 +1,10 @@
-import { pgTable, serial, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 export const templateSetsTable = pgTable("template_sets", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id"),
   name: text("name").notNull(),
   segmentType: text("segment_type"),
   description: text("description"),
