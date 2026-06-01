@@ -1,9 +1,13 @@
-import { pgTable, serial, text, numeric, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, numeric, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { workspacesTable } from "./workspaces";
 
 export const pricingRulesTable = pgTable("pricing_rules", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   category: text("category").notNull(),
   itemName: text("item_name").notNull(),
   startingPrice: numeric("starting_price"),

@@ -14,7 +14,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { clerkAppearance } from "@/lib/clerk-appearance";
-import { WorkspaceProvider } from "@/hooks/use-workspace";
+import { WorkspaceProvider, useWorkspace } from "@/hooks/use-workspace";
 import { PLATFORM } from "@/config/branding";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminPartners from "@/pages/admin-partners";
@@ -112,10 +112,38 @@ function HomeRedirect() {
   );
 }
 
+function WorkspaceGate({ children }: { children: ReactNode }) {
+  const { isLoading, me } = useWorkspace();
+
+  if (isLoading || !me) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-gray-50">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground" />
+      </div>
+    );
+  }
+
+  if (!me.isSuperAdmin && me.workspaces.length === 0) {
+    return (
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-gray-50 px-6 text-center">
+        <h1 className="text-xl font-semibold text-foreground">No workspace access</h1>
+        <p className="max-w-md text-sm text-muted-foreground">
+          Your account ({me.email}) isn&apos;t assigned to any workspace yet.
+          Please ask a super admin to grant you access.
+        </p>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 function RequireAuth({ children }: { children: ReactNode }) {
   return (
     <>
-      <Show when="signed-in">{children}</Show>
+      <Show when="signed-in">
+        <WorkspaceGate>{children}</WorkspaceGate>
+      </Show>
       <Show when="signed-out">
         <Redirect to="/" />
       </Show>

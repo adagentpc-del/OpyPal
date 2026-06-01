@@ -1,9 +1,13 @@
-import { pgTable, serial, text, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { workspacesTable } from "./workspaces";
 
 export const partnersTable = pgTable("partners", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   companyName: text("company_name").notNull(),
   slug: text("slug").notNull().unique(),
   logoUrl: text("logo_url"),
@@ -31,6 +35,9 @@ export type InsertPartner = z.infer<typeof insertPartnerSchema>;
 
 export const partnerAssetsTable = pgTable("partner_assets", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   partnerId: serial("partner_id").references(() => partnersTable.id),
   assetType: text("asset_type"),
   fileUrl: text("file_url").notNull(),

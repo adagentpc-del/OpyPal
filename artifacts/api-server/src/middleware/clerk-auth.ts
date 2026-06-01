@@ -1,8 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
 import { clerkClient, getAuth } from "@clerk/express";
 import { eq, and, isNull } from "drizzle-orm";
-import { db, workspaceMembersTable } from "@workspace/db";
-import { isSuperAdminEmail } from "../lib/platform";
+import { db, workspaceMembersTable, workspacesTable } from "@workspace/db";
+import { isSuperAdminEmail, roleAtLeast } from "../lib/platform";
+import type { WorkspaceRole } from "../lib/platform";
 
 export interface Membership {
   workspaceId: number;
@@ -21,6 +22,11 @@ declare global {
   namespace Express {
     interface Request {
       authContext?: AuthContext;
+      // The workspace this request is scoped to (set by resolveWorkspace).
+      workspaceId?: number;
+      // The caller's role within that workspace ("super_admin" for the
+      // platform super admin acting on any workspace).
+      workspaceRole?: string;
     }
   }
 }
@@ -130,4 +136,103 @@ export function requireWorkspaceAccess(
     return;
   }
   res.status(403).json({ message: "You do not have access to this workspace" });
+}
+
+// Determines which workspace this request operates on and enforces that the
+// caller may access it. The desired workspace is read from the `x-workspace-id`
+// header, the `workspaceId` query param, or the request body (in that order).
+//
+// - Super admin: may target any existing workspace. The id must be provided
+//   and must reference a real workspace.
+// - Workspace member: the target must be one of their memberships. If no target
+//   is provided and they belong to exactly one workspace, it is used.
+//
+// On success it sets req.workspaceId and req.workspaceRole. Must run after
+// requireAuth. This is the single choke point that scopes every data query, so
+// record-id manipulation cannot cross workspace boundaries.
+export async function resolveWorkspace(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const ctx = req.authContext;
+  if (!ctx) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+
+  const headerVal = req.header("x-workspace-id");
+  const queryVal =
+    typeof req.query.workspaceId === "string" ? req.query.workspaceId : undefined;
+  const bodyVal =
+    req.body && typeof req.body === "object" && req.body.workspaceId != null
+      ? String(req.body.workspaceId)
+      : undefined;
+  const rawDesired = headerVal ?? queryVal ?? bodyVal;
+  const desired = rawDesired != null ? Number(rawDesired) : NaN;
+
+  if (ctx.isSuperAdmin) {
+    if (!Number.isFinite(desired)) {
+      res
+        .status(400)
+        .json({ message: "Workspace context required (x-workspace-id)" });
+      return;
+    }
+    const rows = await db
+      .select({ id: workspacesTable.id })
+      .from(workspacesTable)
+      .where(eq(workspacesTable.id, desired))
+      .limit(1);
+    if (rows.length === 0) {
+      res.status(404).json({ message: "Workspace not found" });
+      return;
+    }
+    req.workspaceId = desired;
+    req.workspaceRole = "super_admin";
+    next();
+    return;
+  }
+
+  // Regular member resolution.
+  if (Number.isFinite(desired)) {
+    const membership = ctx.memberships.find((m) => m.workspaceId === desired);
+    if (!membership) {
+      res
+        .status(403)
+        .json({ message: "You do not have access to this workspace" });
+      return;
+    }
+    req.workspaceId = desired;
+    req.workspaceRole = membership.role;
+    next();
+    return;
+  }
+
+  if (ctx.memberships.length === 1) {
+    req.workspaceId = ctx.memberships[0].workspaceId;
+    req.workspaceRole = ctx.memberships[0].role;
+    next();
+    return;
+  }
+
+  res
+    .status(400)
+    .json({ message: "Workspace context required (x-workspace-id)" });
+}
+
+// Gate a route on a minimum workspace role. The super admin always passes.
+// Must run after resolveWorkspace.
+export function requireRole(min: WorkspaceRole) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const role = req.workspaceRole;
+    if (!role) {
+      res.status(401).json({ message: "Workspace context required" });
+      return;
+    }
+    if (role === "super_admin" || roleAtLeast(role, min)) {
+      next();
+      return;
+    }
+    res.status(403).json({ message: "Insufficient permissions" });
+  };
 }

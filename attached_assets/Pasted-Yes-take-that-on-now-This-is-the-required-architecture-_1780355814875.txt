@@ -1,0 +1,95 @@
+Yes, take that on now.
+
+This is the required architecture:
+
+1. I am the only Super Admin.
+- I need access to all workspaces and all data across the platform.
+- I should be able to switch between A3 Visual, Move Mi, StrataLogic, and any future workspace.
+- I should be able to manage users, roles, permissions, partner portals, settings, and data globally.
+
+2. Every business must be its own isolated workspace.
+- A3 Visual
+- Move Mi
+- StrataLogic
+- Alyssa Advisory
+- future workspaces later
+
+3. Each workspace must have its own secure isolated data.
+That includes:
+- contacts
+- companies
+- templates
+- sequences
+- scheduled emails
+- analytics
+- settings
+- branding
+- partner portal data
+- partners
+- partner requests
+- pricing rules
+- assets
+- admin notes
+- uploads
+- any related records
+
+4. No workspace admin, manager, operator, or user should ever be able to access another workspace’s data by:
+- login
+- URL
+- API route
+- record ID manipulation
+- frontend navigation
+- direct query
+
+5. Add workspace scoping to the partner portal system now.
+Add workspaceId to all relevant partner portal tables, including:
+- partners
+- partner_assets
+- partner_requests
+- request_items
+- request_uploads
+- admin_notes
+- pricing_rules
+- any related records that need workspace isolation
+
+6. Migrate existing data correctly.
+- Backfill the existing A3 Visual partner portal dataset into Workspace 1 = A3 Visual
+- Do not lose existing data
+- Create migrations for this change
+
+7. Enforce workspace filtering everywhere.
+- backend queries
+- API routes
+- admin pages
+- public partner portal lookups where appropriate
+- file uploads
+- request detail views
+- pricing rules
+- assets libraries
+
+8. Keep super admin override.
+- I as Super Admin should still be able to access all workspaces and all partner portal data
+- Workspace users should only access their own workspace
+
+9. Implement role-aware auth and authorization cleanly.
+Roles:
+- super_admin
+- workspace_admin
+- manager
+- operator
+- viewer
+
+10. Secure the platform.
+- protect all admin routes and APIs
+- enforce auth middleware
+- enforce workspace-aware permission middleware
+- do not rely on frontend hiding only
+
+After implementation, provide:
+a. exact files changed
+b. schema changes and migrations
+c. which partner portal tables now have workspaceId
+d. how existing A3 data was backfilled
+e. how super admin access works
+f. how workspace isolation is enforced
+g. any remaining security gaps

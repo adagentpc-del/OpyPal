@@ -1,11 +1,17 @@
 const API_BASE = "/api";
+const WORKSPACE_STORAGE_KEY = "opypal_pp_current_workspace";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const workspaceId =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem(WORKSPACE_STORAGE_KEY)
+      : null;
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(workspaceId ? { "x-workspace-id": workspaceId } : {}),
       ...options?.headers,
     },
   });

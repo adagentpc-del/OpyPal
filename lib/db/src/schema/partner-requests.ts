@@ -2,9 +2,13 @@ import { pgTable, serial, text, timestamp, integer, jsonb } from "drizzle-orm/pg
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { partnersTable } from "./partners";
+import { workspacesTable } from "./workspaces";
 
 export const partnerRequestsTable = pgTable("partner_requests", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   partnerId: integer("partner_id").references(() => partnersTable.id),
   companyName: text("company_name"),
   contactName: text("contact_name"),
@@ -40,6 +44,9 @@ export type InsertPartnerRequest = z.infer<typeof insertPartnerRequestSchema>;
 
 export const requestItemsTable = pgTable("request_items", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   requestId: integer("request_id").references(() => partnerRequestsTable.id),
   category: text("category"),
   itemName: text("item_name"),
@@ -52,6 +59,9 @@ export const insertRequestItemSchema = createInsertSchema(requestItemsTable);
 
 export const requestUploadsTable = pgTable("request_uploads", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   requestId: integer("request_id").references(() => partnerRequestsTable.id),
   uploadType: text("upload_type"),
   fileUrl: text("file_url"),
@@ -64,6 +74,9 @@ export const insertRequestUploadSchema = createInsertSchema(requestUploadsTable)
 
 export const adminNotesTable = pgTable("admin_notes", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   requestId: integer("request_id").references(() => partnerRequestsTable.id),
   noteBody: text("note_body").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

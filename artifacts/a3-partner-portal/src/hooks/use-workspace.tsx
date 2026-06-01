@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@clerk/react";
+import { useQueryClient } from "@tanstack/react-query";
 
 export interface WorkspaceSummary {
   id: number;
@@ -42,8 +43,14 @@ const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(
 
 const STORAGE_KEY = "opypal_pp_current_workspace";
 
+function persistWorkspaceId(id: number | null) {
+  if (id == null) localStorage.removeItem(STORAGE_KEY);
+  else localStorage.setItem(STORAGE_KEY, String(id));
+}
+
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth();
+  const queryClient = useQueryClient();
   const [me, setMe] = useState<Me | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentId, setCurrentId] = useState<number | null>(() => {
@@ -61,10 +68,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
       const data: Me = await res.json();
       setMe(data);
-      setCurrentId((prev) => {
-        if (prev && data.workspaces.some((w) => w.id === prev)) return prev;
-        return data.workspaces[0]?.id ?? null;
-      });
+      // Resolve the active workspace and persist it BEFORE any scoped query
+      // runs, so the x-workspace-id header is always present.
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const storedId = stored ? Number(stored) : null;
+      const resolvedId =
+        storedId && data.workspaces.some((w) => w.id === storedId)
+          ? storedId
+          : data.workspaces[0]?.id ?? null;
+      persistWorkspaceId(resolvedId);
+      setCurrentId(resolvedId);
     } catch {
       setMe(null);
     } finally {
@@ -84,7 +97,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const setCurrentWorkspaceId = (id: number) => {
     setCurrentId(id);
-    localStorage.setItem(STORAGE_KEY, String(id));
+    persistWorkspaceId(id);
+    // Discard cached data scoped to the previous workspace.
+    queryClient.clear();
   };
 
   const currentWorkspace =

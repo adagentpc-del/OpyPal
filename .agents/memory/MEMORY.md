@@ -1,2 +1,2 @@
 - [Partner Portal auth boundaries](partner-portal-auth.md) — which API endpoints stay public vs. require Clerk auth; web auth is cookie-based same-origin.
-- [Opypal multi-tenant model](opypal-multitenant.md) — super-admin allowlist vs. workspace_members; partner-domain tables are NOT workspace-scoped yet.
+- [Opypal multi-tenant model](opypal-multitenant.md) — super-admin allowlist vs. workspace_members; partner-domain (7 tables) IS workspace-scoped + enforcement pattern; CRM/sales-os tables still single-tenant.

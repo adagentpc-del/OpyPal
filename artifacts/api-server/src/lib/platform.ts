@@ -19,6 +19,28 @@ export function isSuperAdminEmail(email?: string | null): boolean {
   return SUPER_ADMIN_EMAILS.some((e) => e.toLowerCase() === normalized);
 }
 
+// Roles a person can hold inside a single workspace (stored in
+// workspace_members.role). `super_admin` is platform-level and is NOT one of
+// these — it is resolved from SUPER_ADMIN_EMAILS and bypasses workspace roles.
+export type WorkspaceRole =
+  | "workspace_admin"
+  | "manager"
+  | "operator"
+  | "viewer";
+
+// Higher number = more privilege. Used to gate routes by a minimum role.
+export const ROLE_RANK: Record<string, number> = {
+  viewer: 1,
+  operator: 2,
+  manager: 3,
+  workspace_admin: 4,
+};
+
+// True when `role` meets or exceeds the required `min` role.
+export function roleAtLeast(role: string, min: WorkspaceRole): boolean {
+  return (ROLE_RANK[role] ?? 0) >= (ROLE_RANK[min] ?? Number.POSITIVE_INFINITY);
+}
+
 export function slugify(input: string): string {
   return input
     .toLowerCase()
