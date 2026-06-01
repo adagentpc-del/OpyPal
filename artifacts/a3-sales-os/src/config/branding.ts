@@ -11,8 +11,10 @@
 // for the selected tenant once the workspace backend lands.
 
 export const PLATFORM = {
-  name: "Opypal",
-  foundation: "Opypal Core",
+  name: "OpyPal",
+  fullName: "Opportunity Operations Pal",
+  tagline: "Automated CRM & relationship management",
+  foundation: "OpyPal Core",
 } as const;
 
 export interface Workspace {

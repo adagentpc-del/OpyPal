@@ -102,10 +102,10 @@ function LandingPage() {
     <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-gradient-to-b from-white to-gray-50 px-6 text-center">
       <img src={`${basePath}/logo.svg`} alt={PLATFORM.name} className="h-12 mb-8" />
       <h1 className="max-w-2xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-        The sales operating system for modern teams
+        {PLATFORM.fullName}
       </h1>
       <p className="mt-4 max-w-xl text-lg text-muted-foreground">
-        {PLATFORM.foundation}. Run your pipeline, outreach and qualification in one place.
+        {PLATFORM.tagline}. Run your pipeline, outreach, and qualification in one place.
       </p>
       <div className="mt-8 flex items-center gap-3">
         <Link href="/sign-in">
@@ -251,7 +251,7 @@ function ClerkProviderWithRoutes() {
         signUp: {
           start: {
             title: "Create your account",
-            subtitle: "Get started with Opypal",
+            subtitle: "Get started with OpyPal",
           },
         },
       }}

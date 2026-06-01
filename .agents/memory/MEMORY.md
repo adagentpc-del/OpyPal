@@ -1,1 +1,1 @@
-- [Opypal branding model](opypal-branding-model.md) — platform=Opypal / foundation=Opypal Core / tenant=Workspace / Workspace 1=A3 Visual; source UI brand strings from src/config/branding.ts, never hardcode. lib/api-spec/ is off-limits.
+- [OpyPal product scope](opypal-scope.md) — OpyPal IS the CRM (artifacts/a3-sales-os); partner portal is OUT of scope, deferred to a future super-admin tab.
