@@ -30,3 +30,4 @@ export * from "./pricing-rules";
 export * from "./mailbox-connections";
 export * from "./companies";
 export * from "./reply-review-queue";
+export * from "./workspaces";

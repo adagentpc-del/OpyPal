@@ -1,5 +1,7 @@
 import { Router, type IRouter } from "express";
-import { adminAuth } from "../middleware/admin-auth";
+import { requireAuth } from "../middleware/clerk-auth";
+import meRouter from "./me";
+import workspacesRouter from "./workspaces";
 import healthRouter from "./health";
 import leadsRouter from "./leads";
 import tasksRouter from "./tasks";
@@ -29,6 +31,8 @@ import seedRouter from "./seed-templates";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(meRouter);
+router.use(workspacesRouter);
 router.use(leadsRouter);
 router.use(tasksRouter);
 router.use(templatesRouter);
@@ -49,10 +53,10 @@ router.use(partnersRouter);
 router.use(partnerRequestsRouter);
 router.use(pricingRulesRouter);
 
-router.use(adminAuth, outlookRouter);
-router.use(adminAuth, companiesRouter);
-router.use(adminAuth, replyReviewRouter);
-router.use(adminAuth, settingsRouter);
-router.use(adminAuth, seedRouter);
+router.use(requireAuth, outlookRouter);
+router.use(requireAuth, companiesRouter);
+router.use(requireAuth, replyReviewRouter);
+router.use(requireAuth, settingsRouter);
+router.use(requireAuth, seedRouter);
 
 export default router;

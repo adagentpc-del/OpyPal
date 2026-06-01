@@ -1,6 +1,7 @@
 import { ReactNode, useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, X, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Menu, X, PanelLeftClose, PanelLeft, LogOut } from "lucide-react";
+import { useClerk } from "@clerk/react";
 import { NotificationCenter } from "@/components/notification-center";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +11,9 @@ import {
 } from "@/components/ui/tooltip";
 import { navigationConfig, isActiveRoute, getPageTitle } from "@/lib/navigation";
 import { PLATFORM, CURRENT_WORKSPACE } from "@/config/branding";
+import { useWorkspace } from "@/hooks/use-workspace";
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const STORAGE_KEY = "a3-sidebar-collapsed";
 
@@ -89,17 +93,27 @@ function SidebarContent({
   onNavigate?: () => void;
   showCollapseToggle?: boolean;
 }) {
+  const { me, currentWorkspace } = useWorkspace();
+  const { signOut } = useClerk();
+  const wsName = currentWorkspace?.name ?? CURRENT_WORKSPACE.name;
+  const wsShortCode =
+    currentWorkspace?.shortCode ?? currentWorkspace?.initials ?? CURRENT_WORKSPACE.shortCode;
+  const wsInitials = currentWorkspace?.initials ?? CURRENT_WORKSPACE.initials;
+  const wsRoleLabel = me?.isSuperAdmin
+    ? PLATFORM.name
+    : currentWorkspace?.roleLabel ?? CURRENT_WORKSPACE.roleLabel;
+
   return (
     <>
       <div className={`flex items-center ${collapsed ? "justify-center p-4 pb-3" : "p-6 pb-4"}`}>
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 bg-primary rounded-lg flex items-center justify-center font-bold text-sm text-white shadow-md flex-shrink-0">
-            {CURRENT_WORKSPACE.shortCode}
+            {wsShortCode}
           </div>
           {!collapsed && (
             <div className="flex flex-col min-w-0">
               <span className="font-bold text-xl tracking-tight text-sidebar-foreground whitespace-nowrap leading-none">
-                {CURRENT_WORKSPACE.name}
+                {wsName}
               </span>
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mt-1">
                 {PLATFORM.foundation}
@@ -139,13 +153,39 @@ function SidebarContent({
         {!collapsed && (
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-sm shadow-sm flex-shrink-0">
-              {CURRENT_WORKSPACE.initials}
+              {wsInitials}
             </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-sm font-semibold truncate">{CURRENT_WORKSPACE.name}</span>
-              <span className="text-xs text-muted-foreground truncate">{CURRENT_WORKSPACE.roleLabel}</span>
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-sm font-semibold truncate">{me?.email ?? wsName}</span>
+              <span className="text-xs text-muted-foreground truncate">{wsRoleLabel}</span>
             </div>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => signOut({ redirectUrl: basePath || "/" })}
+                  className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                  aria-label="Log out"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Log out</TooltipContent>
+            </Tooltip>
           </div>
+        )}
+        {collapsed && (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => signOut({ redirectUrl: basePath || "/" })}
+                className="flex items-center justify-center rounded-xl w-full py-2.5 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                aria-label="Log out"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>Log out</TooltipContent>
+          </Tooltip>
         )}
 
         {showCollapseToggle && (

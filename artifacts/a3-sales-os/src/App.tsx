@@ -1,7 +1,27 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect, useRef, type ReactNode } from "react";
+import {
+  ClerkProvider,
+  SignIn,
+  SignUp,
+  Show,
+  useClerk,
+} from "@clerk/react";
+import { publishableKeyFromHost } from "@clerk/react/internal";
+import {
+  Switch,
+  Route,
+  Link,
+  Redirect,
+  useLocation,
+  Router as WouterRouter,
+} from "wouter";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { clerkAppearance } from "@/lib/clerk-appearance";
+import { WorkspaceProvider } from "@/hooks/use-workspace";
+import { PLATFORM } from "@/config/branding";
 import NotFound from "@/pages/not-found";
 
 import Dashboard from "./pages/dashboard";
@@ -42,69 +62,220 @@ const queryClient = new QueryClient({
   },
 });
 
-function Router() {
+const clerkPubKey = publishableKeyFromHost(
+  window.location.hostname,
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+);
+
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function stripBase(path: string): string {
+  return basePath && path.startsWith(basePath)
+    ? path.slice(basePath.length) || "/"
+    : path;
+}
+
+if (!clerkPubKey) {
+  throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY in .env file");
+}
+
+function SignInPage() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+    </div>
+  );
+}
+
+function SignUpPage() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+    </div>
+  );
+}
+
+function LandingPage() {
+  return (
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-gradient-to-b from-white to-gray-50 px-6 text-center">
+      <img src={`${basePath}/logo.svg`} alt={PLATFORM.name} className="h-12 mb-8" />
+      <h1 className="max-w-2xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+        The sales operating system for modern teams
+      </h1>
+      <p className="mt-4 max-w-xl text-lg text-muted-foreground">
+        {PLATFORM.foundation}. Run your pipeline, outreach and qualification in one place.
+      </p>
+      <div className="mt-8 flex items-center gap-3">
+        <Link href="/sign-in">
+          <Button size="lg">Sign in</Button>
+        </Link>
+        <Link href="/sign-up">
+          <Button size="lg" variant="outline">
+            Create account
+          </Button>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function HomeRedirect() {
+  return (
+    <>
+      <Show when="signed-in">
+        <Dashboard />
+      </Show>
+      <Show when="signed-out">
+        <LandingPage />
+      </Show>
+    </>
+  );
+}
+
+function RequireAuth({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <Show when="signed-in">{children}</Show>
+      <Show when="signed-out">
+        <Redirect to="/" />
+      </Show>
+    </>
+  );
+}
+
+function ClerkQueryClientCacheInvalidator() {
+  const { addListener } = useClerk();
+  const qc = useQueryClient();
+  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const unsubscribe = addListener(({ user }) => {
+      const userId = user?.id ?? null;
+      if (
+        prevUserIdRef.current !== undefined &&
+        prevUserIdRef.current !== userId
+      ) {
+        qc.clear();
+      }
+      prevUserIdRef.current = userId;
+    });
+    return unsubscribe;
+  }, [addListener, qc]);
+
+  return null;
+}
+
+function protectedRoute(Component: React.ComponentType) {
+  return () => (
+    <RequireAuth>
+      <Component />
+    </RequireAuth>
+  );
+}
+
+function AppRoutes() {
   return (
     <Switch>
       {/* Main */}
-      <Route path="/" component={Dashboard} />
-      <Route path="/leads" component={Leads} />
-      <Route path="/companies" component={Companies} />
-      <Route path="/contacts" component={ObContacts} />
-      <Route path="/campaigns" component={ObCampaigns} />
-      <Route path="/templates" component={Templates} />
-      <Route path="/sequences" component={ObSequences} />
-      <Route path="/csv-uploads" component={ObUpload} />
+      <Route path="/" component={HomeRedirect} />
+      <Route path="/sign-in/*?" component={SignInPage} />
+      <Route path="/sign-up/*?" component={SignUpPage} />
+
+      <Route path="/leads" component={protectedRoute(Leads)} />
+      <Route path="/companies" component={protectedRoute(Companies)} />
+      <Route path="/contacts" component={protectedRoute(ObContacts)} />
+      <Route path="/campaigns" component={protectedRoute(ObCampaigns)} />
+      <Route path="/templates" component={protectedRoute(Templates)} />
+      <Route path="/sequences" component={protectedRoute(ObSequences)} />
+      <Route path="/csv-uploads" component={protectedRoute(ObUpload)} />
 
       {/* Outreach */}
-      <Route path="/outbox" component={OutreachQueue} />
-      <Route path="/scheduled-emails" component={ObQueue} />
-      <Route path="/follow-ups" component={Tasks} />
-      <Route path="/deliverability" component={Deliverability} />
-      <Route path="/opens-clicks" component={OpensClicks} />
-      <Route path="/unsubscribes" component={ObSuppression} />
+      <Route path="/outbox" component={protectedRoute(OutreachQueue)} />
+      <Route path="/scheduled-emails" component={protectedRoute(ObQueue)} />
+      <Route path="/follow-ups" component={protectedRoute(Tasks)} />
+      <Route path="/deliverability" component={protectedRoute(Deliverability)} />
+      <Route path="/opens-clicks" component={protectedRoute(OpensClicks)} />
+      <Route path="/unsubscribes" component={protectedRoute(ObSuppression)} />
 
       {/* Qualification */}
-      <Route path="/intent-signals" component={IntentSignals} />
-      <Route path="/lead-scoring" component={LeadScoring} />
-      <Route path="/segments" component={Segments} />
-      <Route path="/pipeline" component={Pipeline} />
+      <Route path="/intent-signals" component={protectedRoute(IntentSignals)} />
+      <Route path="/lead-scoring" component={protectedRoute(LeadScoring)} />
+      <Route path="/segments" component={protectedRoute(Segments)} />
+      <Route path="/pipeline" component={protectedRoute(Pipeline)} />
 
       {/* Admin */}
-      <Route path="/settings" component={SettingsPage} />
-      <Route path="/reply-review" component={ReplyReview} />
-      <Route path="/team-notes" component={TeamNotes} />
-      <Route path="/activity-log" component={ActivityLog} />
+      <Route path="/settings" component={protectedRoute(SettingsPage)} />
+      <Route path="/reply-review" component={protectedRoute(ReplyReview)} />
+      <Route path="/team-notes" component={protectedRoute(TeamNotes)} />
+      <Route path="/activity-log" component={protectedRoute(ActivityLog)} />
 
       {/* Legacy routes — keep existing URLs working */}
-      <Route path="/outreach" component={OutreachQueue} />
-      <Route path="/tasks" component={Tasks} />
-      <Route path="/assets" component={Assets} />
-      <Route path="/data" component={ImportExport} />
-      <Route path="/ob/contacts" component={ObContacts} />
-      <Route path="/ob/upload" component={ObUpload} />
-      <Route path="/ob/campaigns" component={ObCampaigns} />
-      <Route path="/ob/sequences" component={ObSequences} />
-      <Route path="/ob/queue" component={ObQueue} />
-      <Route path="/ob/replies" component={ObReplies} />
-      <Route path="/ob/routing" component={ObRouting} />
-      <Route path="/ob/analytics" component={ObAnalytics} />
-      <Route path="/ob/suppression" component={ObSuppression} />
+      <Route path="/outreach" component={protectedRoute(OutreachQueue)} />
+      <Route path="/tasks" component={protectedRoute(Tasks)} />
+      <Route path="/assets" component={protectedRoute(Assets)} />
+      <Route path="/data" component={protectedRoute(ImportExport)} />
+      <Route path="/ob/contacts" component={protectedRoute(ObContacts)} />
+      <Route path="/ob/upload" component={protectedRoute(ObUpload)} />
+      <Route path="/ob/campaigns" component={protectedRoute(ObCampaigns)} />
+      <Route path="/ob/sequences" component={protectedRoute(ObSequences)} />
+      <Route path="/ob/queue" component={protectedRoute(ObQueue)} />
+      <Route path="/ob/replies" component={protectedRoute(ObReplies)} />
+      <Route path="/ob/routing" component={protectedRoute(ObRouting)} />
+      <Route path="/ob/analytics" component={protectedRoute(ObAnalytics)} />
+      <Route path="/ob/suppression" component={protectedRoute(ObSuppression)} />
 
       <Route component={NotFound} />
     </Switch>
   );
 }
 
+function ClerkProviderWithRoutes() {
+  const [, setLocation] = useLocation();
+
+  return (
+    <ClerkProvider
+      publishableKey={clerkPubKey}
+      proxyUrl={clerkProxyUrl}
+      appearance={clerkAppearance}
+      signInUrl={`${basePath}/sign-in`}
+      signUpUrl={`${basePath}/sign-up`}
+      localization={{
+        signIn: {
+          start: {
+            title: "Welcome back",
+            subtitle: "Sign in to your workspace",
+          },
+        },
+        signUp: {
+          start: {
+            title: "Create your account",
+            subtitle: "Get started with Opypal",
+          },
+        },
+      }}
+      routerPush={(to) => setLocation(stripBase(to))}
+      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+    >
+      <QueryClientProvider client={queryClient}>
+        <ClerkQueryClientCacheInvalidator />
+        <WorkspaceProvider>
+          <TooltipProvider>
+            <AppRoutes />
+            <Toaster />
+          </TooltipProvider>
+        </WorkspaceProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
+  );
+}
+
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <WouterRouter base={basePath}>
+      <ClerkProviderWithRoutes />
+    </WouterRouter>
   );
 }
 
