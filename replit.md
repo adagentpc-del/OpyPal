@@ -1,6 +1,10 @@
 # Overview
 
-A3 Sales OS is an internal sales CRM and outbound operating system designed for A3 Visual. Its core purpose is to optimize sales workflows, manage leads, automate outreach, and meticulously track engagement, thereby boosting sales efficiency and providing comprehensive analytics. The system supports lead nurturing, campaign management, and highly personalized outreach. The A3 Partner Portal, a component of this system, facilitates partner intake and internal request management for event production.
+**Opypal** is a multi-tenant, white-label sales and partner operations platform. The shared technical foundation is referred to as **Opypal Core**. Each tenant/account is a **Workspace** with its own branding; a super admin operates at the Opypal level and (eventually) switches between workspaces, while workspace users only ever see their own workspace branding.
+
+**Workspace 1 (Tenant 1) is A3 Visual.** Within the A3 Visual workspace, the platform delivers an internal sales CRM and outbound operating system (queue-based outreach, sequences, reply tracking, analytics, settings) plus a Partner Portal for partner intake and internal request management for event production. A3 Visual users see A3 Visual branding throughout their workspace.
+
+> Legacy note: this product was originally built as "A3 Sales OS." That name now refers only to the CRM module inside the A3 Visual workspace; the platform itself is Opypal. Older build prompts in `attached_assets/` retain the legacy name for migration history.
 
 # User Preferences
 

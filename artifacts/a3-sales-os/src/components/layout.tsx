@@ -9,6 +9,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { navigationConfig, isActiveRoute, getPageTitle } from "@/lib/navigation";
+import { PLATFORM, CURRENT_WORKSPACE } from "@/config/branding";
 
 const STORAGE_KEY = "a3-sidebar-collapsed";
 
@@ -93,12 +94,17 @@ function SidebarContent({
       <div className={`flex items-center ${collapsed ? "justify-center p-4 pb-3" : "p-6 pb-4"}`}>
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 bg-primary rounded-lg flex items-center justify-center font-bold text-sm text-white shadow-md flex-shrink-0">
-            A3
+            {CURRENT_WORKSPACE.shortCode}
           </div>
           {!collapsed && (
-            <span className="font-bold text-xl tracking-tight text-sidebar-foreground whitespace-nowrap">
-              Sales OS
-            </span>
+            <div className="flex flex-col min-w-0">
+              <span className="font-bold text-xl tracking-tight text-sidebar-foreground whitespace-nowrap leading-none">
+                {CURRENT_WORKSPACE.name}
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mt-1">
+                {PLATFORM.foundation}
+              </span>
+            </div>
           )}
         </div>
       </div>
@@ -133,11 +139,11 @@ function SidebarContent({
         {!collapsed && (
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-sm shadow-sm flex-shrink-0">
-              AV
+              {CURRENT_WORKSPACE.initials}
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-semibold truncate">A3 Visual</span>
-              <span className="text-xs text-muted-foreground truncate">Sales Team</span>
+              <span className="text-sm font-semibold truncate">{CURRENT_WORKSPACE.name}</span>
+              <span className="text-xs text-muted-foreground truncate">{CURRENT_WORKSPACE.roleLabel}</span>
             </div>
           </div>
         )}
@@ -170,6 +176,14 @@ function SidebarContent({
             )}
           </Tooltip>
         )}
+
+        {!collapsed && (
+          <div className="px-3 pt-3 mt-1 border-t border-border/60">
+            <span className="text-[10px] text-muted-foreground/60">
+              Powered by {PLATFORM.name}
+            </span>
+          </div>
+        )}
       </div>
     </>
   );
@@ -180,7 +194,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, toggleCollapsed] = useCollapsed();
 
-  const pageTitle = getPageTitle(location) || "A3 Sales OS";
+  const pageTitle = getPageTitle(location) || CURRENT_WORKSPACE.name;
 
   useEffect(() => {
     setMobileOpen(false);

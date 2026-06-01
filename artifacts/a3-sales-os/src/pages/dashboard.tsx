@@ -6,6 +6,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTo
 import { Users, DollarSign, CalendarCheck, Clock, Activity, TrendingUp, Mail, MessageSquare, Handshake, Target, AlertTriangle, CheckCircle2, XCircle, Repeat, Zap, PauseCircle, ShieldAlert } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
+import { CURRENT_WORKSPACE } from "@/config/branding";
 
 const API_BASE = import.meta.env.BASE_URL + "api";
 
@@ -54,7 +55,7 @@ export default function Dashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground text-sm mt-1">Pipeline overview for A3 Visual sales team.</p>
+            <p className="text-muted-foreground text-sm mt-1">Pipeline overview for {CURRENT_WORKSPACE.name} sales team.</p>
           </div>
           {(d.overdueFollowUps > 0) && (
             <div className="flex items-center gap-2 bg-destructive/10 text-destructive px-4 py-2 rounded-xl text-sm font-semibold">

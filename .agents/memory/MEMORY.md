@@ -1,0 +1,1 @@
+- [Opypal branding model](opypal-branding-model.md) — platform=Opypal / foundation=Opypal Core / tenant=Workspace / Workspace 1=A3 Visual; source UI brand strings from src/config/branding.ts, never hardcode. lib/api-spec/ is off-limits.

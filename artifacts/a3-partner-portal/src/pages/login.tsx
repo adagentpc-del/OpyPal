@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { PLATFORM, CURRENT_WORKSPACE } from "@/config/branding";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -36,7 +37,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="space-y-1 text-center pb-8 pt-8">
-          <h1 className="text-3xl font-bold tracking-tight text-primary">A3 Visual</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-primary">{CURRENT_WORKSPACE.name}</h1>
           <p className="text-sm text-muted-foreground">Enter your admin credentials</p>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -63,8 +64,9 @@ export default function Login() {
               />
             </div>
           </CardContent>
-          <CardFooter className="pt-4 pb-8">
+          <CardFooter className="flex-col gap-4 pt-4 pb-8">
             <Button type="submit" className="w-full h-11 text-lg">Sign In</Button>
+            <p className="text-[11px] text-muted-foreground/60">Powered by {PLATFORM.name}</p>
           </CardFooter>
         </form>
       </Card>

@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, useRoute } from "wouter";
+import { CURRENT_WORKSPACE } from "@/config/branding";
 import { ArrowLeft, Save } from "lucide-react";
 
 export default function AdminPartnerForm() {
@@ -191,7 +192,7 @@ export default function AdminPartnerForm() {
                 <Switch checked={form.pricingDisplayEnabled} onCheckedChange={(v) => setForm({ ...form, pricingDisplayEnabled: v })} />
               </div>
               <div className="flex items-center justify-between">
-                <Label>Show "Powered by A3 Visual" Badge</Label>
+                <Label>Show "Powered by {CURRENT_WORKSPACE.name}" Badge</Label>
                 <Switch checked={form.smallA3BadgeEnabled} onCheckedChange={(v) => setForm({ ...form, smallA3BadgeEnabled: v })} />
               </div>
             </CardContent>

@@ -4,6 +4,7 @@ import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarMenu, S
 import { LayoutDashboard, Users, FileText, Image as ImageIcon, DollarSign, LogOut } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { ReactNode } from "react";
+import { PLATFORM, CURRENT_WORKSPACE } from "@/config/branding";
 
 export function AdminLayout({ children }: { children: ReactNode }) {
   const { logout } = useAuth();
@@ -18,8 +19,9 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-gray-50">
         <Sidebar className="border-r border-gray-200">
-          <SidebarHeader className="h-16 flex items-center justify-center border-b border-gray-200">
-            <span className="font-bold text-xl tracking-tight text-primary">A3 Visual</span>
+          <SidebarHeader className="h-16 flex flex-col items-center justify-center border-b border-gray-200">
+            <span className="font-bold text-xl tracking-tight text-primary leading-none">{CURRENT_WORKSPACE.name}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mt-1">{PLATFORM.foundation}</span>
           </SidebarHeader>
           <SidebarContent>
             <SidebarMenu>

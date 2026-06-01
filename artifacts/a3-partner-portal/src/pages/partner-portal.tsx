@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { CURRENT_WORKSPACE } from "@/config/branding";
 import {
   CheckCircle, ChevronRight, ChevronLeft, Upload, Printer,
   Tent, Palette, Hammer, Sparkles, Gift, ArrowRight,
@@ -207,7 +208,7 @@ export default function PartnerPortal() {
             </div>
             {partner.smallA3BadgeEnabled && (
               <div className="text-xs opacity-70 flex items-center gap-1">
-                Powered by <span className="font-semibold">A3 Visual</span>
+                Powered by <span className="font-semibold">{CURRENT_WORKSPACE.name}</span>
               </div>
             )}
           </div>
@@ -231,7 +232,7 @@ export default function PartnerPortal() {
               className="w-full h-full"
               allow="autoplay; encrypted-media"
               allowFullScreen
-              title="A3 Visual Sizzle Reel"
+              title={`${CURRENT_WORKSPACE.name} Sizzle Reel`}
             />
           </div>
         )}
@@ -677,7 +678,7 @@ export default function PartnerPortal() {
 
       <footer className="bg-gray-50 border-t mt-16 py-8">
         <div className="max-w-5xl mx-auto px-6 text-center text-sm text-muted-foreground">
-          <p>Powered by A3 Visual &middot; Premier Event Production</p>
+          <p>Powered by {CURRENT_WORKSPACE.name} &middot; Premier Event Production</p>
         </div>
       </footer>
 

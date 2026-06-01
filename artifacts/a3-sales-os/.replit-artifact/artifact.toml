@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "A3 Sales OS"
+title = "A3 Visual — Opypal"
 version = "1.0.0"
 id = "artifacts/a3-sales-os"
 router = "path"
