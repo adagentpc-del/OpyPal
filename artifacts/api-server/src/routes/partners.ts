@@ -1,10 +1,11 @@
 import { Router } from "express";
+import { requireAuth } from "../middleware/clerk-auth";
 import { db, partnersTable, partnerAssetsTable, pricingRulesTable, partnerRequestsTable, requestItemsTable, requestUploadsTable, adminNotesTable } from "@workspace/db";
 import { eq, desc, and, ilike, sql } from "drizzle-orm";
 
 const router = Router();
 
-router.get("/partners", async (req, res) => {
+router.get("/partners", requireAuth, async (req, res) => {
   try {
     const partners = await db.select().from(partnersTable).orderBy(desc(partnersTable.createdAt));
     res.json(partners);
@@ -13,7 +14,7 @@ router.get("/partners", async (req, res) => {
   }
 });
 
-router.get("/partners/:id", async (req, res) => {
+router.get("/partners/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [partner] = await db.select().from(partnersTable).where(eq(partnersTable.id, id));
@@ -45,7 +46,7 @@ router.get("/partners/slug/:slug", async (req, res) => {
   }
 });
 
-router.post("/partners", async (req, res) => {
+router.post("/partners", requireAuth, async (req, res) => {
   try {
     const [partner] = await db.insert(partnersTable).values({
       ...req.body,
@@ -58,7 +59,7 @@ router.post("/partners", async (req, res) => {
   }
 });
 
-router.put("/partners/:id", async (req, res) => {
+router.put("/partners/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { assets, ...data } = req.body;
@@ -70,7 +71,7 @@ router.put("/partners/:id", async (req, res) => {
   }
 });
 
-router.delete("/partners/:id", async (req, res) => {
+router.delete("/partners/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     await db.delete(partnerAssetsTable).where(eq(partnerAssetsTable.partnerId, id));
@@ -81,7 +82,7 @@ router.delete("/partners/:id", async (req, res) => {
   }
 });
 
-router.post("/partners/:id/assets", async (req, res) => {
+router.post("/partners/:id/assets", requireAuth, async (req, res) => {
   try {
     const partnerId = parseInt(req.params.id);
     const [asset] = await db.insert(partnerAssetsTable).values({
@@ -94,7 +95,7 @@ router.post("/partners/:id/assets", async (req, res) => {
   }
 });
 
-router.delete("/partner-assets/:id", async (req, res) => {
+router.delete("/partner-assets/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     await db.delete(partnerAssetsTable).where(eq(partnerAssetsTable.id, id));

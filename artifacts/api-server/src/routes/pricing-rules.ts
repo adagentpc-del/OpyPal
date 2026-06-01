@@ -1,10 +1,11 @@
 import { Router } from "express";
+import { requireAuth } from "../middleware/clerk-auth";
 import { db, pricingRulesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 
 const router = Router();
 
-router.get("/pricing-rules", async (_req, res) => {
+router.get("/pricing-rules", requireAuth, async (_req, res) => {
   try {
     const rules = await db.select().from(pricingRulesTable).orderBy(pricingRulesTable.category, pricingRulesTable.itemName);
     res.json(rules);
@@ -13,7 +14,7 @@ router.get("/pricing-rules", async (_req, res) => {
   }
 });
 
-router.post("/pricing-rules", async (req, res) => {
+router.post("/pricing-rules", requireAuth, async (req, res) => {
   try {
     const [rule] = await db.insert(pricingRulesTable).values({
       ...req.body,
@@ -26,7 +27,7 @@ router.post("/pricing-rules", async (req, res) => {
   }
 });
 
-router.put("/pricing-rules/:id", async (req, res) => {
+router.put("/pricing-rules/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [rule] = await db.update(pricingRulesTable).set({ ...req.body, updatedAt: new Date() }).where(eq(pricingRulesTable.id, id)).returning();
@@ -37,7 +38,7 @@ router.put("/pricing-rules/:id", async (req, res) => {
   }
 });
 
-router.delete("/pricing-rules/:id", async (req, res) => {
+router.delete("/pricing-rules/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     await db.delete(pricingRulesTable).where(eq(pricingRulesTable.id, id));

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireAuth } from "../middleware/clerk-auth";
 import { db, partnerRequestsTable, requestItemsTable, requestUploadsTable, adminNotesTable, partnersTable } from "@workspace/db";
 import { eq, desc, and, ilike, sql } from "drizzle-orm";
 import { generateInternalSummary, generateAiSummary, getRecommendedUpsells, estimateScopeLevel } from "../lib/partner-ai";
@@ -6,7 +7,7 @@ import { sendAdminNotification } from "../lib/email-adapters";
 
 const router = Router();
 
-router.get("/partner-requests", async (req, res) => {
+router.get("/partner-requests", requireAuth, async (req, res) => {
   try {
     const { partnerId, status, search } = req.query;
     let query = db.select({
@@ -32,7 +33,7 @@ router.get("/partner-requests", async (req, res) => {
   }
 });
 
-router.get("/partner-requests/dashboard/summary", async (req, res) => {
+router.get("/partner-requests/dashboard/summary", requireAuth, async (req, res) => {
   try {
     const [total] = await db.select({ count: sql<number>`count(*)::int` }).from(partnerRequestsTable);
     const statusCounts = await db
@@ -52,7 +53,7 @@ router.get("/partner-requests/dashboard/summary", async (req, res) => {
   }
 });
 
-router.get("/partner-requests/:id", async (req, res) => {
+router.get("/partner-requests/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [request] = await db.select({
@@ -158,7 +159,7 @@ router.post("/partner-requests", async (req, res) => {
   }
 });
 
-router.patch("/partner-requests/:id/status", async (req, res) => {
+router.patch("/partner-requests/:id/status", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { status } = req.body;
@@ -170,7 +171,7 @@ router.patch("/partner-requests/:id/status", async (req, res) => {
   }
 });
 
-router.post("/partner-requests/:id/notes", async (req, res) => {
+router.post("/partner-requests/:id/notes", requireAuth, async (req, res) => {
   try {
     const requestId = parseInt(req.params.id);
     const [note] = await db.insert(adminNotesTable).values({
