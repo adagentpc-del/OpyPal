@@ -102,11 +102,25 @@ function LandingPage() {
     <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-gradient-to-b from-white to-gray-50 px-6 text-center">
       <img src={`${basePath}/logo.svg`} alt={PLATFORM.name} className="h-12 mb-8" />
       <h1 className="max-w-2xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-        {PLATFORM.fullName}
+        {PLATFORM.tagline}
       </h1>
       <p className="mt-4 max-w-xl text-lg text-muted-foreground">
-        {PLATFORM.tagline}. Run your pipeline, outreach, and qualification in one place.
+        {PLATFORM.fullName} — the system that supports and organizes your business.
       </p>
+      <div className="mt-8 grid max-w-2xl gap-3 text-left sm:grid-cols-3">
+        <div className="rounded-lg border bg-white/60 p-4">
+          <p className="text-sm font-semibold text-foreground">Opportunity</p>
+          <p className="mt-1 text-sm text-muted-foreground">{PLATFORM.pillars.opportunity}</p>
+        </div>
+        <div className="rounded-lg border bg-white/60 p-4">
+          <p className="text-sm font-semibold text-foreground">Operations</p>
+          <p className="mt-1 text-sm text-muted-foreground">{PLATFORM.pillars.operations}</p>
+        </div>
+        <div className="rounded-lg border bg-white/60 p-4">
+          <p className="text-sm font-semibold text-foreground">Pal</p>
+          <p className="mt-1 text-sm text-muted-foreground">{PLATFORM.pillars.pal}</p>
+        </div>
+      </div>
       <div className="mt-8 flex items-center gap-3">
         <Link href="/sign-in">
           <Button size="lg">Sign in</Button>

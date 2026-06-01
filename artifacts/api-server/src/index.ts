@@ -4,6 +4,7 @@ import { testConnection, seedFromSheetIfEmpty } from "./lib/sheets-sync";
 import { db, leadsTable } from "@workspace/db";
 import { startScheduler } from "./lib/background-scheduler";
 import { seedTemplatesIfEmpty } from "./lib/seed-templates-on-boot";
+import { seedWorkspacesIfNeeded } from "./lib/seed-workspaces-on-boot";
 
 const rawPort = process.env["PORT"];
 
@@ -78,6 +79,12 @@ app.listen(port, async () => {
     }
   } catch (err: any) {
     logger.warn({ err: err.message }, "Template auto-seed failed");
+  }
+
+  try {
+    await seedWorkspacesIfNeeded();
+  } catch (err: any) {
+    logger.warn({ err: err.message }, "Workspace seed failed");
   }
 
   try {

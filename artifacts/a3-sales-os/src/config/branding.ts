@@ -13,8 +13,14 @@
 export const PLATFORM = {
   name: "OpyPal",
   fullName: "Opportunity Operations Pal",
-  tagline: "Automated CRM & relationship management",
+  tagline: "Opportunity. Operations. Pal.",
   foundation: "OpyPal Core",
+  // Product narrative — what each part of the name means.
+  pillars: {
+    opportunity: "Pipeline, leads, partnerships, and revenue growth.",
+    operations: "Workflow, automation, queue management, and execution.",
+    pal: "The system that supports and organizes your business.",
+  },
 } as const;
 
 export interface Workspace {
