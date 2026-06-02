@@ -21,14 +21,23 @@ import {
   StickyNote,
   Activity,
   MessageCircle,
+  UserCog,
+  ShieldCheck,
+  Users2,
   type LucideIcon,
 } from "lucide-react";
+import type { AppRole } from "@/hooks/use-workspace";
+import { roleAtLeast } from "@/lib/permissions";
 
 export interface NavItem {
   name: string;
   href: string;
   icon: LucideIcon;
   description: string;
+  // Minimum role required to see/use this item. Defaults to "viewer".
+  minRole?: AppRole;
+  // When true, only the platform super admin sees this item.
+  superAdminOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -73,10 +82,18 @@ export const navigationConfig: NavGroup[] = [
   {
     label: "Admin",
     items: [
-      { name: "Settings", href: "/settings", icon: Settings, description: "Application settings" },
+      { name: "Settings", href: "/settings", icon: Settings, description: "Application settings", minRole: "manager" },
       { name: "Reply Review", href: "/reply-review", icon: MessageCircle, description: "Review uncertain email replies" },
       { name: "Team Notes", href: "/team-notes", icon: StickyNote, description: "Shared notes and documentation" },
-      { name: "Activity Log", href: "/activity-log", icon: Activity, description: "System activity history" },
+      { name: "Activity Log", href: "/activity-log", icon: Activity, description: "System activity history", minRole: "manager" },
+    ],
+  },
+  {
+    label: "User Management",
+    items: [
+      { name: "Workspace Members", href: "/members", icon: Users2, description: "Invite and manage members of this workspace", minRole: "workspace_admin" },
+      { name: "Access & Permissions", href: "/access", icon: ShieldCheck, description: "Roles and what each can do" },
+      { name: "All Users", href: "/users", icon: UserCog, description: "Manage users across every workspace", superAdminOnly: true },
     ],
   },
 ];
@@ -111,4 +128,33 @@ export function isActiveRoute(currentPath: string, itemHref: string): boolean {
   const canonical = resolveCanonicalPath(currentPath);
   if (itemHref === "/") return canonical === "/";
   return canonical === itemHref || canonical.startsWith(itemHref + "/");
+}
+
+// True when a user with the given role (and super-admin flag) may see/use the
+// nav item, honoring both superAdminOnly and minRole.
+export function canSeeNavItem(
+  item: NavItem,
+  role: AppRole,
+  isSuperAdmin: boolean,
+): boolean {
+  if (item.superAdminOnly) return isSuperAdmin;
+  if (isSuperAdmin) return true;
+  if (!item.minRole) return true;
+  return roleAtLeast(role, item.minRole);
+}
+
+// Returns only the groups (and items) visible to the given role, dropping any
+// group that ends up empty.
+export function visibleNavigation(
+  role: AppRole,
+  isSuperAdmin: boolean,
+): NavGroup[] {
+  return navigationConfig
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        canSeeNavItem(item, role, isSuperAdmin),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
 }

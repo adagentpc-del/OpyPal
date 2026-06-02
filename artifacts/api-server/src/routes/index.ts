@@ -2,6 +2,8 @@ import { Router, type IRouter } from "express";
 import { requireAuth, resolveWorkspace } from "../middleware/clerk-auth";
 import meRouter from "./me";
 import workspacesRouter from "./workspaces";
+import adminRouter from "./admin";
+import membersRouter from "./members";
 import healthRouter from "./health";
 import leadsRouter from "./leads";
 import tasksRouter from "./tasks";
@@ -34,6 +36,7 @@ const router: IRouter = Router();
 router.use(healthRouter);
 router.use(meRouter); // applies requireAuth internally
 router.use(workspacesRouter); // applies requireAuth/requireSuperAdmin internally
+router.use(adminRouter); // platform admin (super-admin only) — global users
 
 // Partner-portal routers manage their own auth + workspace resolution
 // internally (they expose public partner pages and intake endpoints).
@@ -54,6 +57,7 @@ router.use(outlookRouter);
 // resolveWorkspace run here so every handler has a validated req.workspaceId
 // and cross-workspace access is impossible.
 const scoped = [requireAuth, resolveWorkspace] as const;
+router.use(...scoped, membersRouter);
 router.use(...scoped, leadsRouter);
 router.use(...scoped, tasksRouter);
 router.use(...scoped, templatesRouter);

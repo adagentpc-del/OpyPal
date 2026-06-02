@@ -27,10 +27,14 @@ router.get("/me", requireAuth, async (req, res) => {
 
   workspaces.sort((a, b) => a.id - b.id);
 
+  // Map workspaceId → the caller's role in that workspace.
+  const roleByWorkspace = new Map<number, string>();
+  for (const m of ctx.memberships) roleByWorkspace.set(m.workspaceId, m.role);
+
   const role = ctx.isSuperAdmin
     ? "super_admin"
     : workspaces.length > 0
-      ? "workspace_admin"
+      ? roleByWorkspace.get(workspaces[0]!.id) ?? "workspace_admin"
       : "none";
 
   res.json({
@@ -48,6 +52,11 @@ router.get("/me", requireAuth, async (req, res) => {
       logoUrl: w.logoUrl,
       primaryColor: w.primaryColor,
       isActive: w.isActive,
+      // The caller's role within this workspace. Super admins act as
+      // "super_admin" everywhere; members get their stored role.
+      role: ctx.isSuperAdmin
+        ? "super_admin"
+        : roleByWorkspace.get(w.id) ?? "workspace_admin",
     })),
   });
 });

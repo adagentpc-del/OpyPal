@@ -28,6 +28,20 @@ export type WorkspaceRole =
   | "operator"
   | "viewer";
 
+// All assignable workspace roles, lowest → highest privilege. `super_admin` is
+// intentionally excluded: it is platform-level and cannot be assigned via the
+// member API (it comes only from SUPER_ADMIN_EMAILS).
+export const ALL_WORKSPACE_ROLES: WorkspaceRole[] = [
+  "viewer",
+  "operator",
+  "manager",
+  "workspace_admin",
+];
+
+// Membership lifecycle states stored in workspace_members.status.
+export const MEMBER_STATUSES = ["active", "suspended"] as const;
+export type MemberStatus = (typeof MEMBER_STATUSES)[number];
+
 // Higher number = more privilege. Used to gate routes by a minimum role.
 export const ROLE_RANK: Record<string, number> = {
   viewer: 1,
@@ -40,6 +54,40 @@ export const ROLE_RANK: Record<string, number> = {
 export function roleAtLeast(role: string, min: WorkspaceRole): boolean {
   return (ROLE_RANK[role] ?? 0) >= (ROLE_RANK[min] ?? Number.POSITIVE_INFINITY);
 }
+
+// Coarse capability model used both to gate sensitive actions on the server and
+// to drive module/button visibility on the client (mirrored in the frontend's
+// lib/permissions.ts). Each capability maps to the minimum role that holds it.
+// super_admin holds every capability.
+export type Capability =
+  | "view" // read workspace data
+  | "act" // act on records (send, enroll, edit own work)
+  | "mutate" // create/update/delete records
+  | "manage" // manage members, settings within a workspace
+  | "admin"; // full workspace administration
+
+export const CAPABILITY_MIN_ROLE: Record<Capability, WorkspaceRole> = {
+  view: "viewer",
+  act: "operator",
+  mutate: "operator",
+  manage: "manager",
+  admin: "workspace_admin",
+};
+
+// True when the given role (or super_admin) holds the capability.
+export function roleCan(role: string, capability: Capability): boolean {
+  if (role === "super_admin") return true;
+  return roleAtLeast(role, CAPABILITY_MIN_ROLE[capability]);
+}
+
+// Human-friendly labels for roles, shown in the UI.
+export const ROLE_LABELS: Record<string, string> = {
+  super_admin: "Super Admin",
+  workspace_admin: "Workspace Admin",
+  manager: "Manager",
+  operator: "Operator",
+  viewer: "Viewer",
+};
 
 export function slugify(input: string): string {
   return input

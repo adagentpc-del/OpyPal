@@ -99,6 +99,11 @@ export const workspaceMembersTable = pgTable(
     email: text("email").notNull(),
     clerkUserId: text("clerk_user_id"),
     role: text("role").default("workspace_admin").notNull(),
+    // "active" | "suspended". Suspended members keep their row (and history)
+    // but are denied access until reactivated.
+    status: text("status").default("active").notNull(),
+    // Email of the super_admin / workspace_admin who created the membership.
+    createdBy: text("created_by"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

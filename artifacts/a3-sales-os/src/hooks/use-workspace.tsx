@@ -9,6 +9,14 @@ import {
 import { useAuth } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
 
+export type AppRole =
+  | "super_admin"
+  | "workspace_admin"
+  | "manager"
+  | "operator"
+  | "viewer"
+  | "none";
+
 export interface WorkspaceSummary {
   id: number;
   name: string;
@@ -19,12 +27,14 @@ export interface WorkspaceSummary {
   logoUrl?: string | null;
   primaryColor?: string | null;
   isActive?: boolean;
+  // The signed-in user's role within this specific workspace.
+  role?: AppRole;
 }
 
 export interface Me {
   email: string;
   isSuperAdmin: boolean;
-  role: "super_admin" | "workspace_admin" | "none";
+  role: AppRole;
   platform: { name: string; foundation: string };
   workspaces: WorkspaceSummary[];
 }
@@ -33,6 +43,9 @@ interface WorkspaceContextValue {
   me: Me | null;
   isLoading: boolean;
   currentWorkspace: WorkspaceSummary | null;
+  // The user's effective role in the currently selected workspace
+  // (super_admin everywhere for super admins).
+  currentRole: AppRole;
   setCurrentWorkspaceId: (id: number) => void;
   refresh: () => Promise<void>;
 }
@@ -106,9 +119,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     me?.workspaces[0] ??
     null;
 
+  const currentRole: AppRole = me?.isSuperAdmin
+    ? "super_admin"
+    : currentWorkspace?.role ?? "none";
+
   return (
     <WorkspaceContext.Provider
-      value={{ me, isLoading, currentWorkspace, setCurrentWorkspaceId, refresh: load }}
+      value={{
+        me,
+        isLoading,
+        currentWorkspace,
+        currentRole,
+        setCurrentWorkspaceId,
+        refresh: load,
+      }}
     >
       {children}
     </WorkspaceContext.Provider>

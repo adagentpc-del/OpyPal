@@ -96,7 +96,7 @@ router.get("/scheduler/status", async (_req, res) => {
   }
 });
 
-router.post("/scheduler/start", async (_req, res) => {
+router.post("/scheduler/start", requireRole("workspace_admin"), async (_req, res) => {
   try {
     startScheduler();
     const status = await getSchedulerStatus();
@@ -106,7 +106,7 @@ router.post("/scheduler/start", async (_req, res) => {
   }
 });
 
-router.post("/scheduler/stop", async (_req, res) => {
+router.post("/scheduler/stop", requireRole("workspace_admin"), async (_req, res) => {
   try {
     stopScheduler();
     const status = await getSchedulerStatus();

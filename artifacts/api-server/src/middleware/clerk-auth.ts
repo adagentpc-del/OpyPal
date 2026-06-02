@@ -84,7 +84,11 @@ export async function loadAuthContext(
       .from(workspaceMembersTable)
       .where(eq(workspaceMembersTable.email, email));
 
-    memberships = rows.map((r) => ({ workspaceId: r.workspaceId, role: r.role }));
+    // Suspended memberships grant no access: the row is retained for history
+    // but excluded from the caller's effective workspace memberships.
+    memberships = rows
+      .filter((r) => r.status !== "suspended")
+      .map((r) => ({ workspaceId: r.workspaceId, role: r.role }));
 
     // Backfill the Clerk user id on memberships the first time this person
     // signs in, so we can later reference them by id.

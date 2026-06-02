@@ -20,7 +20,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { clerkAppearance } from "@/lib/clerk-appearance";
-import { WorkspaceProvider, useWorkspace } from "@/hooks/use-workspace";
+import { WorkspaceProvider, useWorkspace, type AppRole } from "@/hooks/use-workspace";
+import { roleAtLeast, roleLabel } from "@/lib/permissions";
 import { PLATFORM } from "@/config/branding";
 import NotFound from "@/pages/not-found";
 
@@ -52,6 +53,9 @@ import SettingsPage from "./pages/settings";
 import TeamNotes from "./pages/team-notes";
 import ActivityLog from "./pages/activity-log";
 import ReplyReview from "./pages/reply-review";
+import Members from "./pages/members";
+import Users from "./pages/users";
+import Access from "./pages/access";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -221,6 +225,55 @@ function protectedRoute(Component: React.ComponentType) {
   );
 }
 
+// Gates a page on a minimum role (super admins always pass). Renders a clear
+// "no access" message rather than redirecting, so the URL stays put.
+function RequireRole({
+  min,
+  superAdminOnly = false,
+  children,
+}: {
+  min?: AppRole;
+  superAdminOnly?: boolean;
+  children: ReactNode;
+}) {
+  const { currentRole, me } = useWorkspace();
+  const isSuper = me?.isSuperAdmin ?? false;
+  const allowed = superAdminOnly
+    ? isSuper
+    : isSuper || (min ? roleAtLeast(currentRole, min) : true);
+
+  if (!allowed) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+        <h1 className="text-xl font-semibold text-foreground">
+          You don’t have access to this page
+        </h1>
+        <p className="mt-2 max-w-md text-sm text-muted-foreground">
+          Your role ({roleLabel(currentRole)}) doesn’t include this area. Contact
+          a workspace admin if you need access.
+        </p>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
+function roleRoute(
+  Component: React.ComponentType,
+  opts: { min?: AppRole; superAdminOnly?: boolean },
+) {
+  return () => (
+    <RequireAuth>
+      <RequireWorkspace>
+        <RequireRole min={opts.min} superAdminOnly={opts.superAdminOnly}>
+          <Component />
+        </RequireRole>
+      </RequireWorkspace>
+    </RequireAuth>
+  );
+}
+
 function AppRoutes() {
   return (
     <Switch>
@@ -252,10 +305,15 @@ function AppRoutes() {
       <Route path="/pipeline" component={protectedRoute(Pipeline)} />
 
       {/* Admin */}
-      <Route path="/settings" component={protectedRoute(SettingsPage)} />
+      <Route path="/settings" component={roleRoute(SettingsPage, { min: "manager" })} />
       <Route path="/reply-review" component={protectedRoute(ReplyReview)} />
       <Route path="/team-notes" component={protectedRoute(TeamNotes)} />
-      <Route path="/activity-log" component={protectedRoute(ActivityLog)} />
+      <Route path="/activity-log" component={roleRoute(ActivityLog, { min: "manager" })} />
+
+      {/* User management */}
+      <Route path="/members" component={roleRoute(Members, { min: "workspace_admin" })} />
+      <Route path="/access" component={protectedRoute(Access)} />
+      <Route path="/users" component={roleRoute(Users, { superAdminOnly: true })} />
 
       {/* Legacy routes — keep existing URLs working */}
       <Route path="/outreach" component={protectedRoute(OutreachQueue)} />

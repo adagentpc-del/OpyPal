@@ -18,9 +18,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronsUpDown, Check } from "lucide-react";
-import { navigationConfig, isActiveRoute, getPageTitle } from "@/lib/navigation";
+import { visibleNavigation, isActiveRoute, getPageTitle } from "@/lib/navigation";
 import { PLATFORM, CURRENT_WORKSPACE } from "@/config/branding";
 import { useWorkspace } from "@/hooks/use-workspace";
+import { roleLabel } from "@/lib/permissions";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -102,7 +103,7 @@ function SidebarContent({
   onNavigate?: () => void;
   showCollapseToggle?: boolean;
 }) {
-  const { me, currentWorkspace, setCurrentWorkspaceId } = useWorkspace();
+  const { me, currentWorkspace, currentRole, setCurrentWorkspaceId } = useWorkspace();
   const { signOut } = useClerk();
   const workspaces = me?.workspaces ?? [];
   const canSwitch = workspaces.length > 1;
@@ -111,8 +112,9 @@ function SidebarContent({
     currentWorkspace?.shortCode ?? currentWorkspace?.initials ?? CURRENT_WORKSPACE.shortCode;
   const wsInitials = currentWorkspace?.initials ?? CURRENT_WORKSPACE.initials;
   const wsRoleLabel = me?.isSuperAdmin
-    ? PLATFORM.name
-    : currentWorkspace?.roleLabel ?? CURRENT_WORKSPACE.roleLabel;
+    ? "Super Admin"
+    : roleLabel(currentRole);
+  const navGroups = visibleNavigation(currentRole, me?.isSuperAdmin ?? false);
 
   return (
     <>
@@ -184,7 +186,7 @@ function SidebarContent({
       </div>
 
       <div className={`flex-1 overflow-y-auto py-2 space-y-1 ${collapsed ? "px-2" : "px-4"}`}>
-        {navigationConfig.map((group, gi) => (
+        {navGroups.map((group, gi) => (
           <div key={group.label}>
             <div className={gi > 0 ? "pt-4 pb-1" : "pb-1"}>
               {!collapsed ? (

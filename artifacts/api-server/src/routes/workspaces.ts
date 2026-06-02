@@ -1,13 +1,15 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and } from "drizzle-orm";
 import { db, workspacesTable, workspaceMembersTable } from "@workspace/db";
 import {
   requireAuth,
   requireSuperAdmin,
   requireWorkspaceAccess,
+  requireRole,
 } from "../middleware/clerk-auth";
-import { slugify } from "../lib/platform";
+import { slugify, ALL_WORKSPACE_ROLES } from "../lib/platform";
+import { writeAudit } from "../lib/audit";
 
 const router: IRouter = Router();
 
@@ -34,7 +36,7 @@ const updateWorkspaceSchema = createWorkspaceSchema.partial();
 
 const addMemberSchema = z.object({
   email: z.string().trim().toLowerCase().email("A valid email is required"),
-  role: z.enum(["workspace_admin", "member"]).optional(),
+  role: z.enum(ALL_WORKSPACE_ROLES as [string, ...string[]]).optional(),
 });
 
 // List workspaces visible to the caller (all for super admin, own otherwise).
@@ -123,11 +125,12 @@ router.patch("/workspaces/:id", requireAuth, requireSuperAdmin, async (req, res)
   res.json(updated);
 });
 
-// List members of a workspace (super admin or a member of that workspace).
+// List members of a workspace (super admin or a workspace admin of that workspace).
 router.get(
   "/workspaces/:id/members",
   requireAuth,
   requireWorkspaceAccess,
+  requireRole("workspace_admin"),
   async (req, res) => {
     const id = Number(req.params.id);
     const members = await db
@@ -174,14 +177,26 @@ router.post(
       return;
     }
 
+    const role = parsed.data.role || "workspace_admin";
     const [member] = await db
       .insert(workspaceMembersTable)
       .values({
         workspaceId: id,
         email: parsed.data.email,
-        role: parsed.data.role || "workspace_admin",
+        role,
+        status: "active",
+        createdBy: req.authContext?.email ?? null,
       })
       .returning();
+
+    await writeAudit({
+      workspaceId: id,
+      type: "member_invited",
+      description: `Invited ${parsed.data.email} as ${role}`,
+      createdBy: req.authContext?.email,
+      metadata: { email: parsed.data.email, role, via: "workspaces" },
+    });
+
     res.status(201).json(member);
   },
 );
@@ -192,14 +207,34 @@ router.delete(
   requireAuth,
   requireSuperAdmin,
   async (req, res) => {
+    const id = Number(req.params.id);
     const memberId = Number(req.params.memberId);
-    if (!Number.isFinite(memberId)) {
+    if (!Number.isFinite(memberId) || !Number.isFinite(id)) {
       res.status(400).json({ message: "Invalid member id" });
       return;
     }
-    await db
+    const [deleted] = await db
       .delete(workspaceMembersTable)
-      .where(eq(workspaceMembersTable.id, memberId));
+      .where(
+        and(
+          eq(workspaceMembersTable.id, memberId),
+          eq(workspaceMembersTable.workspaceId, id),
+        ),
+      )
+      .returning();
+    if (!deleted) {
+      res.status(404).json({ message: "Member not found" });
+      return;
+    }
+
+    await writeAudit({
+      workspaceId: id,
+      type: "member_removed",
+      description: `Removed ${deleted.email} from the workspace`,
+      createdBy: req.authContext?.email,
+      metadata: { email: deleted.email, role: deleted.role, via: "workspaces" },
+    });
+
     res.json({ message: "Member removed" });
   },
 );

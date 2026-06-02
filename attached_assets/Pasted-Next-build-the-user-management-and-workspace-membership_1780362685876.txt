@@ -1,0 +1,88 @@
+Next, build the user management and workspace membership layer for Opypal.
+
+This is required so each workspace can have multiple users on their own profiles with role-based permissions, while only I as super_admin can access everything.
+
+Implement the following in the Sales OS / Opypal codebase only:
+
+1. Workspace membership system
+- Make workspace_members fully operational
+- Users can belong to a specific workspace with a specific role
+- Support:
+  - super_admin
+  - workspace_admin
+  - manager
+  - operator
+  - viewer
+
+2. Super admin rules
+- I am the only super_admin
+- I can access all workspaces
+- I can switch between all workspaces
+- I can view and manage all users, workspaces, permissions, settings, and data
+- I can create, edit, suspend, or remove workspace users
+- I can impersonate or view a workspace context if needed
+
+3. Workspace user rules
+- workspace_admin can only access their own workspace
+- manager can only access their own workspace with limited admin authority
+- operator can only access their own workspace and assigned modules/actions
+- viewer is read-only in their own workspace
+- no one except super_admin can access another workspace by URL, API route, record ID, or direct query
+
+4. User management UI
+Build real pages for:
+- Users
+- Workspace Members
+- Role Assignment
+- Access / Permission Settings
+
+Required features:
+- create user
+- invite user
+- assign workspace
+- assign role
+- edit role
+- activate / deactivate user
+- remove user from workspace
+- view which workspace(s) they belong to
+- show status badges
+
+5. Permission enforcement
+Implement backend and frontend permission checks for:
+- workspace access
+- role-based actions
+- admin routes
+- module visibility
+- record mutations
+- settings access
+- provider connection access
+
+6. Seed memberships
+Seed the system with:
+- me as the only super_admin with access to all workspaces
+- sample workspace_admin for A3 Visual
+- sample workspace_admin for Move Mi
+- sample workspace_admin for StrataLogic
+- sample lower-level roles for testing if helpful
+
+7. Workspace-aware auth UX
+- super_admin sees workspace switcher
+- workspace users see only their own workspace
+- unauthorized routes redirect cleanly
+- unauthorized actions show proper errors
+
+8. Auditability
+Log user management actions in activity / audit log:
+- invite
+- role change
+- membership change
+- deactivation
+- removal
+
+After implementation, provide:
+a. exact files changed
+b. pages added or updated
+c. how roles are enforced
+d. how workspace_members now works
+e. how super_admin override works
+f. any remaining permission gaps

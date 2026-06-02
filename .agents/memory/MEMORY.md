@@ -1,2 +1,4 @@
-- [Partner Portal auth boundaries](partner-portal-auth.md) — which API endpoints stay public vs. require Clerk auth; web auth is cookie-based same-origin.
-- [Opypal multi-tenant model](opypal-multitenant.md) — super-admin allowlist vs. workspace_members; partner-domain (7 tables) IS workspace-scoped + enforcement pattern; CRM/sales-os tables still single-tenant.
+# Memory Index
+
+- [lib/db composite build + DDL](db-package-build.md) — rebuild lib/db dist after schema edits or consumers typecheck stale; use psql for DDL (drizzle push is interactive); api-server has ~150 pre-existing tsc errors.
+- [Sales OS workspace RBAC](sales-os-rbac.md) — role ranks, super_admin allowlist, suspended=denied at auth-load, super-admin cross-ws needs explicit x-workspace-id header, control-plane routes need explicit requireRole.
