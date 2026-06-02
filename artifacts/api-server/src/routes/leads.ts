@@ -17,6 +17,7 @@ import {
   CreateLeadHistoryBody,
 } from "@workspace/api-zod";
 import { syncLeadToSheet, deleteLeadFromSheet, fullSyncToSheet } from "../lib/sheets-sync";
+import { requireRole } from "../middleware/clerk-auth";
 
 const router: IRouter = Router();
 
@@ -51,7 +52,7 @@ function inferPipeline(lead: { companyName?: string; title?: string; industry?: 
 router.get("/leads", async (req, res) => {
   try {
     const query = GetLeadsQueryParams.parse(req.query);
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(leadsTable.workspaceId, req.workspaceId!)];
 
     if (query.search) {
       const searchTerm = `%${query.search}%`;
@@ -90,7 +91,7 @@ router.get("/leads", async (req, res) => {
   }
 });
 
-router.post("/leads", async (req, res) => {
+router.post("/leads", requireRole("operator"), async (req, res) => {
   try {
     const data = CreateLeadBody.parse(req.body);
     const forecastValue = calculateForecast(
@@ -106,12 +107,14 @@ router.post("/leads", async (req, res) => {
       proposalValue: data.proposalValue?.toString(),
       closeProbability: data.closeProbability?.toString(),
       forecastValue,
+      workspaceId: req.workspaceId!,
     }).returning();
 
     await db.insert(activityTable).values({
       type: "lead_created",
       description: `New lead created: ${lead.companyName}`,
       leadId: lead.id,
+      workspaceId: req.workspaceId!,
     });
 
     syncLeadToSheet(lead).catch(() => {});
@@ -125,7 +128,7 @@ router.post("/leads", async (req, res) => {
 router.get("/leads/:id", async (req, res) => {
   try {
     const { id } = GetLeadParams.parse({ id: req.params.id });
-    const [lead] = await db.select().from(leadsTable).where(eq(leadsTable.id, id));
+    const [lead] = await db.select().from(leadsTable).where(and(eq(leadsTable.id, id), eq(leadsTable.workspaceId, req.workspaceId!)));
     if (!lead) return res.status(404).json({ message: "Lead not found" });
     res.json(lead);
   } catch (err: any) {
@@ -133,7 +136,7 @@ router.get("/leads/:id", async (req, res) => {
   }
 });
 
-router.put("/leads/:id", async (req, res) => {
+router.put("/leads/:id", requireRole("operator"), async (req, res) => {
   try {
     const { id } = UpdateLeadParams.parse({ id: req.params.id });
     const data = UpdateLeadBody.parse(req.body);
@@ -153,7 +156,7 @@ router.put("/leads/:id", async (req, res) => {
         forecastValue,
         updatedAt: new Date(),
       })
-      .where(eq(leadsTable.id, id))
+      .where(and(eq(leadsTable.id, id), eq(leadsTable.workspaceId, req.workspaceId!)))
       .returning();
 
     if (!lead) return res.status(404).json({ message: "Lead not found" });
@@ -162,6 +165,7 @@ router.put("/leads/:id", async (req, res) => {
       type: "lead_updated",
       description: `Lead updated: ${lead.companyName}`,
       leadId: lead.id,
+      workspaceId: req.workspaceId!,
     });
 
     syncLeadToSheet(lead).catch(() => {});
@@ -172,17 +176,18 @@ router.put("/leads/:id", async (req, res) => {
   }
 });
 
-router.delete("/leads/:id", async (req, res) => {
+router.delete("/leads/:id", requireRole("manager"), async (req, res) => {
   try {
     const { id } = DeleteLeadParams.parse({ id: req.params.id });
-    const [lead] = await db.select().from(leadsTable).where(eq(leadsTable.id, id));
+    const [lead] = await db.select().from(leadsTable).where(and(eq(leadsTable.id, id), eq(leadsTable.workspaceId, req.workspaceId!)));
     if (!lead) return res.status(404).json({ message: "Lead not found" });
 
-    await db.delete(leadsTable).where(eq(leadsTable.id, id));
+    await db.delete(leadsTable).where(and(eq(leadsTable.id, id), eq(leadsTable.workspaceId, req.workspaceId!)));
 
     await db.insert(activityTable).values({
       type: "lead_deleted",
       description: `Lead deleted: ${lead.companyName}`,
+      workspaceId: req.workspaceId!,
     });
 
     deleteLeadFromSheet(id).catch(() => {});
@@ -193,22 +198,24 @@ router.delete("/leads/:id", async (req, res) => {
   }
 });
 
-router.post("/leads/:id/duplicate", async (req, res) => {
+router.post("/leads/:id/duplicate", requireRole("operator"), async (req, res) => {
   try {
     const { id } = DuplicateLeadParams.parse({ id: req.params.id });
-    const [original] = await db.select().from(leadsTable).where(eq(leadsTable.id, id));
+    const [original] = await db.select().from(leadsTable).where(and(eq(leadsTable.id, id), eq(leadsTable.workspaceId, req.workspaceId!)));
     if (!original) return res.status(404).json({ message: "Lead not found" });
 
     const { id: _, createdAt, updatedAt, ...rest } = original;
     const [lead] = await db.insert(leadsTable).values({
       ...rest,
       companyName: `${original.companyName} (Copy)`,
+      workspaceId: req.workspaceId!,
     }).returning();
 
     await db.insert(activityTable).values({
       type: "lead_duplicated",
       description: `Lead duplicated: ${lead.companyName}`,
       leadId: lead.id,
+      workspaceId: req.workspaceId!,
     });
 
     syncLeadToSheet(lead).catch(() => {});
@@ -219,14 +226,14 @@ router.post("/leads/:id/duplicate", async (req, res) => {
   }
 });
 
-router.patch("/leads/:id/status", async (req, res) => {
+router.patch("/leads/:id/status", requireRole("operator"), async (req, res) => {
   try {
     const { id } = UpdateLeadStatusParams.parse({ id: req.params.id });
     const { status } = UpdateLeadStatusBody.parse(req.body);
 
     const [lead] = await db.update(leadsTable)
       .set({ status, updatedAt: new Date() })
-      .where(eq(leadsTable.id, id))
+      .where(and(eq(leadsTable.id, id), eq(leadsTable.workspaceId, req.workspaceId!)))
       .returning();
 
     if (!lead) return res.status(404).json({ message: "Lead not found" });
@@ -235,6 +242,7 @@ router.patch("/leads/:id/status", async (req, res) => {
       type: "status_changed",
       description: `${lead.companyName} status changed to ${status}`,
       leadId: lead.id,
+      workspaceId: req.workspaceId!,
     });
 
     syncLeadToSheet(lead).catch(() => {});
@@ -245,7 +253,7 @@ router.patch("/leads/:id/status", async (req, res) => {
   }
 });
 
-router.post("/leads/import", async (req, res) => {
+router.post("/leads/import", requireRole("manager"), async (req, res) => {
   try {
     const { leads } = ImportLeadsBody.parse(req.body);
     let imported = 0;
@@ -260,11 +268,12 @@ router.post("/leads/import", async (req, res) => {
 
     for (const leadData of leads) {
       const hasDupByEmail = leadData.email ? (await db.select().from(leadsTable)
-        .where(eq(leadsTable.email, leadData.email))).length > 0 : false;
+        .where(and(eq(leadsTable.email, leadData.email), eq(leadsTable.workspaceId, req.workspaceId!)))).length > 0 : false;
       const hasDupByName = (await db.select().from(leadsTable)
         .where(and(
           eq(leadsTable.companyName, leadData.companyName),
-          eq(leadsTable.contactName, leadData.contactName)
+          eq(leadsTable.contactName, leadData.contactName),
+          eq(leadsTable.workspaceId, req.workspaceId!)
         ))).length > 0;
 
       if (hasDupByEmail || hasDupByName) {
@@ -307,13 +316,14 @@ router.post("/leads/import", async (req, res) => {
         proposalValue: leadData.proposalValue?.toString() || null,
         closeProbability: leadData.closeProbability?.toString() || null,
         forecastValue,
+        workspaceId: req.workspaceId!,
       }).returning();
       importedLeads.push(lead);
       imported++;
     }
 
     if (importedLeads.length > 0) {
-      const allLeads = await db.select().from(leadsTable).orderBy(leadsTable.id);
+      const allLeads = await db.select().from(leadsTable).where(eq(leadsTable.workspaceId, req.workspaceId!)).orderBy(leadsTable.id);
       fullSyncToSheet(allLeads).catch(() => {});
     }
 
@@ -327,7 +337,7 @@ router.get("/leads/:id/history", async (req, res) => {
   try {
     const { id } = GetLeadHistoryParams.parse({ id: req.params.id });
     const history = await db.select().from(outreachHistoryTable)
-      .where(eq(outreachHistoryTable.leadId, id))
+      .where(and(eq(outreachHistoryTable.leadId, id), eq(outreachHistoryTable.workspaceId, req.workspaceId!)))
       .orderBy(desc(outreachHistoryTable.sentAt));
     res.json(history);
   } catch (err: any) {
@@ -335,7 +345,7 @@ router.get("/leads/:id/history", async (req, res) => {
   }
 });
 
-router.post("/leads/:id/history", async (req, res) => {
+router.post("/leads/:id/history", requireRole("operator"), async (req, res) => {
   try {
     const { id } = CreateLeadHistoryParams.parse({ id: req.params.id });
     const data = CreateLeadHistoryBody.parse(req.body);
@@ -343,6 +353,7 @@ router.post("/leads/:id/history", async (req, res) => {
     const [entry] = await db.insert(outreachHistoryTable).values({
       leadId: id,
       ...data,
+      workspaceId: req.workspaceId!,
     }).returning();
 
     res.status(201).json(entry);
@@ -354,7 +365,7 @@ router.post("/leads/:id/history", async (req, res) => {
 router.get("/leads/:id/activities", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const conditions: any[] = [eq(activityTable.leadId, id)];
+    const conditions: any[] = [eq(activityTable.leadId, id), eq(activityTable.workspaceId, req.workspaceId!)];
     if (req.query.type) conditions.push(eq(activityTable.type, String(req.query.type)));
     if (req.query.category) {
       const cat = String(req.query.category);
@@ -378,7 +389,7 @@ router.get("/leads/:id/activities", async (req, res) => {
   }
 });
 
-router.post("/leads/:id/activities", async (req, res) => {
+router.post("/leads/:id/activities", requireRole("operator"), async (req, res) => {
   try {
     const leadId = Number(req.params.id);
     const { type, description, metadata, relatedTemplateId, relatedSequenceId, relatedScheduledEmailId, createdBy } = req.body;
@@ -393,6 +404,7 @@ router.post("/leads/:id/activities", async (req, res) => {
       relatedSequenceId: relatedSequenceId || null,
       relatedScheduledEmailId: relatedScheduledEmailId || null,
       createdBy: createdBy || "user",
+      workspaceId: req.workspaceId!,
     }).returning();
 
     res.status(201).json(activity);

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, contactsTable, sequenceStepsTable, sendLogsTable, sequenceTemplatesTable, templateSetsTable, sequenceEnrollmentsTable, emailEventsTable, suppressionListTable } from "@workspace/db";
 import { eq, and, or, ilike, sql, desc } from "drizzle-orm";
 import { renderTemplate, renderSubject, splitFullName, calculateEngagementScore, getEngagementTier, type TemplateContact } from "../lib/template-engine";
+import { requireRole } from "../middleware/clerk-auth";
 
 const SEQUENCE_DELAYS = [0, 3, 7, 14, 30, 120, 180];
 
@@ -29,9 +30,9 @@ function contactToTemplate(c: any): TemplateContact {
   };
 }
 
-async function buildSequenceStepsFromTemplates(contactId: number, contact: any, templateSetId: number, enrollmentId: number, now: Date) {
+async function buildSequenceStepsFromTemplates(contactId: number, contact: any, templateSetId: number, enrollmentId: number, now: Date, workspaceId: number) {
   const seqTemplates = await db.select().from(sequenceTemplatesTable)
-    .where(eq(sequenceTemplatesTable.templateSetId, templateSetId))
+    .where(and(eq(sequenceTemplatesTable.templateSetId, templateSetId), eq(sequenceTemplatesTable.workspaceId, workspaceId)))
     .orderBy(sequenceTemplatesTable.stepNumber);
 
   const tc = contactToTemplate(contact);
@@ -50,6 +51,7 @@ async function buildSequenceStepsFromTemplates(contactId: number, contact: any, 
       body: t.body,
       status: "scheduled" as const,
       scheduledFor: t.delayDays === 0 ? now : addBusinessDays(now, t.delayDays),
+      workspaceId,
     }));
   }
 
@@ -66,6 +68,7 @@ async function buildSequenceStepsFromTemplates(contactId: number, contact: any, 
     body: null as string | null,
     status: "scheduled" as const,
     scheduledFor: delay === 0 ? now : addBusinessDays(now, delay),
+    workspaceId,
   }));
 }
 
@@ -74,7 +77,7 @@ const router: IRouter = Router();
 router.get("/contacts", async (req, res) => {
   try {
     const { search, sequenceStatus, campaignName, segmentType, engagementTier, doNotContact } = req.query as any;
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(contactsTable.workspaceId, req.workspaceId!)];
 
     if (search) {
       conditions.push(or(
@@ -103,23 +106,23 @@ router.get("/contacts", async (req, res) => {
 router.get("/contacts/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, id));
+    const [contact] = await db.select().from(contactsTable).where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)));
     if (!contact) return res.status(404).json({ message: "Contact not found" });
 
     const steps = await db.select().from(sequenceStepsTable)
-      .where(eq(sequenceStepsTable.contactId, id))
+      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.workspaceId, req.workspaceId!)))
       .orderBy(sequenceStepsTable.stepNumber);
 
     const sendLogs = await db.select().from(sendLogsTable)
-      .where(eq(sendLogsTable.contactId, id))
+      .where(and(eq(sendLogsTable.contactId, id), eq(sendLogsTable.workspaceId, req.workspaceId!)))
       .orderBy(desc(sendLogsTable.sentAt));
 
     const events = await db.select().from(emailEventsTable)
-      .where(eq(emailEventsTable.contactId, id))
+      .where(and(eq(emailEventsTable.contactId, id), eq(emailEventsTable.workspaceId, req.workspaceId!)))
       .orderBy(desc(emailEventsTable.timestamp));
 
     const enrollments = await db.select().from(sequenceEnrollmentsTable)
-      .where(eq(sequenceEnrollmentsTable.contactId, id))
+      .where(and(eq(sequenceEnrollmentsTable.contactId, id), eq(sequenceEnrollmentsTable.workspaceId, req.workspaceId!)))
       .orderBy(desc(sequenceEnrollmentsTable.enrolledAt));
 
     res.json({ ...contact, steps, sendLogs, events, enrollments });
@@ -128,7 +131,7 @@ router.get("/contacts/:id", async (req, res) => {
   }
 });
 
-router.post("/contacts", async (req, res) => {
+router.post("/contacts", requireRole("operator"), async (req, res) => {
   try {
     const data = req.body;
     if (data.fullName && (!data.firstName || !data.lastName)) {
@@ -136,19 +139,20 @@ router.post("/contacts", async (req, res) => {
       if (!data.firstName) data.firstName = firstName;
       if (!data.lastName) data.lastName = lastName;
     }
-    const [contact] = await db.insert(contactsTable).values(data).returning();
+    const [contact] = await db.insert(contactsTable).values({ ...data, workspaceId: req.workspaceId! }).returning();
     res.status(201).json(contact);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }
 });
 
-router.put("/contacts/:id", async (req, res) => {
+router.put("/contacts/:id", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const { workspaceId: _ignoreWorkspaceId, ...updateData } = req.body;
     const [contact] = await db.update(contactsTable)
-      .set({ ...req.body, updatedAt: new Date() })
-      .where(eq(contactsTable.id, id))
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)))
       .returning();
     if (!contact) return res.status(404).json({ message: "Contact not found" });
     res.json(contact);
@@ -157,29 +161,29 @@ router.put("/contacts/:id", async (req, res) => {
   }
 });
 
-router.delete("/contacts/:id", async (req, res) => {
+router.delete("/contacts/:id", requireRole("manager"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    await db.delete(contactsTable).where(eq(contactsTable.id, id));
+    await db.delete(contactsTable).where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)));
     res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }
 });
 
-router.post("/contacts/:id/enroll", async (req, res) => {
+router.post("/contacts/:id/enroll", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { templateSetId, campaignId, campaignName, templateSetName } = req.body;
 
-    const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, id));
+    const [contact] = await db.select().from(contactsTable).where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)));
     if (!contact) return res.status(404).json({ message: "Contact not found" });
 
     if (contact.sequenceStatus === "active") {
       return res.json({ success: false, message: "Contact is already in an active sequence", stepsCreated: 0 });
     }
 
-    const suppressed = await db.select().from(suppressionListTable).where(eq(suppressionListTable.email, contact.email.toLowerCase()));
+    const suppressed = await db.select().from(suppressionListTable).where(and(eq(suppressionListTable.email, contact.email.toLowerCase()), eq(suppressionListTable.workspaceId, req.workspaceId!)));
     if (suppressed.length > 0) {
       return res.json({ success: false, message: "Contact email is on suppression list", stepsCreated: 0 });
     }
@@ -194,11 +198,12 @@ router.post("/contacts/:id/enroll", async (req, res) => {
       sequenceStatus: "active",
       enrolledAt: now,
       nextSendAt: now,
+      workspaceId: req.workspaceId!,
     }).returning();
 
     let steps: any[];
     if (templateSetId) {
-      steps = await buildSequenceStepsFromTemplates(id, contact, templateSetId, enrollment.id, now);
+      steps = await buildSequenceStepsFromTemplates(id, contact, templateSetId, enrollment.id, now, req.workspaceId!);
     } else {
       steps = SEQUENCE_DELAYS.map((delay, idx) => ({
         contactId: id,
@@ -213,6 +218,7 @@ router.post("/contacts/:id/enroll", async (req, res) => {
         body: null,
         status: "scheduled" as const,
         scheduledFor: delay === 0 ? now : addBusinessDays(now, delay),
+        workspaceId: req.workspaceId!,
       }));
     }
 
@@ -227,7 +233,7 @@ router.post("/contacts/:id/enroll", async (req, res) => {
       campaignName: campaignName || contact.campaignName,
       nextSendAt: steps[0]?.scheduledFor || now,
       updatedAt: now,
-    }).where(eq(contactsTable.id, id));
+    }).where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)));
 
     res.json({ success: true, message: `Enrolled with ${steps.length} steps`, stepsCreated: steps.length, enrollmentId: enrollment.id });
   } catch (err: any) {
@@ -235,23 +241,23 @@ router.post("/contacts/:id/enroll", async (req, res) => {
   }
 });
 
-router.post("/contacts/:id/pause", async (req, res) => {
+router.post("/contacts/:id/pause", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const reason = req.body.reason || "manual";
     const [contact] = await db.update(contactsTable)
       .set({ sequenceStatus: "paused_manual", updatedAt: new Date() })
-      .where(eq(contactsTable.id, id))
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)))
       .returning();
     if (!contact) return res.status(404).json({ message: "Contact not found" });
 
     await db.update(sequenceStepsTable)
       .set({ status: "paused" })
-      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")));
+      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled"), eq(sequenceStepsTable.workspaceId, req.workspaceId!)));
 
     await db.update(sequenceEnrollmentsTable)
       .set({ sequenceStatus: "paused_manual", pausedReason: reason, updatedAt: new Date() })
-      .where(and(eq(sequenceEnrollmentsTable.contactId, id), eq(sequenceEnrollmentsTable.sequenceStatus, "active")));
+      .where(and(eq(sequenceEnrollmentsTable.contactId, id), eq(sequenceEnrollmentsTable.sequenceStatus, "active"), eq(sequenceEnrollmentsTable.workspaceId, req.workspaceId!)));
 
     res.json(contact);
   } catch (err: any) {
@@ -259,14 +265,14 @@ router.post("/contacts/:id/pause", async (req, res) => {
   }
 });
 
-router.post("/contacts/:id/resume", async (req, res) => {
+router.post("/contacts/:id/resume", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, id));
+    const [contact] = await db.select().from(contactsTable).where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)));
     if (!contact) return res.status(404).json({ message: "Contact not found" });
 
     if (["paused_replied", "completed", "dnc", "do_not_contact"].includes(contact.sequenceStatus)) {
-      await db.delete(sequenceStepsTable).where(eq(sequenceStepsTable.contactId, id));
+      await db.delete(sequenceStepsTable).where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.workspaceId, req.workspaceId!)));
       const now = new Date();
       const tsId = contact.templateSetId || req.body.templateSetId;
 
@@ -278,11 +284,12 @@ router.post("/contacts/:id/resume", async (req, res) => {
         sequenceStatus: "active",
         enrolledAt: now,
         nextSendAt: now,
+        workspaceId: req.workspaceId!,
       }).returning();
 
       let steps: any[];
       if (tsId) {
-        steps = await buildSequenceStepsFromTemplates(id, contact, tsId, enrollment.id, now);
+        steps = await buildSequenceStepsFromTemplates(id, contact, tsId, enrollment.id, now, req.workspaceId!);
       } else {
         steps = SEQUENCE_DELAYS.map((delay, idx) => ({
           contactId: id,
@@ -297,18 +304,19 @@ router.post("/contacts/:id/resume", async (req, res) => {
           body: null,
           status: "scheduled" as const,
           scheduledFor: delay === 0 ? now : addBusinessDays(now, delay),
+          workspaceId: req.workspaceId!,
         }));
       }
       await db.insert(sequenceStepsTable).values(steps);
       const [updated] = await db.update(contactsTable)
         .set({ sequenceStatus: "active", currentStep: 1, nextSendAt: now, lastReplyAt: null, doNotContact: false, updatedAt: now })
-        .where(eq(contactsTable.id, id))
+        .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)))
         .returning();
       return res.json(updated);
     }
 
     const pausedSteps = await db.select().from(sequenceStepsTable)
-      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "paused")))
+      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "paused"), eq(sequenceStepsTable.workspaceId, req.workspaceId!)))
       .orderBy(sequenceStepsTable.stepNumber);
 
     if (pausedSteps.length === 0) {
@@ -321,16 +329,16 @@ router.post("/contacts/:id/resume", async (req, res) => {
       const newSchedule = addBusinessDays(now, i === 0 ? 0 : step.delayDays);
       await db.update(sequenceStepsTable)
         .set({ status: "scheduled", scheduledFor: newSchedule })
-        .where(eq(sequenceStepsTable.id, step.id));
+        .where(and(eq(sequenceStepsTable.id, step.id), eq(sequenceStepsTable.workspaceId, req.workspaceId!)));
     }
 
     await db.update(sequenceEnrollmentsTable)
       .set({ sequenceStatus: "active", pausedReason: null, updatedAt: new Date() })
-      .where(and(eq(sequenceEnrollmentsTable.contactId, id), or(eq(sequenceEnrollmentsTable.sequenceStatus, "paused_manual"), eq(sequenceEnrollmentsTable.sequenceStatus, "paused_replied"))));
+      .where(and(eq(sequenceEnrollmentsTable.contactId, id), or(eq(sequenceEnrollmentsTable.sequenceStatus, "paused_manual"), eq(sequenceEnrollmentsTable.sequenceStatus, "paused_replied")), eq(sequenceEnrollmentsTable.workspaceId, req.workspaceId!)));
 
     const [updated] = await db.update(contactsTable)
       .set({ sequenceStatus: "active", nextSendAt: now, updatedAt: new Date() })
-      .where(eq(contactsTable.id, id))
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)))
       .returning();
 
     res.json(updated);
@@ -339,24 +347,24 @@ router.post("/contacts/:id/resume", async (req, res) => {
   }
 });
 
-router.post("/contacts/:id/skip-step", async (req, res) => {
+router.post("/contacts/:id/skip-step", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const now = new Date();
 
     const [nextStep] = await db.select().from(sequenceStepsTable)
-      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")))
+      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled"), eq(sequenceStepsTable.workspaceId, req.workspaceId!)))
       .orderBy(sequenceStepsTable.stepNumber)
       .limit(1);
 
     if (nextStep) {
       await db.update(sequenceStepsTable)
         .set({ status: "skipped", skippedAt: now })
-        .where(eq(sequenceStepsTable.id, nextStep.id));
+        .where(and(eq(sequenceStepsTable.id, nextStep.id), eq(sequenceStepsTable.workspaceId, req.workspaceId!)));
     }
 
     const [nextNext] = await db.select().from(sequenceStepsTable)
-      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")))
+      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled"), eq(sequenceStepsTable.workspaceId, req.workspaceId!)))
       .orderBy(sequenceStepsTable.stepNumber)
       .limit(1);
 
@@ -367,7 +375,7 @@ router.post("/contacts/:id/skip-step", async (req, res) => {
         sequenceStatus: nextNext ? "active" : "completed",
         updatedAt: now,
       })
-      .where(eq(contactsTable.id, id))
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)))
       .returning();
 
     if (!contact) return res.status(404).json({ message: "Contact not found" });
@@ -377,25 +385,25 @@ router.post("/contacts/:id/skip-step", async (req, res) => {
   }
 });
 
-router.post("/contacts/:id/force-send", async (req, res) => {
+router.post("/contacts/:id/force-send", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
 
     const [nextStep] = await db.select().from(sequenceStepsTable)
-      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")))
+      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled"), eq(sequenceStepsTable.workspaceId, req.workspaceId!)))
       .orderBy(sequenceStepsTable.stepNumber)
       .limit(1);
 
     if (!nextStep) return res.json({ success: false, message: "No scheduled steps to send" });
 
-    const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, id));
+    const [contact] = await db.select().from(contactsTable).where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)));
     if (!contact) return res.status(404).json({ success: false, message: "Contact not found" });
 
     const now = new Date();
 
     await db.update(sequenceStepsTable)
       .set({ status: "sent", sentAt: now })
-      .where(eq(sequenceStepsTable.id, nextStep.id));
+      .where(and(eq(sequenceStepsTable.id, nextStep.id), eq(sequenceStepsTable.workspaceId, req.workspaceId!)));
 
     await db.insert(sendLogsTable).values({
       contactId: id,
@@ -410,16 +418,18 @@ router.post("/contacts/:id/force-send", async (req, res) => {
       status: "sent",
       sentAt: now,
       createdAt: now,
+      workspaceId: req.workspaceId!,
     });
 
     await db.insert(emailEventsTable).values({
       contactId: id,
       eventType: "sent",
       timestamp: now,
+      workspaceId: req.workspaceId!,
     });
 
     const [nextNext] = await db.select().from(sequenceStepsTable)
-      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")))
+      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled"), eq(sequenceStepsTable.workspaceId, req.workspaceId!)))
       .orderBy(sequenceStepsTable.stepNumber)
       .limit(1);
 
@@ -429,7 +439,7 @@ router.post("/contacts/:id/force-send", async (req, res) => {
       nextSendAt: nextNext?.scheduledFor || null,
       sequenceStatus: nextNext ? "active" : "completed",
       updatedAt: now,
-    }).where(eq(contactsTable.id, id));
+    }).where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)));
 
     res.json({ success: true, message: `Step ${nextStep.stepNumber} sent (force)` });
   } catch (err: any) {
@@ -437,32 +447,33 @@ router.post("/contacts/:id/force-send", async (req, res) => {
   }
 });
 
-router.post("/contacts/:id/mark-replied", async (req, res) => {
+router.post("/contacts/:id/mark-replied", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const now = new Date();
 
     await db.update(sequenceStepsTable)
       .set({ status: "canceled", canceledAt: now })
-      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")));
+      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled"), eq(sequenceStepsTable.workspaceId, req.workspaceId!)));
 
     await db.insert(emailEventsTable).values({
       contactId: id,
       eventType: "reply",
       timestamp: now,
+      workspaceId: req.workspaceId!,
     });
 
     await db.update(sequenceEnrollmentsTable)
       .set({ sequenceStatus: "paused_replied", pausedReason: "reply_detected", updatedAt: now })
-      .where(and(eq(sequenceEnrollmentsTable.contactId, id), eq(sequenceEnrollmentsTable.sequenceStatus, "active")));
+      .where(and(eq(sequenceEnrollmentsTable.contactId, id), eq(sequenceEnrollmentsTable.sequenceStatus, "active"), eq(sequenceEnrollmentsTable.workspaceId, req.workspaceId!)));
 
-    const events = await db.select().from(emailEventsTable).where(eq(emailEventsTable.contactId, id));
+    const events = await db.select().from(emailEventsTable).where(and(eq(emailEventsTable.contactId, id), eq(emailEventsTable.workspaceId, req.workspaceId!)));
     const score = calculateEngagementScore(events);
     const tier = getEngagementTier(score);
 
     const [contact] = await db.update(contactsTable)
       .set({ sequenceStatus: "paused_replied", lastReplyAt: now, nextSendAt: null, engagementScore: score, engagementTier: tier, updatedAt: now })
-      .where(eq(contactsTable.id, id))
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)))
       .returning();
 
     if (!contact) return res.status(404).json({ message: "Contact not found" });
@@ -472,22 +483,22 @@ router.post("/contacts/:id/mark-replied", async (req, res) => {
   }
 });
 
-router.post("/contacts/:id/mark-dnc", async (req, res) => {
+router.post("/contacts/:id/mark-dnc", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const now = new Date();
 
     await db.update(sequenceStepsTable)
       .set({ status: "canceled", canceledAt: now })
-      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")));
+      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled"), eq(sequenceStepsTable.workspaceId, req.workspaceId!)));
 
     await db.update(sequenceEnrollmentsTable)
       .set({ sequenceStatus: "do_not_contact", updatedAt: now })
-      .where(and(eq(sequenceEnrollmentsTable.contactId, id), eq(sequenceEnrollmentsTable.sequenceStatus, "active")));
+      .where(and(eq(sequenceEnrollmentsTable.contactId, id), eq(sequenceEnrollmentsTable.sequenceStatus, "active"), eq(sequenceEnrollmentsTable.workspaceId, req.workspaceId!)));
 
     const [contact] = await db.update(contactsTable)
       .set({ doNotContact: true, sequenceStatus: "do_not_contact", nextSendAt: null, updatedAt: now })
-      .where(eq(contactsTable.id, id))
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)))
       .returning();
 
     if (!contact) return res.status(404).json({ message: "Contact not found" });
@@ -495,6 +506,7 @@ router.post("/contacts/:id/mark-dnc", async (req, res) => {
     await db.insert(suppressionListTable).values({
       email: contact.email.toLowerCase(),
       reason: "marked_dnc",
+      workspaceId: req.workspaceId!,
     }).onConflictDoNothing();
 
     res.json(contact);
@@ -503,18 +515,18 @@ router.post("/contacts/:id/mark-dnc", async (req, res) => {
   }
 });
 
-router.post("/contacts/:id/mark-unsubscribed", async (req, res) => {
+router.post("/contacts/:id/mark-unsubscribed", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const now = new Date();
 
     await db.update(sequenceStepsTable)
       .set({ status: "canceled", canceledAt: now })
-      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled")));
+      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.status, "scheduled"), eq(sequenceStepsTable.workspaceId, req.workspaceId!)));
 
     const [contact] = await db.update(contactsTable)
       .set({ unsubscribed: true, sequenceStatus: "unsubscribed", nextSendAt: null, updatedAt: now })
-      .where(eq(contactsTable.id, id))
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)))
       .returning();
 
     if (!contact) return res.status(404).json({ message: "Contact not found" });
@@ -522,6 +534,7 @@ router.post("/contacts/:id/mark-unsubscribed", async (req, res) => {
     await db.insert(suppressionListTable).values({
       email: contact.email.toLowerCase(),
       reason: "unsubscribed",
+      workspaceId: req.workspaceId!,
     }).onConflictDoNothing();
 
     res.json(contact);
@@ -534,7 +547,7 @@ router.get("/contacts/:id/steps", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const steps = await db.select().from(sequenceStepsTable)
-      .where(eq(sequenceStepsTable.contactId, id))
+      .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.workspaceId, req.workspaceId!)))
       .orderBy(sequenceStepsTable.stepNumber);
     res.json(steps);
   } catch (err: any) {
@@ -546,7 +559,7 @@ router.get("/contacts/:id/events", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const events = await db.select().from(emailEventsTable)
-      .where(eq(emailEventsTable.contactId, id))
+      .where(and(eq(emailEventsTable.contactId, id), eq(emailEventsTable.workspaceId, req.workspaceId!)))
       .orderBy(desc(emailEventsTable.timestamp));
     res.json(events);
   } catch (err: any) {

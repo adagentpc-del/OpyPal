@@ -1,18 +1,19 @@
 import { Router, type IRouter } from "express";
 import { db, templatesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { requireRole } from "../middleware/clerk-auth";
 
 const router: IRouter = Router();
 
 router.get("/templates", async (req, res) => {
   try {
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(templatesTable.workspaceId, req.workspaceId!)];
     if (req.query.category) conditions.push(eq(templatesTable.category, String(req.query.category)));
     if (req.query.type) conditions.push(eq(templatesTable.type, String(req.query.type)));
     if (req.query.isActive === "true") conditions.push(eq(templatesTable.isActive, true));
     if (req.query.isActive === "false") conditions.push(eq(templatesTable.isActive, false));
 
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const where = and(...conditions);
     const templates = await db.select().from(templatesTable).where(where).orderBy(templatesTable.id);
     res.json(templates);
   } catch (err: any) {
@@ -20,7 +21,7 @@ router.get("/templates", async (req, res) => {
   }
 });
 
-router.post("/templates", async (req, res) => {
+router.post("/templates", requireRole("operator"), async (req, res) => {
   try {
     const { name, category, type, subject, body, description, linkedAssetIds, linkedTemplateSetId, linkedSequenceId, isActive, audienceTags } = req.body;
     if (!name || !body) return res.status(400).json({ message: "Name and body are required" });
@@ -30,6 +31,7 @@ router.post("/templates", async (req, res) => {
       linkedSequenceId: linkedSequenceId || null,
       isActive: isActive !== undefined ? isActive : true,
       audienceTags: audienceTags || null,
+      workspaceId: req.workspaceId!,
     }).returning();
     res.status(201).json(template);
   } catch (err: any) {
@@ -37,7 +39,7 @@ router.post("/templates", async (req, res) => {
   }
 });
 
-router.put("/templates/:id", async (req, res) => {
+router.put("/templates/:id", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { name, category, type, subject, body, description, linkedAssetIds, linkedTemplateSetId, linkedSequenceId, isActive, audienceTags } = req.body;
@@ -56,7 +58,7 @@ router.put("/templates/:id", async (req, res) => {
 
     const [template] = await db.update(templatesTable)
       .set(updates)
-      .where(eq(templatesTable.id, id))
+      .where(and(eq(templatesTable.id, id), eq(templatesTable.workspaceId, req.workspaceId!)))
       .returning();
 
     if (!template) return res.status(404).json({ message: "Template not found" });
@@ -66,10 +68,10 @@ router.put("/templates/:id", async (req, res) => {
   }
 });
 
-router.delete("/templates/:id", async (req, res) => {
+router.delete("/templates/:id", requireRole("manager"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    await db.delete(templatesTable).where(eq(templatesTable.id, id));
+    await db.delete(templatesTable).where(and(eq(templatesTable.id, id), eq(templatesTable.workspaceId, req.workspaceId!)));
     res.json({ message: "Template deleted" });
   } catch (err: any) {
     res.status(400).json({ message: err.message });

@@ -2,9 +2,13 @@ import { pgTable, serial, text, integer, timestamp, boolean } from "drizzle-orm/
 import { templateSetsTable } from "./template-sets";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { workspacesTable } from "./workspaces";
 
 export const sequenceTemplatesTable = pgTable("sequence_templates", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   templateSetId: integer("template_set_id").notNull().references(() => templateSetsTable.id, { onDelete: "cascade" }),
   stepNumber: integer("step_number").notNull(),
   name: text("name"),

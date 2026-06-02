@@ -340,7 +340,7 @@ async function syncSentFolder(connectionId: number, senderEmail: string): Promis
       const recipientEmail = msg.toRecipients?.[0]?.emailAddress?.address || "";
       if (!recipientEmail) continue;
 
-      const [lead] = await db.select({ id: leadsTable.id })
+      const [lead] = await db.select({ id: leadsTable.id, workspaceId: leadsTable.workspaceId })
         .from(leadsTable)
         .where(eq(leadsTable.email, recipientEmail.toLowerCase()))
         .limit(1);
@@ -348,6 +348,7 @@ async function syncSentFolder(connectionId: number, senderEmail: string): Promis
       if (!lead) continue;
 
       await db.insert(activityTable).values({
+        workspaceId: lead.workspaceId,
         type: "manual_outlook_email",
         description: `Manual Outlook email: "${msg.subject || "(no subject)"}"`,
         leadId: lead.id,
@@ -375,13 +376,14 @@ async function matchOutboundToLead(senderEmail: string, msg: any): Promise<boole
   const recipientEmail = msg.toRecipients?.[0]?.emailAddress?.address;
   if (!recipientEmail) return false;
 
-  const [lead] = await db.select({ id: leadsTable.id })
+  const [lead] = await db.select({ id: leadsTable.id, workspaceId: leadsTable.workspaceId })
     .from(leadsTable)
     .where(eq(leadsTable.email, recipientEmail.toLowerCase()))
     .limit(1);
 
   if (lead) {
     await db.insert(activityTable).values({
+      workspaceId: lead.workspaceId,
       type: "outlook_sent_synced",
       description: `Outbound email synced from Outlook: "${msg.subject || ""}"`,
       leadId: lead.id,
@@ -393,13 +395,14 @@ async function matchOutboundToLead(senderEmail: string, msg: any): Promise<boole
   return false;
 }
 
-export async function getPrimaryConnection(): Promise<{ id: number; emailAddress: string } | null> {
+export async function getPrimaryConnection(workspaceId = 1): Promise<{ id: number; emailAddress: string } | null> {
   const [conn] = await db.select({
     id: mailboxConnectionsTable.id,
     emailAddress: mailboxConnectionsTable.emailAddress,
   })
     .from(mailboxConnectionsTable)
     .where(and(
+      eq(mailboxConnectionsTable.workspaceId, workspaceId),
       eq(mailboxConnectionsTable.isActive, true),
       eq(mailboxConnectionsTable.isPrimary, true),
     ))
@@ -412,14 +415,20 @@ export async function getPrimaryConnection(): Promise<{ id: number; emailAddress
     emailAddress: mailboxConnectionsTable.emailAddress,
   })
     .from(mailboxConnectionsTable)
-    .where(eq(mailboxConnectionsTable.isActive, true))
+    .where(and(
+      eq(mailboxConnectionsTable.workspaceId, workspaceId),
+      eq(mailboxConnectionsTable.isActive, true),
+    ))
     .limit(1);
 
   return any || null;
 }
 
-export async function getActiveConnections() {
+export async function getActiveConnections(workspaceId = 1) {
   return db.select().from(mailboxConnectionsTable)
-    .where(eq(mailboxConnectionsTable.isActive, true))
+    .where(and(
+      eq(mailboxConnectionsTable.workspaceId, workspaceId),
+      eq(mailboxConnectionsTable.isActive, true),
+    ))
     .orderBy(desc(mailboxConnectionsTable.createdAt));
 }

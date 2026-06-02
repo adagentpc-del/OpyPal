@@ -1,9 +1,13 @@
 import { pgTable, serial, text, numeric, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { workspacesTable } from "./workspaces";
 
 export const leadsTable = pgTable("leads", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   pipelineType: text("pipeline_type").notNull(),
   companyName: text("company_name").notNull(),
   contactName: text("contact_name").notNull(),

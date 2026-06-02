@@ -2,9 +2,13 @@ import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
 import { contactsTable } from "./contacts";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { workspacesTable } from "./workspaces";
 
 export const personalizationLogsTable = pgTable("personalization_logs", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   contactId: integer("contact_id").notNull().references(() => contactsTable.id, { onDelete: "cascade" }),
   mode: text("mode").notNull(),
   inputFieldsUsed: text("input_fields_used"),

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, companiesTable, leadsTable } from "@workspace/db";
-import { eq, desc, ilike, sql } from "drizzle-orm";
+import { eq, and, desc, ilike, sql } from "drizzle-orm";
+import { requireRole } from "../middleware/clerk-auth";
 
 const router: IRouter = Router();
 
@@ -12,11 +13,12 @@ router.get("/companies", async (req, res) => {
     let companies;
     if (search) {
       companies = await db.select().from(companiesTable)
-        .where(ilike(companiesTable.name, `%${search}%`))
+        .where(and(ilike(companiesTable.name, `%${search}%`), eq(companiesTable.workspaceId, req.workspaceId!)))
         .orderBy(desc(companiesTable.updatedAt))
         .limit(limit);
     } else {
       companies = await db.select().from(companiesTable)
+        .where(eq(companiesTable.workspaceId, req.workspaceId!))
         .orderBy(desc(companiesTable.updatedAt))
         .limit(limit);
     }
@@ -30,7 +32,7 @@ router.get("/companies", async (req, res) => {
         dealValueEstimate: leadsTable.dealValueEstimate,
       })
         .from(leadsTable)
-        .where(ilike(leadsTable.companyName, company.name));
+        .where(and(ilike(leadsTable.companyName, company.name), eq(leadsTable.workspaceId, req.workspaceId!)));
 
       return {
         ...company,
@@ -49,12 +51,12 @@ router.get("/companies", async (req, res) => {
 router.get("/companies/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, id));
+    const [company] = await db.select().from(companiesTable).where(and(eq(companiesTable.id, id), eq(companiesTable.workspaceId, req.workspaceId!)));
     if (!company) return res.status(404).json({ message: "Company not found" });
 
     const leads = await db.select()
       .from(leadsTable)
-      .where(ilike(leadsTable.companyName, company.name))
+      .where(and(ilike(leadsTable.companyName, company.name), eq(leadsTable.workspaceId, req.workspaceId!)))
       .orderBy(desc(leadsTable.updatedAt));
 
     res.json({ ...company, leads });
@@ -63,7 +65,7 @@ router.get("/companies/:id", async (req, res) => {
   }
 });
 
-router.post("/companies", async (req, res) => {
+router.post("/companies", requireRole("operator"), async (req, res) => {
   try {
     const { name, website, industry, subIndustry, city, state, country, phone, notes } = req.body;
     if (!name) return res.status(400).json({ message: "Company name is required" });
@@ -78,6 +80,7 @@ router.post("/companies", async (req, res) => {
       country: country || null,
       phone: phone || null,
       notes: notes || null,
+      workspaceId: req.workspaceId!,
     }).returning();
 
     res.status(201).json(company);
@@ -86,7 +89,7 @@ router.post("/companies", async (req, res) => {
   }
 });
 
-router.put("/companies/:id", async (req, res) => {
+router.put("/companies/:id", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { name, website, industry, subIndustry, city, state, country, phone, notes } = req.body;
@@ -102,7 +105,7 @@ router.put("/companies/:id", async (req, res) => {
       phone: phone || null,
       notes: notes || null,
       updatedAt: new Date(),
-    }).where(eq(companiesTable.id, id)).returning();
+    }).where(and(eq(companiesTable.id, id), eq(companiesTable.workspaceId, req.workspaceId!))).returning();
 
     if (!updated) return res.status(404).json({ message: "Company not found" });
     res.json(updated);
@@ -111,23 +114,23 @@ router.put("/companies/:id", async (req, res) => {
   }
 });
 
-router.delete("/companies/:id", async (req, res) => {
+router.delete("/companies/:id", requireRole("manager"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    await db.delete(companiesTable).where(eq(companiesTable.id, id));
+    await db.delete(companiesTable).where(and(eq(companiesTable.id, id), eq(companiesTable.workspaceId, req.workspaceId!)));
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
 });
 
-router.post("/companies/sync-from-leads", async (_req, res) => {
+router.post("/companies/sync-from-leads", requireRole("manager"), async (req, res) => {
   try {
     const leads = await db.select({
       companyName: leadsTable.companyName,
       industry: leadsTable.industry,
       location: leadsTable.location,
-    }).from(leadsTable);
+    }).from(leadsTable).where(eq(leadsTable.workspaceId, req.workspaceId!));
 
     const companyMap = new Map<string, { industry?: string; location?: string; count: number }>();
     for (const lead of leads) {
@@ -149,7 +152,7 @@ router.post("/companies/sync-from-leads", async (_req, res) => {
     for (const [name, data] of companyMap) {
       const [existing] = await db.select({ id: companiesTable.id })
         .from(companiesTable)
-        .where(eq(companiesTable.name, name))
+        .where(and(eq(companiesTable.name, name), eq(companiesTable.workspaceId, req.workspaceId!)))
         .limit(1);
 
       if (!existing) {
@@ -160,13 +163,14 @@ router.post("/companies/sync-from-leads", async (_req, res) => {
           city: parts[0] || null,
           state: parts[1] || null,
           leadCount: data.count,
+          workspaceId: req.workspaceId!,
         });
         created++;
       } else {
         await db.update(companiesTable).set({
           leadCount: data.count,
           updatedAt: new Date(),
-        }).where(eq(companiesTable.id, existing.id));
+        }).where(and(eq(companiesTable.id, existing.id), eq(companiesTable.workspaceId, req.workspaceId!)));
       }
     }
 

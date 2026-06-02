@@ -20,7 +20,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { clerkAppearance } from "@/lib/clerk-appearance";
-import { WorkspaceProvider } from "@/hooks/use-workspace";
+import { WorkspaceProvider, useWorkspace } from "@/hooks/use-workspace";
 import { PLATFORM } from "@/config/branding";
 import NotFound from "@/pages/not-found";
 
@@ -139,7 +139,9 @@ function HomeRedirect() {
   return (
     <>
       <Show when="signed-in">
-        <Dashboard />
+        <RequireWorkspace>
+          <Dashboard />
+        </RequireWorkspace>
       </Show>
       <Show when="signed-out">
         <LandingPage />
@@ -181,10 +183,40 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+function RequireWorkspace({ children }: { children: ReactNode }) {
+  const { isLoading, me, currentWorkspace } = useWorkspace();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+      </div>
+    );
+  }
+
+  if (!me || me.workspaces.length === 0 || !currentWorkspace) {
+    return (
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-6 text-center">
+        <h1 className="text-xl font-semibold text-foreground">
+          No workspace access
+        </h1>
+        <p className="mt-2 max-w-md text-sm text-muted-foreground">
+          Your account isn’t a member of any workspace yet. Ask your workspace
+          administrator to invite you.
+        </p>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 function protectedRoute(Component: React.ComponentType) {
   return () => (
     <RequireAuth>
-      <Component />
+      <RequireWorkspace>
+        <Component />
+      </RequireWorkspace>
     </RequireAuth>
   );
 }

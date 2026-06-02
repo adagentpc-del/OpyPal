@@ -117,6 +117,7 @@ export async function seedTemplatesIfEmpty(): Promise<{ templates: number; sets:
   if (existingTemplates.length === 0) {
     for (const t of STANDALONE_TEMPLATES) {
       await db.insert(templatesTable).values({
+        workspaceId: 1,
         name: t.name,
         category: t.category,
         type: t.type,
@@ -133,6 +134,7 @@ export async function seedTemplatesIfEmpty(): Promise<{ templates: number; sets:
   if (existingSets.length === 0) {
     for (const setDef of SEGMENT_SETS) {
       const [set] = await db.insert(templateSetsTable).values({
+        workspaceId: 1,
         name: setDef.name,
         segmentType: setDef.segmentType,
         description: setDef.description,
@@ -161,9 +163,9 @@ export async function seedTemplatesIfEmpty(): Promise<{ templates: number; sets:
     logger.info({ sets: result.sets, steps: result.steps }, "Seeded sequence template sets");
   }
 
-  await db.insert(settingsTable).values(DEFAULT_SETTINGS).onConflictDoNothing();
-  await db.insert(nextActionsTable).values(DEFAULT_NEXT_ACTIONS).onConflictDoNothing();
-  await db.insert(ctaLibraryTable).values(DEFAULT_CTAS).onConflictDoNothing();
+  await db.insert(settingsTable).values(DEFAULT_SETTINGS.map(s => ({ ...s, workspaceId: 1 }))).onConflictDoNothing();
+  await db.insert(nextActionsTable).values(DEFAULT_NEXT_ACTIONS.map(a => ({ ...a, workspaceId: 1 }))).onConflictDoNothing();
+  await db.insert(ctaLibraryTable).values(DEFAULT_CTAS.map(c => ({ ...c, workspaceId: 1 }))).onConflictDoNothing();
 
   return result;
 }

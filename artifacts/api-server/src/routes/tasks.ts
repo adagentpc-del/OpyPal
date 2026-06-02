@@ -2,12 +2,13 @@ import { Router, type IRouter } from "express";
 import { db, tasksTable, leadsTable, activityTable } from "@workspace/db";
 import { eq, and, lte, gte, lt, sql, desc, inArray } from "drizzle-orm";
 import { getAutoTaskSettings, updateAutoTaskSettings } from "../lib/smart-followup-engine";
+import { requireRole } from "../middleware/clerk-auth";
 
 const router: IRouter = Router();
 
 router.get("/tasks", async (req, res) => {
   try {
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(tasksTable.workspaceId, req.workspaceId!)];
 
     if (req.query.leadId) conditions.push(eq(tasksTable.leadId, Number(req.query.leadId)));
     if (req.query.status) conditions.push(eq(tasksTable.status, String(req.query.status)));
@@ -77,13 +78,13 @@ router.get("/tasks/summary", async (req, res) => {
     const today = new Date().toISOString().split("T")[0];
 
     const [openResult] = await db.select({ count: sql<number>`count(*)::int` }).from(tasksTable)
-      .where(inArray(tasksTable.status, ["open", "in_progress"]));
+      .where(and(eq(tasksTable.workspaceId, req.workspaceId!), inArray(tasksTable.status, ["open", "in_progress"])));
     const [dueTodayResult] = await db.select({ count: sql<number>`count(*)::int` }).from(tasksTable)
-      .where(and(eq(tasksTable.dueDate, today), sql`${tasksTable.status} NOT IN ('completed', 'dismissed')`));
+      .where(and(eq(tasksTable.workspaceId, req.workspaceId!), eq(tasksTable.dueDate, today), sql`${tasksTable.status} NOT IN ('completed', 'dismissed')`));
     const [overdueResult] = await db.select({ count: sql<number>`count(*)::int` }).from(tasksTable)
-      .where(and(lt(tasksTable.dueDate, today), sql`${tasksTable.status} NOT IN ('completed', 'dismissed')`));
+      .where(and(eq(tasksTable.workspaceId, req.workspaceId!), lt(tasksTable.dueDate, today), sql`${tasksTable.status} NOT IN ('completed', 'dismissed')`));
     const [urgentResult] = await db.select({ count: sql<number>`count(*)::int` }).from(tasksTable)
-      .where(and(inArray(tasksTable.priority, ["high", "urgent"]), sql`${tasksTable.status} NOT IN ('completed', 'dismissed')`));
+      .where(and(eq(tasksTable.workspaceId, req.workspaceId!), inArray(tasksTable.priority, ["high", "urgent"]), sql`${tasksTable.status} NOT IN ('completed', 'dismissed')`));
 
     res.json({
       open: openResult?.count || 0,
@@ -104,7 +105,7 @@ router.get("/tasks/auto-rules", async (_req, res) => {
   }
 });
 
-router.put("/tasks/auto-rules", async (req, res) => {
+router.put("/tasks/auto-rules", requireRole("manager"), async (req, res) => {
   try {
     updateAutoTaskSettings(req.body);
     res.json(getAutoTaskSettings());
@@ -113,7 +114,7 @@ router.put("/tasks/auto-rules", async (req, res) => {
   }
 });
 
-router.post("/tasks", async (req, res) => {
+router.post("/tasks", requireRole("operator"), async (req, res) => {
   try {
     const data = req.body;
     const [task] = await db.insert(tasksTable).values({
@@ -131,16 +132,18 @@ router.post("/tasks", async (req, res) => {
       notes: data.notes || null,
       source: data.source || "user",
       createdBy: data.createdBy || "user",
+      workspaceId: req.workspaceId!,
     }).returning();
 
     if (task.leadId) {
-      const [lead] = await db.select().from(leadsTable).where(eq(leadsTable.id, task.leadId));
+      const [lead] = await db.select().from(leadsTable).where(and(eq(leadsTable.id, task.leadId), eq(leadsTable.workspaceId, req.workspaceId!)));
       if (lead) {
         await db.insert(activityTable).values({
           type: "task_created",
           description: `Task "${task.title || task.taskType}" created for ${lead.companyName}`,
           leadId: lead.id,
           createdBy: task.source === "system" ? "system" : undefined,
+          workspaceId: req.workspaceId!,
         });
       }
     }
@@ -151,7 +154,7 @@ router.post("/tasks", async (req, res) => {
   }
 });
 
-router.put("/tasks/:id", async (req, res) => {
+router.put("/tasks/:id", requireRole("operator"), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const data = req.body;
@@ -168,10 +171,11 @@ router.put("/tasks/:id", async (req, res) => {
     if (data.notes !== undefined) updates.notes = data.notes;
     if (data.ownerId !== undefined) updates.ownerId = data.ownerId;
     if (data.reminderAt !== undefined) updates.reminderAt = data.reminderAt ? new Date(data.reminderAt) : null;
+    delete updates.workspaceId;
 
     const [task] = await db.update(tasksTable)
       .set(updates)
-      .where(eq(tasksTable.id, id))
+      .where(and(eq(tasksTable.id, id), eq(tasksTable.workspaceId, req.workspaceId!)))
       .returning();
 
     if (!task) return res.status(404).json({ message: "Task not found" });
@@ -181,33 +185,34 @@ router.put("/tasks/:id", async (req, res) => {
   }
 });
 
-router.delete("/tasks/:id", async (req, res) => {
+router.delete("/tasks/:id", requireRole("manager"), async (req, res) => {
   try {
     const id = Number(req.params.id);
-    await db.delete(tasksTable).where(eq(tasksTable.id, id));
+    await db.delete(tasksTable).where(and(eq(tasksTable.id, id), eq(tasksTable.workspaceId, req.workspaceId!)));
     res.json({ message: "Task deleted" });
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }
 });
 
-router.patch("/tasks/:id/complete", async (req, res) => {
+router.patch("/tasks/:id/complete", requireRole("operator"), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const [task] = await db.update(tasksTable)
       .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
-      .where(eq(tasksTable.id, id))
+      .where(and(eq(tasksTable.id, id), eq(tasksTable.workspaceId, req.workspaceId!)))
       .returning();
 
     if (!task) return res.status(404).json({ message: "Task not found" });
 
     if (task.leadId) {
-      const [lead] = await db.select().from(leadsTable).where(eq(leadsTable.id, task.leadId));
+      const [lead] = await db.select().from(leadsTable).where(and(eq(leadsTable.id, task.leadId), eq(leadsTable.workspaceId, req.workspaceId!)));
       if (lead) {
         await db.insert(activityTable).values({
           type: "task_completed",
           description: `Task "${task.title || task.taskType}" completed for ${lead.companyName}`,
           leadId: lead.id,
+          workspaceId: req.workspaceId!,
         });
       }
     }
@@ -218,12 +223,12 @@ router.patch("/tasks/:id/complete", async (req, res) => {
   }
 });
 
-router.patch("/tasks/:id/dismiss", async (req, res) => {
+router.patch("/tasks/:id/dismiss", requireRole("operator"), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const [task] = await db.update(tasksTable)
       .set({ status: "dismissed", updatedAt: new Date() })
-      .where(eq(tasksTable.id, id))
+      .where(and(eq(tasksTable.id, id), eq(tasksTable.workspaceId, req.workspaceId!)))
       .returning();
 
     if (!task) return res.status(404).json({ message: "Task not found" });

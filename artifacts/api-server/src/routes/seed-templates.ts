@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, templatesTable, templateSetsTable, sequenceTemplatesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -272,11 +272,11 @@ Best,
 A3 Visual Team`,
 ];
 
-router.get("/seed-templates/status", async (_req, res) => {
+router.get("/seed-templates/status", async (req, res) => {
   try {
-    const templates = await db.select().from(templatesTable);
-    const sets = await db.select().from(templateSetsTable);
-    const steps = await db.select().from(sequenceTemplatesTable);
+    const templates = await db.select().from(templatesTable).where(eq(templatesTable.workspaceId, req.workspaceId!));
+    const sets = await db.select().from(templateSetsTable).where(eq(templateSetsTable.workspaceId, req.workspaceId!));
+    const steps = await db.select().from(sequenceTemplatesTable).where(eq(sequenceTemplatesTable.workspaceId, req.workspaceId!));
     res.json({
       templates: templates.length,
       templateSets: sets.length,
@@ -288,9 +288,9 @@ router.get("/seed-templates/status", async (_req, res) => {
   }
 });
 
-router.post("/seed-templates", async (_req, res) => {
+router.post("/seed-templates", async (req, res) => {
   try {
-    const existingTemplates = await db.select({ name: templatesTable.name }).from(templatesTable);
+    const existingTemplates = await db.select({ name: templatesTable.name }).from(templatesTable).where(eq(templatesTable.workspaceId, req.workspaceId!));
     const existingNames = new Set(existingTemplates.map(t => t.name));
 
     const allTemplates = [...A3_CORE_TEMPLATES, ...MEDICAL_TEMPLATES, ...REACTIVATION_TEMPLATES];
@@ -301,6 +301,7 @@ router.post("/seed-templates", async (_req, res) => {
     for (const t of allTemplates) {
       if (existingNames.has(t.name)) continue;
       const [created] = await db.insert(templatesTable).values({
+        workspaceId: req.workspaceId!,
         name: t.name,
         category: t.category,
         type: t.type,
@@ -314,7 +315,7 @@ router.post("/seed-templates", async (_req, res) => {
       templatesCreated++;
     }
 
-    const existingSets = await db.select({ name: templateSetsTable.name }).from(templateSetsTable);
+    const existingSets = await db.select({ name: templateSetsTable.name }).from(templateSetsTable).where(eq(templateSetsTable.workspaceId, req.workspaceId!));
     const existingSetNames = new Set(existingSets.map(s => s.name));
 
     let sequencesCreated = 0;
@@ -330,6 +331,7 @@ router.post("/seed-templates", async (_req, res) => {
       if (existingSetNames.has(seqDef.name)) continue;
 
       const [set] = await db.insert(templateSetsTable).values({
+        workspaceId: req.workspaceId!,
         name: seqDef.name,
         description: `Default follow-up sequence for ${seqDef.category} vertical with 3d/7d/14d/1m/3m/6m/1y cadence`,
       }).returning();
@@ -341,6 +343,7 @@ router.post("/seed-templates", async (_req, res) => {
         const bodyOverride = SEQUENCE_BODIES[i];
 
         await db.insert(sequenceTemplatesTable).values({
+          workspaceId: req.workspaceId!,
           templateSetId: set.id,
           stepNumber: step.stepNumber,
           name: step.stepLabel,
@@ -362,7 +365,7 @@ router.post("/seed-templates", async (_req, res) => {
           linkedSequenceId: set.id,
           linkedTemplateSetId: set.id,
           updatedAt: new Date(),
-        }).where(eq(templatesTable.id, initialTemplateId));
+        }).where(and(eq(templatesTable.id, initialTemplateId), eq(templatesTable.workspaceId, req.workspaceId!)));
       }
 
       sequencesCreated++;

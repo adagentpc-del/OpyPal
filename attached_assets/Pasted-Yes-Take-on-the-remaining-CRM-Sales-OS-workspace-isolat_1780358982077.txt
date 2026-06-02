@@ -1,0 +1,92 @@
+Yes. Take on the remaining CRM / Sales OS workspace isolation now.
+
+The partner portal isolation is not enough. Opypal must have full workspace isolation across the entire CRM / outreach / sales operating system.
+
+Implement the next required migration and enforcement layer with these requirements:
+
+1. Add workspaceId to all remaining core CRM / Sales OS tables that are still single-tenant, including where applicable:
+- leads
+- contacts
+- companies
+- campaigns
+- scheduled_emails
+- activity / activity_log
+- settings
+- mailbox_connections
+- bulk_send_campaigns
+- suppression_list
+- inbound_emails
+- templates
+- sequences
+- follow_up_steps
+- contact_sequences
+- tasks
+- notes
+- pipeline stages
+- lead statuses
+- analytics-related records
+- uploads / attachments
+- any other Sales OS tables still implicitly tied to A3 Visual
+
+2. Backfill all existing Sales OS / CRM data into Workspace 1 = A3 Visual.
+Do not lose existing data.
+
+3. Enforce workspace isolation everywhere:
+- backend queries
+- API routes
+- UI page loaders
+- mutations / writes
+- queue processing
+- reply processing
+- analytics queries
+- imports / exports
+- search / filters
+- mailbox sync logic
+- template rendering
+- scheduled follow-up processing
+
+4. Implement real workspace membership and role assignment.
+Use:
+- super_admin
+- workspace_admin
+- manager
+- operator
+- viewer
+
+5. Make workspace_members operational, not empty scaffolding.
+Seed proper memberships for:
+- me as super_admin with access to all workspaces
+- A3 Visual workspace users limited to A3
+- Move Mi workspace users limited to Move Mi
+- StrataLogic workspace users limited to StrataLogic
+- future workspaces isolated by default
+
+6. Enforce authorization rules:
+- only super_admin can access all workspaces
+- workspace users can only access their own workspace
+- no access by URL manipulation
+- no access by record ID guessing
+- no cross-workspace API access
+- no cross-workspace queue processing or mailbox access
+
+7. Add defense-in-depth where practical:
+- composite constraints or equivalent safeguards tying children to same-workspace parents
+- integration tests for workspace isolation and permission boundaries
+
+8. Keep existing functionality working:
+- CRM
+- outreach
+- sequences
+- queue
+- analytics
+- templates
+- reply processing
+- partner portal isolation already completed
+
+After implementation, provide:
+a. exact files changed
+b. all tables newly workspace-scoped
+c. how existing CRM / Sales OS data was backfilled into A3 Visual
+d. how workspace_members is now populated and enforced
+e. how super_admin override works
+f. any remaining non-isolated tables or security gaps

@@ -2,11 +2,12 @@ import { Router, type IRouter } from "express";
 import { db, contactsTable, sequenceStepsTable, sendLogsTable, settingsTable, emailEventsTable, sequenceEnrollmentsTable } from "@workspace/db";
 import { eq, and, lte, sql, desc } from "drizzle-orm";
 import { calculateEngagementScore, getEngagementTier } from "../lib/template-engine";
+import { requireRole } from "../middleware/clerk-auth";
 
 const router: IRouter = Router();
 
-async function getSetting(key: string, defaultValue: string): Promise<string> {
-  const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, key));
+async function getSetting(workspaceId: number, key: string, defaultValue: string): Promise<string> {
+  const [row] = await db.select().from(settingsTable).where(and(eq(settingsTable.key, key), eq(settingsTable.workspaceId, workspaceId)));
   return row?.value || defaultValue;
 }
 
@@ -25,7 +26,7 @@ router.get("/sequence/queue", async (req, res) => {
     const statusFilter = req.query.status as string | undefined;
     const dueToday = req.query.dueToday === "true";
 
-    let conditions: any[] = [];
+    let conditions: any[] = [eq(sequenceStepsTable.workspaceId, req.workspaceId!)];
     if (statusFilter) conditions.push(eq(sequenceStepsTable.status, statusFilter));
 
     if (dueToday) {
@@ -45,7 +46,7 @@ router.get("/sequence/queue", async (req, res) => {
 
     const contactIds = [...new Set(steps.map(s => s.contactId))];
     const contacts = contactIds.length > 0
-      ? await db.select().from(contactsTable).where(sql`${contactsTable.id} IN (${sql.join(contactIds.map(id => sql`${id}`), sql`,`)})`)
+      ? await db.select().from(contactsTable).where(and(eq(contactsTable.workspaceId, req.workspaceId!), sql`${contactsTable.id} IN (${sql.join(contactIds.map(id => sql`${id}`), sql`,`)})`))
       : [];
     const contactMap = Object.fromEntries(contacts.map(c => [c.id, c]));
 
@@ -68,24 +69,24 @@ router.get("/sequence/queue", async (req, res) => {
   }
 });
 
-router.post("/sequence/process", async (_req, res) => {
+router.post("/sequence/process", requireRole("manager"), async (req, res) => {
   try {
     const now = new Date();
 
-    const businessDaysOnly = (await getSetting("business_days_only", "true")) === "true";
+    const businessDaysOnly = (await getSetting(req.workspaceId!, "business_days_only", "true")) === "true";
     if (businessDaysOnly && !isBusinessDay(now)) {
       return res.json({ processed: 0, skipped: 0, errors: 0, message: "Not a business day, skipping" });
     }
 
-    const sendWindowStart = parseInt(await getSetting("send_window_start", "8"), 10);
-    const sendWindowEnd = parseInt(await getSetting("send_window_end", "18"), 10);
+    const sendWindowStart = parseInt(await getSetting(req.workspaceId!, "send_window_start", "8"), 10);
+    const sendWindowEnd = parseInt(await getSetting(req.workspaceId!, "send_window_end", "18"), 10);
 
     if (!isInSendWindow(now, sendWindowStart, sendWindowEnd)) {
       return res.json({ processed: 0, skipped: 0, errors: 0, message: `Outside send window (${sendWindowStart}:00-${sendWindowEnd}:00)` });
     }
 
-    const dailyCap = parseInt(await getSetting("daily_send_cap", "50"), 10);
-    const useRandomSpacing = (await getSetting("randomized_spacing", "true")) === "true";
+    const dailyCap = parseInt(await getSetting(req.workspaceId!, "daily_send_cap", "50"), 10);
+    const useRandomSpacing = (await getSetting(req.workspaceId!, "randomized_spacing", "true")) === "true";
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -94,7 +95,8 @@ router.post("/sequence/process", async (_req, res) => {
     }).from(sendLogsTable).where(
       and(
         sql`${sendLogsTable.sentAt} >= ${todayStart}`,
-        eq(sendLogsTable.status, "sent")
+        eq(sendLogsTable.status, "sent"),
+        eq(sendLogsTable.workspaceId, req.workspaceId!)
       )
     );
     const sentToday = sentTodayResult?.count || 0;
@@ -108,7 +110,8 @@ router.post("/sequence/process", async (_req, res) => {
     const dueSteps = await db.select().from(sequenceStepsTable)
       .where(and(
         eq(sequenceStepsTable.status, "scheduled"),
-        lte(sequenceStepsTable.scheduledFor, now)
+        lte(sequenceStepsTable.scheduledFor, now),
+        eq(sequenceStepsTable.workspaceId, req.workspaceId!)
       ))
       .orderBy(sequenceStepsTable.scheduledFor)
       .limit(remaining);
@@ -119,17 +122,17 @@ router.post("/sequence/process", async (_req, res) => {
 
     for (const step of dueSteps) {
       try {
-        const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, step.contactId));
+        const [contact] = await db.select().from(contactsTable).where(and(eq(contactsTable.id, step.contactId), eq(contactsTable.workspaceId, req.workspaceId!)));
         if (!contact || contact.doNotContact || contact.bounced || contact.unsubscribed ||
             contact.sequenceStatus === "paused_replied" || contact.sequenceStatus === "paused_manual" ||
             contact.sequenceStatus === "do_not_contact" || contact.sequenceStatus === "bounce" ||
             contact.sequenceStatus === "unsubscribed") {
-          await db.update(sequenceStepsTable).set({ status: "skipped", skippedAt: now }).where(eq(sequenceStepsTable.id, step.id));
+          await db.update(sequenceStepsTable).set({ status: "skipped", skippedAt: now }).where(and(eq(sequenceStepsTable.id, step.id), eq(sequenceStepsTable.workspaceId, req.workspaceId!)));
           skipped++;
           continue;
         }
 
-        await db.update(sequenceStepsTable).set({ status: "sent", sentAt: now }).where(eq(sequenceStepsTable.id, step.id));
+        await db.update(sequenceStepsTable).set({ status: "sent", sentAt: now }).where(and(eq(sequenceStepsTable.id, step.id), eq(sequenceStepsTable.workspaceId, req.workspaceId!)));
 
         await db.insert(sendLogsTable).values({
           contactId: step.contactId,
@@ -144,6 +147,7 @@ router.post("/sequence/process", async (_req, res) => {
           status: "sent",
           sentAt: now,
           createdAt: now,
+          workspaceId: req.workspaceId!,
         });
 
         await db.insert(emailEventsTable).values({
@@ -151,10 +155,11 @@ router.post("/sequence/process", async (_req, res) => {
           sendLogId: null,
           eventType: "sent",
           timestamp: now,
+          workspaceId: req.workspaceId!,
         });
 
         const [nextStep] = await db.select().from(sequenceStepsTable)
-          .where(and(eq(sequenceStepsTable.contactId, step.contactId), eq(sequenceStepsTable.status, "scheduled")))
+          .where(and(eq(sequenceStepsTable.contactId, step.contactId), eq(sequenceStepsTable.status, "scheduled"), eq(sequenceStepsTable.workspaceId, req.workspaceId!)))
           .orderBy(sequenceStepsTable.stepNumber)
           .limit(1);
 
@@ -166,7 +171,7 @@ router.post("/sequence/process", async (_req, res) => {
           nextSendAt: nextStep?.scheduledFor || null,
           sequenceStatus: newStatus,
           updatedAt: now,
-        }).where(eq(contactsTable.id, step.contactId));
+        }).where(and(eq(contactsTable.id, step.contactId), eq(contactsTable.workspaceId, req.workspaceId!)));
 
         if (step.enrollmentId) {
           await db.update(sequenceEnrollmentsTable).set({
@@ -175,13 +180,13 @@ router.post("/sequence/process", async (_req, res) => {
             sequenceStatus: newStatus,
             completedAt: newStatus === "completed" ? now : null,
             updatedAt: now,
-          }).where(eq(sequenceEnrollmentsTable.id, step.enrollmentId));
+          }).where(and(eq(sequenceEnrollmentsTable.id, step.enrollmentId), eq(sequenceEnrollmentsTable.workspaceId, req.workspaceId!)));
         }
 
-        const events = await db.select().from(emailEventsTable).where(eq(emailEventsTable.contactId, step.contactId));
+        const events = await db.select().from(emailEventsTable).where(and(eq(emailEventsTable.contactId, step.contactId), eq(emailEventsTable.workspaceId, req.workspaceId!)));
         const score = calculateEngagementScore(events);
         const tier = getEngagementTier(score);
-        await db.update(contactsTable).set({ engagementScore: score, engagementTier: tier }).where(eq(contactsTable.id, step.contactId));
+        await db.update(contactsTable).set({ engagementScore: score, engagementTier: tier }).where(and(eq(contactsTable.id, step.contactId), eq(contactsTable.workspaceId, req.workspaceId!)));
 
         processed++;
 
@@ -191,7 +196,7 @@ router.post("/sequence/process", async (_req, res) => {
         }
       } catch (e: any) {
         errors++;
-        await db.update(sequenceStepsTable).set({ status: "failed" }).where(eq(sequenceStepsTable.id, step.id));
+        await db.update(sequenceStepsTable).set({ status: "failed" }).where(and(eq(sequenceStepsTable.id, step.id), eq(sequenceStepsTable.workspaceId, req.workspaceId!)));
         await db.insert(sendLogsTable).values({
           contactId: step.contactId,
           enrollmentId: step.enrollmentId,
@@ -202,6 +207,7 @@ router.post("/sequence/process", async (_req, res) => {
           errorMessage: e.message,
           sentAt: now,
           createdAt: now,
+          workspaceId: req.workspaceId!,
         });
       }
     }

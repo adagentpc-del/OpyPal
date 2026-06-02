@@ -50,7 +50,8 @@ export interface SuppressionReport {
 
 export async function validateRecipients(
   recipients: BulkRecipient[],
-  sequenceId?: number
+  sequenceId?: number,
+  workspaceId = 1
 ): Promise<SuppressionReport> {
   const report: SuppressionReport = {
     ready: [],
@@ -69,6 +70,7 @@ export async function validateRecipients(
     const existing = await db.select({ leadId: scheduledEmailsTable.leadId })
       .from(scheduledEmailsTable)
       .where(and(
+        eq(scheduledEmailsTable.workspaceId, workspaceId),
         eq(scheduledEmailsTable.sequenceId, sequenceId),
         inArray(scheduledEmailsTable.status, ["scheduled", "paused", "queued"])
       ));
@@ -130,12 +132,13 @@ export interface BulkSendResult {
   recipients: { leadId: number; companyName: string; status: string; queuePosition?: number }[];
 }
 
-export async function executeBulkSend(req: BulkSendRequest): Promise<BulkSendResult> {
+export async function executeBulkSend(req: BulkSendRequest, workspaceId = 1): Promise<BulkSendResult> {
   const sendsPerHour = req.sendsPerHour || 50;
   const delayBetweenSendsMs = req.delayBetweenSendsMs || 5000;
   const batchSize = req.batchSize || 5;
 
   const [campaign] = await db.insert(bulkSendCampaignsTable).values({
+    workspaceId,
     name: req.campaignName || `Bulk send ${new Date().toLocaleDateString()}`,
     templateId: req.templateId,
     templateName: req.templateName,
@@ -164,6 +167,7 @@ export async function executeBulkSend(req: BulkSendRequest): Promise<BulkSendRes
 
     if (req.mode === "send_now") {
       await db.insert(scheduledEmailsTable).values({
+        workspaceId,
         leadId: lead.leadId,
         templateId: req.templateId,
         subject: personalizedSubject,
@@ -186,6 +190,7 @@ export async function executeBulkSend(req: BulkSendRequest): Promise<BulkSendRes
     } else {
       const schedDate = req.scheduledFor ? new Date(req.scheduledFor) : new Date();
       await db.insert(scheduledEmailsTable).values({
+        workspaceId,
         leadId: lead.leadId,
         templateId: req.templateId,
         subject: personalizedSubject,
@@ -201,6 +206,7 @@ export async function executeBulkSend(req: BulkSendRequest): Promise<BulkSendRes
       });
 
       await db.insert(activityTable).values({
+        workspaceId,
         type: "bulk_email_scheduled",
         description: `Bulk email scheduled: "${personalizedSubject}"`,
         leadId: lead.leadId,
@@ -222,6 +228,7 @@ export async function executeBulkSend(req: BulkSendRequest): Promise<BulkSendRes
         const stepSubject = personalize(step.subject || `Follow-up Step ${step.stepNumber}`, lead);
         const stepBody = personalize(step.body || "", lead);
         await db.insert(scheduledEmailsTable).values({
+          workspaceId,
           leadId: lead.leadId,
           subject: stepSubject,
           body: stepBody,
@@ -237,6 +244,7 @@ export async function executeBulkSend(req: BulkSendRequest): Promise<BulkSendRes
       }
 
       await db.insert(activityTable).values({
+        workspaceId,
         type: "bulk_sequence_enrolled",
         description: `Enrolled in sequence: ${req.sequenceName || "Unnamed"} (${req.sequenceSteps.length} steps)`,
         leadId: lead.leadId,

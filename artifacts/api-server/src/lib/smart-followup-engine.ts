@@ -155,7 +155,16 @@ export async function processEngagementEvent(
 ): Promise<{ actionsApplied: string[] }> {
   const actionsApplied: string[] = [];
 
+  // Resolve the lead first and derive the workspace server-side from it. Unknown
+  // leads are rejected before ANY write so an arbitrary leadId can never inject
+  // rows (and never falls back to workspace 1).
+  const leads = await db.select().from(leadsTable).where(eq(leadsTable.id, leadId)).limit(1);
+  if (!leads.length) return { actionsApplied: ["lead_not_found"] };
+  const lead = leads[0];
+  const ws = lead.workspaceId;
+
   const eventRow: any = {
+    workspaceId: ws,
     leadId,
     eventType,
     eventTimestamp: new Date(),
@@ -170,10 +179,6 @@ export async function processEngagementEvent(
 
   const rule = DEFAULT_RULES.find(r => r.eventType === eventType);
   if (!rule) return { actionsApplied: ["event_logged"] };
-
-  const leads = await db.select().from(leadsTable).where(eq(leadsTable.id, leadId)).limit(1);
-  if (!leads.length) return { actionsApplied: ["lead_not_found"] };
-  const lead = leads[0];
 
   if (eventType === "opened") {
     const openCount = await db.select({ count: sql<number>`count(*)::int` })
@@ -190,6 +195,7 @@ export async function processEngagementEvent(
         )).limit(1);
       if (existingWarmTask.length === 0) {
         await db.insert(tasksTable).values({
+          workspaceId: ws,
           title: "Warm lead — multiple opens, no reply",
           taskType: "follow_up_call",
           leadId,
@@ -202,6 +208,7 @@ export async function processEngagementEvent(
           sequenceId: metadata?.sequenceId || null,
         });
         await db.insert(notificationsTable).values({
+          workspaceId: ws,
           type: "multiple_opens",
           title: "Multiple opens detected",
           description: `${lead.companyName} — ${lead.contactName} opened ${totalOpens} times without replying`,
@@ -218,6 +225,7 @@ export async function processEngagementEvent(
   const newScore = Math.max(0, (lead.engagementScore || 0) + (rule.actions.find(a => a.type === "update_engagement")?.params?.scoreChange || 0));
   if (newScore >= 30 && (lead.engagementScore || 0) < 30 && ruleOverrides.high_intent_score_threshold !== false) {
     await db.insert(tasksTable).values({
+      workspaceId: ws,
       title: "High intent lead — personal outreach recommended",
       taskType: "check_high_intent",
       leadId,
@@ -228,6 +236,7 @@ export async function processEngagementEvent(
       dueDate: new Date().toISOString().split("T")[0],
     });
     await db.insert(notificationsTable).values({
+      workspaceId: ws,
       type: "score_threshold",
       title: "Lead score threshold crossed",
       description: `${lead.companyName} reached engagement score ${newScore}`,
@@ -295,6 +304,7 @@ export async function processEngagementEvent(
       case "notify": {
         if (!shouldNotify(eventType)) break;
         await db.insert(notificationsTable).values({
+          workspaceId: ws,
           type: eventType,
           title: action.params?.title || eventType,
           description: `${lead.companyName} — ${lead.contactName}`,
@@ -311,6 +321,7 @@ export async function processEngagementEvent(
         if (!shouldCreateTask(eventType)) break;
         const today = new Date().toISOString().split("T")[0];
         await db.insert(tasksTable).values({
+          workspaceId: ws,
           title: action.params?.title || `Follow up: ${eventType}`,
           taskType: action.params?.taskType || "custom",
           leadId,
@@ -327,6 +338,7 @@ export async function processEngagementEvent(
       }
       case "create_activity": {
         const actRow: any = {
+          workspaceId: ws,
           type: action.params?.type || eventType,
           description: action.params?.description || `Event: ${eventType}`,
           leadId,

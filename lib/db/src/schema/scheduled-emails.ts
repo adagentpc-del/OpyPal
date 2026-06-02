@@ -1,10 +1,14 @@
 import { pgTable, serial, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { workspacesTable } from "./workspaces";
 import { leadsTable } from "./leads";
 
 export const scheduledEmailsTable = pgTable("scheduled_emails", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   leadId: integer("lead_id").references(() => leadsTable.id, { onDelete: "cascade" }).notNull(),
   templateId: integer("template_id"),
   subject: text("subject").notNull(),

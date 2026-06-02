@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, bulkSendCampaignsTable, scheduledEmailsTable } from "@workspace/db";
 import { desc, eq, and } from "drizzle-orm";
+import { requireRole } from "../middleware/clerk-auth";
 import { validateRecipients, executeBulkSend } from "../lib/bulk-send-engine";
 import { checkResendConnection, DEFAULT_REPLY_TO, DEFAULT_FROM_EMAIL } from "../lib/resend";
 import { getQueueStatus, abortQueue, getGlobalQueueStatus, startQueueProcessor } from "../lib/send-queue";
@@ -34,11 +35,11 @@ router.get("/bulk-send/sender-config", async (_req, res) => {
   }
 });
 
-router.post("/bulk-send/validate", async (req, res) => {
+router.post("/bulk-send/validate", requireRole("operator"), async (req, res) => {
   try {
     const { recipients, sequenceId } = req.body;
     if (!recipients || !Array.isArray(recipients)) return res.status(400).json({ message: "recipients array required" });
-    const report = await validateRecipients(recipients, sequenceId);
+    const report = await validateRecipients(recipients, sequenceId, req.workspaceId!);
     res.json({
       ready: report.ready.length,
       skippedNoEmail: report.skippedNoEmail.length,
@@ -63,7 +64,7 @@ router.post("/bulk-send/validate", async (req, res) => {
   }
 });
 
-router.post("/bulk-send/execute", async (req, res) => {
+router.post("/bulk-send/execute", requireRole("manager"), async (req, res) => {
   try {
     const { recipients, templateId, templateName, subject, body, sequenceId, sequenceName, sequenceSteps, activateSequence, mode, scheduledFor, campaignName, senderEmail, senderName, replyTo, sendsPerHour, delayBetweenSendsMs, batchSize } = req.body;
     if (!recipients?.length) return res.status(400).json({ message: "No recipients" });
@@ -74,7 +75,7 @@ router.post("/bulk-send/execute", async (req, res) => {
       if (!connCheck.connected) return res.status(400).json({ message: `Resend not configured: ${connCheck.error}` });
     }
 
-    const report = await validateRecipients(recipients, sequenceId);
+    const report = await validateRecipients(recipients, sequenceId, req.workspaceId!);
     const totalSkipped = report.skippedNoEmail.length + report.skippedInvalidEmail.length +
       report.skippedUnsubscribed.length + report.skippedBounced.length +
       report.skippedDuplicateEmail.length + report.skippedDuplicateEnrollment.length;
@@ -93,7 +94,7 @@ router.post("/bulk-send/execute", async (req, res) => {
       delayBetweenSendsMs: delayBetweenSendsMs || 5000,
       batchSize: batchSize || 5,
       totalSkipped,
-    });
+    }, req.workspaceId!);
 
     res.json(result);
   } catch (err: any) {
@@ -104,6 +105,7 @@ router.post("/bulk-send/execute", async (req, res) => {
 router.get("/bulk-send/campaigns", async (req, res) => {
   try {
     const campaigns = await db.select().from(bulkSendCampaignsTable)
+      .where(eq(bulkSendCampaignsTable.workspaceId, req.workspaceId!))
       .orderBy(desc(bulkSendCampaignsTable.createdAt))
       .limit(Number(req.query.limit) || 50);
     res.json(campaigns);
@@ -115,7 +117,7 @@ router.get("/bulk-send/campaigns", async (req, res) => {
 router.get("/bulk-send/campaigns/:id", async (req, res) => {
   try {
     const [campaign] = await db.select().from(bulkSendCampaignsTable)
-      .where(eq(bulkSendCampaignsTable.id, Number(req.params.id)));
+      .where(and(eq(bulkSendCampaignsTable.id, Number(req.params.id)), eq(bulkSendCampaignsTable.workspaceId, req.workspaceId!)));
     if (!campaign) return res.status(404).json({ message: "Campaign not found" });
 
     const queueStatus = getQueueStatus(campaign.id);
@@ -129,7 +131,7 @@ router.get("/bulk-send/campaigns/:id/progress", async (req, res) => {
   try {
     const campaignId = Number(req.params.id);
     const [campaign] = await db.select().from(bulkSendCampaignsTable)
-      .where(eq(bulkSendCampaignsTable.id, campaignId));
+      .where(and(eq(bulkSendCampaignsTable.id, campaignId), eq(bulkSendCampaignsTable.workspaceId, req.workspaceId!)));
     if (!campaign) return res.status(404).json({ message: "Campaign not found" });
 
     const queueStatus = getQueueStatus(campaignId);
@@ -144,7 +146,7 @@ router.get("/bulk-send/campaigns/:id/progress", async (req, res) => {
       retryCount: scheduledEmailsTable.retryCount,
       queuePosition: scheduledEmailsTable.queuePosition,
     }).from(scheduledEmailsTable)
-      .where(eq(scheduledEmailsTable.campaignId, campaignId))
+      .where(and(eq(scheduledEmailsTable.campaignId, campaignId), eq(scheduledEmailsTable.workspaceId, req.workspaceId!)))
       .orderBy(scheduledEmailsTable.queuePosition);
 
     res.json({
@@ -156,7 +158,7 @@ router.get("/bulk-send/campaigns/:id/progress", async (req, res) => {
   }
 });
 
-router.post("/bulk-send/campaigns/:id/pause", async (req, res) => {
+router.post("/bulk-send/campaigns/:id/pause", requireRole("operator"), async (req, res) => {
   try {
     const campaignId = Number(req.params.id);
     const aborted = abortQueue(campaignId);
@@ -165,7 +167,7 @@ router.post("/bulk-send/campaigns/:id/pause", async (req, res) => {
       await db.update(bulkSendCampaignsTable).set({
         status: "paused",
         updatedAt: new Date(),
-      }).where(eq(bulkSendCampaignsTable.id, campaignId));
+      }).where(and(eq(bulkSendCampaignsTable.id, campaignId), eq(bulkSendCampaignsTable.workspaceId, req.workspaceId!)));
     }
 
     res.json({ paused: true });
@@ -174,11 +176,11 @@ router.post("/bulk-send/campaigns/:id/pause", async (req, res) => {
   }
 });
 
-router.post("/bulk-send/campaigns/:id/resume", async (req, res) => {
+router.post("/bulk-send/campaigns/:id/resume", requireRole("operator"), async (req, res) => {
   try {
     const campaignId = Number(req.params.id);
     const [campaign] = await db.select().from(bulkSendCampaignsTable)
-      .where(eq(bulkSendCampaignsTable.id, campaignId));
+      .where(and(eq(bulkSendCampaignsTable.id, campaignId), eq(bulkSendCampaignsTable.workspaceId, req.workspaceId!)));
     if (!campaign) return res.status(404).json({ message: "Campaign not found" });
 
     startQueueProcessor(campaignId, {

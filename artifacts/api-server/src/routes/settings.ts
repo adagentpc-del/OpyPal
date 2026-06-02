@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, settingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { requireRole } from "../middleware/clerk-auth";
 import { getSchedulerStatus, startScheduler, stopScheduler } from "../lib/background-scheduler";
 
 const router: IRouter = Router();
@@ -37,9 +38,10 @@ const DEFAULT_VALUES: Record<string, string> = {
   outlook_sync_interval_minutes: "2",
 };
 
-router.get("/settings", async (_req, res) => {
+router.get("/settings", async (req, res) => {
   try {
-    const rows = await db.select().from(settingsTable);
+    const rows = await db.select().from(settingsTable)
+      .where(eq(settingsTable.workspaceId, req.workspaceId!));
     const settings: Record<string, string> = {};
 
     for (const key of SETTINGS_KEYS) {
@@ -53,22 +55,26 @@ router.get("/settings", async (_req, res) => {
   }
 });
 
-router.put("/settings", async (req, res) => {
+router.put("/settings", requireRole("manager"), async (req, res) => {
   try {
     const updates = req.body as Record<string, string>;
+    const workspaceId = req.workspaceId!;
 
     for (const [key, value] of Object.entries(updates)) {
       if (!SETTINGS_KEYS.includes(key)) continue;
 
-      const [existing] = await db.select().from(settingsTable).where(eq(settingsTable.key, key));
+      const [existing] = await db.select().from(settingsTable)
+        .where(and(eq(settingsTable.workspaceId, workspaceId), eq(settingsTable.key, key)));
       if (existing) {
-        await db.update(settingsTable).set({ value, updatedAt: new Date() }).where(eq(settingsTable.key, key));
+        await db.update(settingsTable).set({ value, updatedAt: new Date() })
+          .where(and(eq(settingsTable.workspaceId, workspaceId), eq(settingsTable.key, key)));
       } else {
-        await db.insert(settingsTable).values({ key, value });
+        await db.insert(settingsTable).values({ key, value, workspaceId });
       }
     }
 
-    const rows = await db.select().from(settingsTable);
+    const rows = await db.select().from(settingsTable)
+      .where(eq(settingsTable.workspaceId, workspaceId));
     const settings: Record<string, string> = {};
     for (const key of SETTINGS_KEYS) {
       const row = rows.find(r => r.key === key);

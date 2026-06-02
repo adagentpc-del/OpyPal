@@ -1,10 +1,13 @@
 import { pgTable, serial, text, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { workspacesTable } from "./workspaces";
 
 export const templatesTable = pgTable("templates", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id"),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   name: text("name").notNull(),
   category: text("category").notNull(),
   type: text("type").default("custom"),

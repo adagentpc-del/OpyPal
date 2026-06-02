@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { requireAuth } from "../middleware/clerk-auth";
+import { requireAuth, resolveWorkspace } from "../middleware/clerk-auth";
 import meRouter from "./me";
 import workspacesRouter from "./workspaces";
 import healthRouter from "./health";
@@ -30,33 +30,46 @@ import seedRouter from "./seed-templates";
 
 const router: IRouter = Router();
 
+// Public / unauthenticated.
 router.use(healthRouter);
-router.use(meRouter);
-router.use(workspacesRouter);
-router.use(leadsRouter);
-router.use(tasksRouter);
-router.use(templatesRouter);
-router.use(assetsRouter);
-router.use(dashboardRouter);
-router.use(syncRouter);
-router.use(contactsRouter);
-router.use(campaignsRouter);
-router.use(templateSetsRouter);
-router.use(sequenceRouter);
-router.use(outboundRouter);
-router.use(scheduledEmailsRouter);
-router.use(notificationsRouter);
-router.use(engagementEventsRouter);
-router.use(bulkSendRouter);
-router.use(inboundEmailRouter);
+router.use(meRouter); // applies requireAuth internally
+router.use(workspacesRouter); // applies requireAuth/requireSuperAdmin internally
+
+// Partner-portal routers manage their own auth + workspace resolution
+// internally (they expose public partner pages and intake endpoints).
 router.use(partnersRouter);
 router.use(partnerRequestsRouter);
 router.use(pricingRulesRouter);
 
-router.use(requireAuth, outlookRouter);
-router.use(requireAuth, companiesRouter);
-router.use(requireAuth, replyReviewRouter);
-router.use(requireAuth, settingsRouter);
-router.use(requireAuth, seedRouter);
+// Mixed routers: they contain PUBLIC webhook/tracking/callback routes that
+// cannot carry an x-workspace-id header, so they apply auth + workspace
+// resolution per-route internally and derive the workspace server-side for
+// their public endpoints.
+router.use(outboundRouter);
+router.use(engagementEventsRouter);
+router.use(inboundEmailRouter);
+router.use(outlookRouter);
+
+// Fully authenticated, workspace-scoped CRM / Sales OS routers. requireAuth +
+// resolveWorkspace run here so every handler has a validated req.workspaceId
+// and cross-workspace access is impossible.
+const scoped = [requireAuth, resolveWorkspace] as const;
+router.use(...scoped, leadsRouter);
+router.use(...scoped, tasksRouter);
+router.use(...scoped, templatesRouter);
+router.use(...scoped, assetsRouter);
+router.use(...scoped, dashboardRouter);
+router.use(...scoped, syncRouter);
+router.use(...scoped, contactsRouter);
+router.use(...scoped, campaignsRouter);
+router.use(...scoped, templateSetsRouter);
+router.use(...scoped, sequenceRouter);
+router.use(...scoped, scheduledEmailsRouter);
+router.use(...scoped, notificationsRouter);
+router.use(...scoped, bulkSendRouter);
+router.use(...scoped, companiesRouter);
+router.use(...scoped, replyReviewRouter);
+router.use(...scoped, settingsRouter);
+router.use(...scoped, seedRouter);
 
 export default router;

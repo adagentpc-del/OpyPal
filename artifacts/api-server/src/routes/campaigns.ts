@@ -1,17 +1,22 @@
 import { Router, type IRouter } from "express";
 import { db, campaignsTable, contactsTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
+import { requireRole } from "../middleware/clerk-auth";
 
 const router: IRouter = Router();
 
-router.get("/campaigns", async (_req, res) => {
+router.get("/campaigns", async (req, res) => {
   try {
-    const campaigns = await db.select().from(campaignsTable).orderBy(campaignsTable.id);
+    const campaigns = await db.select().from(campaignsTable)
+      .where(eq(campaignsTable.workspaceId, req.workspaceId!))
+      .orderBy(campaignsTable.id);
 
     const counts = await db.select({
       campaignName: contactsTable.campaignName,
       count: sql<number>`count(*)::int`,
-    }).from(contactsTable).groupBy(contactsTable.campaignName);
+    }).from(contactsTable)
+      .where(eq(contactsTable.workspaceId, req.workspaceId!))
+      .groupBy(contactsTable.campaignName);
 
     const countMap = Object.fromEntries(counts.map(c => [c.campaignName, c.count]));
 
@@ -26,21 +31,22 @@ router.get("/campaigns", async (_req, res) => {
   }
 });
 
-router.post("/campaigns", async (req, res) => {
+router.post("/campaigns", requireRole("operator"), async (req, res) => {
   try {
-    const [campaign] = await db.insert(campaignsTable).values(req.body).returning();
+    const [campaign] = await db.insert(campaignsTable).values({ ...req.body, workspaceId: req.workspaceId! }).returning();
     res.status(201).json({ ...campaign, contactCount: 0 });
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }
 });
 
-router.put("/campaigns/:id", async (req, res) => {
+router.put("/campaigns/:id", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const { workspaceId: _ignoredWorkspaceId, ...rest } = req.body ?? {};
     const [campaign] = await db.update(campaignsTable)
-      .set({ ...req.body, updatedAt: new Date() })
-      .where(eq(campaignsTable.id, id))
+      .set({ ...rest, updatedAt: new Date() })
+      .where(and(eq(campaignsTable.id, id), eq(campaignsTable.workspaceId, req.workspaceId!)))
       .returning();
     if (!campaign) return res.status(404).json({ message: "Campaign not found" });
     res.json(campaign);
@@ -49,10 +55,10 @@ router.put("/campaigns/:id", async (req, res) => {
   }
 });
 
-router.delete("/campaigns/:id", async (req, res) => {
+router.delete("/campaigns/:id", requireRole("manager"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    await db.delete(campaignsTable).where(eq(campaignsTable.id, id));
+    await db.delete(campaignsTable).where(and(eq(campaignsTable.id, id), eq(campaignsTable.workspaceId, req.workspaceId!)));
     res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ message: err.message });

@@ -10,6 +10,22 @@ export interface Membership {
   role: string;
 }
 
+// Public (unauthenticated) endpoints exposed by the "mixed" routers
+// (outbound, engagement-events, inbound-email, outlook). These routers are all
+// mounted at the same parent root via router.use(), so each one's catch-all auth
+// gate sees pass-through traffic destined for its siblings. To avoid the
+// first-mounted router 401ing a sibling's public webhook, every mixed router's
+// gate must exempt ALL of these paths, not just its own. The handlers for these
+// paths derive the workspace server-side from the referenced record.
+export function isPublicMixedRoutePath(path: string): boolean {
+  return (
+    path.startsWith("/track") ||
+    path === "/inbound-email" ||
+    path === "/engagement-events/webhook" ||
+    path === "/outlook/callback"
+  );
+}
+
 export interface AuthContext {
   userId: string;
   email: string;

@@ -1,7 +1,7 @@
 import { sendEmail } from "./resend";
 import { sendViaOutlook, getPrimaryConnection, isOutlookConfigured } from "./outlook-graph";
 import { db, settingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 interface EmailAdapter {
   sendAdminNotification(data: AdminNotificationData): Promise<void>;
@@ -93,8 +93,10 @@ class ResendEmailAdapter implements EmailAdapter {
 }
 
 class OutlookEmailAdapter implements EmailAdapter {
+  constructor(private workspaceId: number = 1) {}
+
   async sendAdminNotification(data: AdminNotificationData): Promise<void> {
-    const conn = await getPrimaryConnection();
+    const conn = await getPrimaryConnection(this.workspaceId);
     if (!conn) {
       return new ResendEmailAdapter().sendAdminNotification(data);
     }
@@ -132,32 +134,35 @@ class OutlookEmailAdapter implements EmailAdapter {
   }
 }
 
-async function getSendProvider(): Promise<"outlook" | "resend"> {
+async function getSendProvider(workspaceId: number): Promise<"outlook" | "resend"> {
   try {
-    const [setting] = await db.select().from(settingsTable).where(eq(settingsTable.key, "primary_send_provider"));
+    const [setting] = await db.select().from(settingsTable).where(and(
+      eq(settingsTable.workspaceId, workspaceId),
+      eq(settingsTable.key, "primary_send_provider"),
+    ));
     if (setting?.value === "outlook" && isOutlookConfigured()) {
-      const conn = await getPrimaryConnection();
+      const conn = await getPrimaryConnection(workspaceId);
       if (conn) return "outlook";
     }
   } catch {}
   return "resend";
 }
 
-export async function getActiveAdapter(): Promise<EmailAdapter> {
-  const provider = await getSendProvider();
-  if (provider === "outlook") return new OutlookEmailAdapter();
+export async function getActiveAdapter(workspaceId = 1): Promise<EmailAdapter> {
+  const provider = await getSendProvider(workspaceId);
+  if (provider === "outlook") return new OutlookEmailAdapter(workspaceId);
   return new ResendEmailAdapter();
 }
 
-export const sendAdminNotification = async (data: AdminNotificationData) => {
-  const adapter = await getActiveAdapter();
+export const sendAdminNotification = async (data: AdminNotificationData, workspaceId = 1) => {
+  const adapter = await getActiveAdapter(workspaceId);
   return adapter.sendAdminNotification(data);
 };
-export const sendSubmitterConfirmation = async (data: SubmitterConfirmationData) => {
-  const adapter = await getActiveAdapter();
+export const sendSubmitterConfirmation = async (data: SubmitterConfirmationData, workspaceId = 1) => {
+  const adapter = await getActiveAdapter(workspaceId);
   return adapter.sendSubmitterConfirmation(data);
 };
-export const sendStatusUpdate = async (data: StatusUpdateData) => {
-  const adapter = await getActiveAdapter();
+export const sendStatusUpdate = async (data: StatusUpdateData, workspaceId = 1) => {
+  const adapter = await getActiveAdapter(workspaceId);
   return adapter.sendStatusUpdate(data);
 };

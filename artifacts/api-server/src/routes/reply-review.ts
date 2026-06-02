@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, replyReviewQueueTable, inboundEmailsTable, leadsTable, scheduledEmailsTable, activityTable, notificationsTable } from "@workspace/db";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { getConversationThread } from "../lib/reply-processor";
+import { requireRole } from "../middleware/clerk-auth";
 
 const router: IRouter = Router();
 
@@ -19,7 +20,7 @@ router.get("/reply-review", async (req, res) => {
     })
       .from(replyReviewQueueTable)
       .leftJoin(leadsTable, eq(replyReviewQueueTable.leadId, leadsTable.id))
-      .where(eq(replyReviewQueueTable.status, status))
+      .where(and(eq(replyReviewQueueTable.status, status), eq(replyReviewQueueTable.workspaceId, req.workspaceId!)))
       .orderBy(desc(replyReviewQueueTable.createdAt))
       .limit(limit);
 
@@ -48,13 +49,13 @@ router.get("/reply-review/:id", async (req, res) => {
     })
       .from(replyReviewQueueTable)
       .leftJoin(leadsTable, eq(replyReviewQueueTable.leadId, leadsTable.id))
-      .where(eq(replyReviewQueueTable.id, id));
+      .where(and(eq(replyReviewQueueTable.id, id), eq(replyReviewQueueTable.workspaceId, req.workspaceId!)));
 
     if (!item) return res.status(404).json({ message: "Not found" });
 
     let inboundEmail = null;
     if (item.review.inboundEmailId) {
-      const [email] = await db.select().from(inboundEmailsTable).where(eq(inboundEmailsTable.id, item.review.inboundEmailId));
+      const [email] = await db.select().from(inboundEmailsTable).where(and(eq(inboundEmailsTable.id, item.review.inboundEmailId), eq(inboundEmailsTable.workspaceId, req.workspaceId!)));
       inboundEmail = email;
     }
 
@@ -76,7 +77,7 @@ router.get("/reply-review/:id", async (req, res) => {
   }
 });
 
-router.post("/reply-review/:id/decide", async (req, res) => {
+router.post("/reply-review/:id/decide", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { decision } = req.body;
@@ -85,7 +86,7 @@ router.post("/reply-review/:id/decide", async (req, res) => {
       return res.status(400).json({ message: "Decision must be: human_reply, auto_reply, or pause" });
     }
 
-    const [item] = await db.select().from(replyReviewQueueTable).where(eq(replyReviewQueueTable.id, id));
+    const [item] = await db.select().from(replyReviewQueueTable).where(and(eq(replyReviewQueueTable.id, id), eq(replyReviewQueueTable.workspaceId, req.workspaceId!)));
     if (!item) return res.status(404).json({ message: "Not found" });
 
     await db.update(replyReviewQueueTable).set({
@@ -93,14 +94,14 @@ router.post("/reply-review/:id/decide", async (req, res) => {
       reviewedBy: "admin",
       reviewedAt: new Date(),
       status: "reviewed",
-    }).where(eq(replyReviewQueueTable.id, id));
+    }).where(and(eq(replyReviewQueueTable.id, id), eq(replyReviewQueueTable.workspaceId, req.workspaceId!)));
 
     if (item.inboundEmailId) {
       await db.update(inboundEmailsTable).set({
         classification: decision === "pause" ? "uncertain" : decision,
         reviewStatus: "reviewed",
         isAutoReply: decision === "auto_reply",
-      }).where(eq(inboundEmailsTable.id, item.inboundEmailId));
+      }).where(and(eq(inboundEmailsTable.id, item.inboundEmailId), eq(inboundEmailsTable.workspaceId, req.workspaceId!)));
     }
 
     if (decision === "human_reply" && item.leadId) {
@@ -110,13 +111,14 @@ router.post("/reply-review/:id/decide", async (req, res) => {
         lastEngagementType: "reply",
         lastEngagementAt: new Date(),
         updatedAt: new Date(),
-      }).where(eq(leadsTable.id, item.leadId));
+      }).where(and(eq(leadsTable.id, item.leadId), eq(leadsTable.workspaceId, req.workspaceId!)));
 
       const futureEmails = await db.select({ id: scheduledEmailsTable.id })
         .from(scheduledEmailsTable)
         .where(and(
           eq(scheduledEmailsTable.leadId, item.leadId),
           inArray(scheduledEmailsTable.status, ["scheduled", "queued"]),
+          eq(scheduledEmailsTable.workspaceId, req.workspaceId!),
         ));
 
       if (futureEmails.length > 0) {
@@ -125,7 +127,7 @@ router.post("/reply-review/:id/decide", async (req, res) => {
           pauseReason: "reply_confirmed",
           pausedAt: new Date(),
           updatedAt: new Date(),
-        }).where(inArray(scheduledEmailsTable.id, futureEmails.map(e => e.id)));
+        }).where(and(inArray(scheduledEmailsTable.id, futureEmails.map(e => e.id)), eq(scheduledEmailsTable.workspaceId, req.workspaceId!)));
       }
 
       await db.insert(activityTable).values({
@@ -134,6 +136,7 @@ router.post("/reply-review/:id/decide", async (req, res) => {
         leadId: item.leadId,
         metadata: { reviewId: id, pausedCount: futureEmails.length },
         createdBy: "admin",
+        workspaceId: req.workspaceId!,
       });
     }
 
@@ -144,6 +147,7 @@ router.post("/reply-review/:id/decide", async (req, res) => {
           eq(scheduledEmailsTable.leadId, item.leadId),
           eq(scheduledEmailsTable.status, "paused"),
           eq(scheduledEmailsTable.pauseReason, "reply_received"),
+          eq(scheduledEmailsTable.workspaceId, req.workspaceId!),
         ));
 
       if (pausedEmails.length > 0) {
@@ -152,7 +156,7 @@ router.post("/reply-review/:id/decide", async (req, res) => {
           pauseReason: null,
           pausedAt: null,
           updatedAt: new Date(),
-        }).where(inArray(scheduledEmailsTable.id, pausedEmails.map(e => e.id)));
+        }).where(and(inArray(scheduledEmailsTable.id, pausedEmails.map(e => e.id)), eq(scheduledEmailsTable.workspaceId, req.workspaceId!)));
       }
 
       await db.insert(activityTable).values({
@@ -161,6 +165,7 @@ router.post("/reply-review/:id/decide", async (req, res) => {
         leadId: item.leadId,
         metadata: { reviewId: id, resumedCount: pausedEmails.length },
         createdBy: "admin",
+        workspaceId: req.workspaceId!,
       });
     }
 
@@ -170,6 +175,7 @@ router.post("/reply-review/:id/decide", async (req, res) => {
         .where(and(
           eq(scheduledEmailsTable.leadId, item.leadId),
           inArray(scheduledEmailsTable.status, ["scheduled", "queued"]),
+          eq(scheduledEmailsTable.workspaceId, req.workspaceId!),
         ));
 
       if (futureEmails.length > 0) {
@@ -178,7 +184,7 @@ router.post("/reply-review/:id/decide", async (req, res) => {
           pauseReason: "manual_review_pause",
           pausedAt: new Date(),
           updatedAt: new Date(),
-        }).where(inArray(scheduledEmailsTable.id, futureEmails.map(e => e.id)));
+        }).where(and(inArray(scheduledEmailsTable.id, futureEmails.map(e => e.id)), eq(scheduledEmailsTable.workspaceId, req.workspaceId!)));
       }
 
       await db.insert(activityTable).values({
@@ -187,6 +193,7 @@ router.post("/reply-review/:id/decide", async (req, res) => {
         leadId: item.leadId,
         metadata: { reviewId: id, pausedCount: futureEmails.length },
         createdBy: "admin",
+        workspaceId: req.workspaceId!,
       });
     }
 

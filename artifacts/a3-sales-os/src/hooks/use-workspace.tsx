@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@clerk/react";
+import { useQueryClient } from "@tanstack/react-query";
 
 export interface WorkspaceSummary {
   id: number;
@@ -44,12 +45,21 @@ const STORAGE_KEY = "opypal_current_workspace";
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth();
+  const queryClient = useQueryClient();
   const [me, setMe] = useState<Me | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentId, setCurrentId] = useState<number | null>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored ? Number(stored) : null;
   });
+
+  // Keep localStorage in sync so the fetch interceptor always stamps requests
+  // with the active workspace, even on the very first render after load().
+  useEffect(() => {
+    if (currentId != null) {
+      localStorage.setItem(STORAGE_KEY, String(currentId));
+    }
+  }, [currentId]);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -83,8 +93,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [isLoaded, isSignedIn, load]);
 
   const setCurrentWorkspaceId = (id: number) => {
+    if (id === currentId) return;
     setCurrentId(id);
     localStorage.setItem(STORAGE_KEY, String(id));
+    // Drop all cached data so nothing from the previous workspace bleeds into
+    // the newly selected one; subsequent fetches re-run under the new context.
+    queryClient.clear();
   };
 
   const currentWorkspace =

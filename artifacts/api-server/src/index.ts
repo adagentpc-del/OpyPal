@@ -39,6 +39,7 @@ app.listen(port, async () => {
               ? (((rest.proposalValue || rest.dealValueEstimate) * (rest.closeProbability || 0)) / 100).toFixed(2)
               : null;
             await db.insert(leadsTable).values({
+              workspaceId: 1,
               pipelineType: rest.pipelineType || "Event",
               companyName: rest.companyName,
               contactName: rest.contactName,

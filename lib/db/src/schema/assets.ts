@@ -1,10 +1,14 @@
 import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { workspacesTable } from "./workspaces";
 import { leadsTable } from "./leads";
 
 export const assetsTable = pgTable("assets", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   title: text("title").notNull(),
   category: text("category").notNull(),
   description: text("description"),

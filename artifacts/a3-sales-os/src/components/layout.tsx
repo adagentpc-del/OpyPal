@@ -9,6 +9,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronsUpDown, Check } from "lucide-react";
 import { navigationConfig, isActiveRoute, getPageTitle } from "@/lib/navigation";
 import { PLATFORM, CURRENT_WORKSPACE } from "@/config/branding";
 import { useWorkspace } from "@/hooks/use-workspace";
@@ -93,8 +102,10 @@ function SidebarContent({
   onNavigate?: () => void;
   showCollapseToggle?: boolean;
 }) {
-  const { me, currentWorkspace } = useWorkspace();
+  const { me, currentWorkspace, setCurrentWorkspaceId } = useWorkspace();
   const { signOut } = useClerk();
+  const workspaces = me?.workspaces ?? [];
+  const canSwitch = workspaces.length > 1;
   const wsName = currentWorkspace?.name ?? CURRENT_WORKSPACE.name;
   const wsShortCode =
     currentWorkspace?.shortCode ?? currentWorkspace?.initials ?? CURRENT_WORKSPACE.shortCode;
@@ -106,21 +117,70 @@ function SidebarContent({
   return (
     <>
       <div className={`flex items-center ${collapsed ? "justify-center p-4 pb-3" : "p-6 pb-4"}`}>
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 bg-primary rounded-lg flex items-center justify-center font-bold text-sm text-white shadow-md flex-shrink-0">
-            {wsShortCode}
-          </div>
-          {!collapsed && (
-            <div className="flex flex-col min-w-0">
-              <span className="font-bold text-xl tracking-tight text-sidebar-foreground whitespace-nowrap leading-none">
-                {wsName}
-              </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mt-1">
-                {PLATFORM.foundation}
-              </span>
+        {canSwitch ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={`flex items-center gap-3 rounded-lg transition-colors hover:bg-sidebar-accent/60 ${collapsed ? "p-1" : "-mx-2 px-2 py-1.5 w-full"}`}
+                aria-label="Switch workspace"
+              >
+                <div className="h-9 w-9 bg-primary rounded-lg flex items-center justify-center font-bold text-sm text-white shadow-md flex-shrink-0">
+                  {wsShortCode}
+                </div>
+                {!collapsed && (
+                  <>
+                    <div className="flex flex-col min-w-0 text-left">
+                      <span className="font-bold text-xl tracking-tight text-sidebar-foreground whitespace-nowrap leading-none">
+                        {wsName}
+                      </span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mt-1">
+                        {PLATFORM.foundation}
+                      </span>
+                    </div>
+                    <ChevronsUpDown className="ml-auto h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  </>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>
+                {me?.isSuperAdmin ? "Switch workspace" : "Your workspaces"}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {workspaces.map((ws) => (
+                <DropdownMenuItem
+                  key={ws.id}
+                  onClick={() => setCurrentWorkspaceId(ws.id)}
+                  className="gap-2"
+                >
+                  <span className="flex h-6 w-6 items-center justify-center rounded bg-primary/10 text-[10px] font-bold text-primary flex-shrink-0">
+                    {ws.shortCode ?? ws.initials ?? ws.name.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="truncate">{ws.name}</span>
+                  {ws.id === currentWorkspace?.id && (
+                    <Check className="ml-auto h-4 w-4 text-primary flex-shrink-0" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 bg-primary rounded-lg flex items-center justify-center font-bold text-sm text-white shadow-md flex-shrink-0">
+              {wsShortCode}
             </div>
-          )}
-        </div>
+            {!collapsed && (
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-xl tracking-tight text-sidebar-foreground whitespace-nowrap leading-none">
+                  {wsName}
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mt-1">
+                  {PLATFORM.foundation}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className={`flex-1 overflow-y-auto py-2 space-y-1 ${collapsed ? "px-2" : "px-4"}`}>

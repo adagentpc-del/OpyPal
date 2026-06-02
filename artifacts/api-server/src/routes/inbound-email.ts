@@ -1,11 +1,20 @@
 import { Router, type IRouter } from "express";
-import { db, inboundEmailsTable } from "@workspace/db";
+import { db, inboundEmailsTable, leadsTable } from "@workspace/db";
 import { eq, desc, and, isNull } from "drizzle-orm";
 import { processInboundEmail, getConversationThread } from "../lib/reply-processor";
+import { requireAuth, resolveWorkspace, isPublicMixedRoutePath } from "../middleware/clerk-auth";
 
 const router: IRouter = Router();
 
 const WEBHOOK_SECRET = process.env.INBOUND_EMAIL_WEBHOOK_SECRET || "";
+
+router.use((req, res, next) => {
+  if (isPublicMixedRoutePath(req.path)) return next();
+  requireAuth(req, res, (authErr?: any) => {
+    if (authErr) return next(authErr);
+    resolveWorkspace(req, res, next);
+  });
+});
 
 router.post("/inbound-email", async (req, res) => {
   try {
@@ -68,15 +77,18 @@ router.get("/inbound-emails", async (req, res) => {
     const matchedOnly = req.query.matched === "true";
     const unmatchedOnly = req.query.unmatched === "true";
 
-    let query = db.select().from(inboundEmailsTable).orderBy(desc(inboundEmailsTable.createdAt)).limit(limit);
+    const ws = req.workspaceId!;
+    let query = db.select().from(inboundEmailsTable)
+      .where(eq(inboundEmailsTable.workspaceId, ws))
+      .orderBy(desc(inboundEmailsTable.createdAt)).limit(limit);
 
     if (matchedOnly) {
       query = db.select().from(inboundEmailsTable)
-        .where(eq(inboundEmailsTable.matched, true))
+        .where(and(eq(inboundEmailsTable.workspaceId, ws), eq(inboundEmailsTable.matched, true)))
         .orderBy(desc(inboundEmailsTable.createdAt)).limit(limit);
     } else if (unmatchedOnly) {
       query = db.select().from(inboundEmailsTable)
-        .where(eq(inboundEmailsTable.matched, false))
+        .where(and(eq(inboundEmailsTable.workspaceId, ws), eq(inboundEmailsTable.matched, false)))
         .orderBy(desc(inboundEmailsTable.createdAt)).limit(limit);
     }
 
@@ -90,6 +102,9 @@ router.get("/inbound-emails", async (req, res) => {
 router.get("/leads/:leadId/conversation", async (req, res) => {
   try {
     const leadId = Number(req.params.leadId);
+    const [lead] = await db.select({ id: leadsTable.id }).from(leadsTable)
+      .where(and(eq(leadsTable.id, leadId), eq(leadsTable.workspaceId, req.workspaceId!)));
+    if (!lead) return res.status(404).json({ message: "Lead not found" });
     const thread = await getConversationThread(leadId);
     res.json(thread);
   } catch (err: any) {

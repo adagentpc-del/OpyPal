@@ -201,7 +201,19 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
     }
   }
 
+  // Derive the workspace server-side from the matched lead. Unmatched inbound
+  // mail (no lead) falls back to workspace 1 (A3 Visual) so it is never
+  // silently attributed to another tenant.
+  let derivedWorkspaceId: number | null = null;
+  if (leadId) {
+    const [wsRow] = await db.select({ workspaceId: leadsTable.workspaceId })
+      .from(leadsTable).where(eq(leadsTable.id, leadId)).limit(1);
+    derivedWorkspaceId = wsRow?.workspaceId ?? null;
+  }
+  const ws = derivedWorkspaceId ?? 1;
+
   const [inboundRecord] = await db.insert(inboundEmailsTable).values({
+    workspaceId: ws,
     leadId,
     scheduledEmailId,
     senderEmail: data.senderEmail,
@@ -227,6 +239,7 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
 
   if (replyClassification.classification === "uncertain" && leadId) {
     await db.insert(replyReviewQueueTable).values({
+      workspaceId: ws,
       leadId,
       inboundEmailId: inboundRecord.id,
       senderEmail: data.senderEmail,
@@ -239,6 +252,7 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
     });
 
     await db.insert(notificationsTable).values({
+      workspaceId: ws,
       type: "review_needed",
       title: "Uncertain reply needs review",
       description: `Reply from ${data.senderEmail}: "${(data.subject || "").substring(0, 100)}"`,
@@ -255,6 +269,7 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
       : `Reply received: "${data.subject || "(no subject)"}"`;
 
     await db.insert(activityTable).values({
+      workspaceId: ws,
       type: replyType,
       description: replyDesc,
       leadId,
@@ -306,6 +321,7 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
       }
 
       await db.insert(notificationsTable).values({
+        workspaceId: ws,
         type: "reply_received",
         title: `Reply from ${data.senderEmail}`,
         description: `${data.subject || "(no subject)"}: ${(data.bodyText || "").substring(0, 200)}`,
@@ -314,6 +330,7 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
       });
     } else if (replyClassification.classification === "uncertain") {
       await db.insert(notificationsTable).values({
+        workspaceId: ws,
         type: "reply_received",
         title: `Uncertain reply from ${data.senderEmail}`,
         description: `Queued for review: "${data.subject || "(no subject)"}"`,
@@ -357,7 +374,10 @@ async function pauseSequencesForLead(leadId: number): Promise<number> {
   }).where(inArray(scheduledEmailsTable.id, emailIds));
 
   if (sequenceIds.length > 0) {
+    const [wsRow] = await db.select({ workspaceId: leadsTable.workspaceId })
+      .from(leadsTable).where(eq(leadsTable.id, leadId)).limit(1);
     await db.insert(activityTable).values({
+      workspaceId: wsRow?.workspaceId ?? 1,
       type: "sequence_paused",
       description: `Sequence paused — reply received (${futureEmails.length} future email${futureEmails.length !== 1 ? "s" : ""} paused)`,
       leadId,

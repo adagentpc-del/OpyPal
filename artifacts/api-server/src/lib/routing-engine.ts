@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import { contactsTable, routingLogsTable, emailEventsTable, settingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 export type RoutingState =
   | "standard_nurture"
@@ -49,8 +49,9 @@ function getSegmentAction(segment: string | null | undefined, tier: string): str
   return actions[tier] || "continue_sequence";
 }
 
-export async function getTierThresholds(): Promise<{ warmMin: number; hotMin: number }> {
-  const rows = await db.select().from(settingsTable);
+export async function getTierThresholds(workspaceId: number): Promise<{ warmMin: number; hotMin: number }> {
+  const rows = await db.select().from(settingsTable)
+    .where(eq(settingsTable.workspaceId, workspaceId));
   const get = (key: string, def: string) => rows.find(r => r.key === key)?.value || def;
   return {
     warmMin: parseInt(get("tier_warm_min", "3")),
@@ -123,13 +124,19 @@ export function evaluateRouting(contact: {
   };
 }
 
-export async function evaluateAndUpdateContact(contactId: number): Promise<RoutingDecision | null> {
-  const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, contactId));
+export async function evaluateAndUpdateContact(contactId: number, workspaceId: number): Promise<RoutingDecision | null> {
+  const [contact] = await db.select().from(contactsTable).where(and(
+    eq(contactsTable.id, contactId),
+    eq(contactsTable.workspaceId, workspaceId),
+  ));
   if (!contact) return null;
 
   if (contact.routingLocked) return null;
 
-  const events = await db.select().from(emailEventsTable).where(eq(emailEventsTable.contactId, contactId));
+  const events = await db.select().from(emailEventsTable).where(and(
+    eq(emailEventsTable.contactId, contactId),
+    eq(emailEventsTable.workspaceId, contact.workspaceId),
+  ));
 
   const decision = evaluateRouting(contact, events);
 
@@ -138,9 +145,13 @@ export async function evaluateAndUpdateContact(contactId: number): Promise<Routi
       routingState: decision.routingState,
       recommendedNextAction: decision.recommendedNextAction,
       updatedAt: new Date(),
-    }).where(eq(contactsTable.id, contactId));
+    }).where(and(
+      eq(contactsTable.id, contactId),
+      eq(contactsTable.workspaceId, workspaceId),
+    ));
 
     await db.insert(routingLogsTable).values({
+      workspaceId: contact.workspaceId,
       contactId,
       previousRoutingState: contact.routingState,
       newRoutingState: decision.routingState,

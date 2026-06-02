@@ -1,11 +1,15 @@
 import { pgTable, serial, text, integer, numeric, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { workspacesTable } from "./workspaces";
 import { leadsTable } from "./leads";
 import { inboundEmailsTable } from "./inbound-emails";
 
 export const replyReviewQueueTable = pgTable("reply_review_queue", {
   id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id")
+    .references(() => workspacesTable.id)
+    .notNull(),
   leadId: integer("lead_id").references(() => leadsTable.id, { onDelete: "cascade" }),
   inboundEmailId: integer("inbound_email_id").references(() => inboundEmailsTable.id, { onDelete: "cascade" }),
   senderEmail: text("sender_email"),

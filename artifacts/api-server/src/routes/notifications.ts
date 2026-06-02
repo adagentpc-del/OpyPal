@@ -1,12 +1,13 @@
 import { Router, type IRouter } from "express";
 import { db, notificationsTable, leadsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
+import { requireRole } from "../middleware/clerk-auth";
 
 const router: IRouter = Router();
 
 router.get("/notifications", async (req, res) => {
   try {
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(notificationsTable.workspaceId, req.workspaceId!)];
     if (req.query.unreadOnly === "true") conditions.push(eq(notificationsTable.isRead, false));
     if (req.query.priority) conditions.push(eq(notificationsTable.priority, String(req.query.priority)));
     if (req.query.severity) conditions.push(eq(notificationsTable.severity, String(req.query.severity)));
@@ -46,18 +47,18 @@ router.get("/notifications", async (req, res) => {
 router.get("/notifications/unread-count", async (req, res) => {
   try {
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(notificationsTable)
-      .where(eq(notificationsTable.isRead, false));
+      .where(and(eq(notificationsTable.workspaceId, req.workspaceId!), eq(notificationsTable.isRead, false)));
     res.json({ count: result[0]?.count || 0 });
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }
 });
 
-router.patch("/notifications/:id/read", async (req, res) => {
+router.patch("/notifications/:id/read", requireRole("operator"), async (req, res) => {
   try {
     const [n] = await db.update(notificationsTable)
       .set({ isRead: true })
-      .where(eq(notificationsTable.id, Number(req.params.id)))
+      .where(and(eq(notificationsTable.id, Number(req.params.id)), eq(notificationsTable.workspaceId, req.workspaceId!)))
       .returning();
     res.json(n);
   } catch (err: any) {
@@ -65,18 +66,18 @@ router.patch("/notifications/:id/read", async (req, res) => {
   }
 });
 
-router.post("/notifications/mark-all-read", async (req, res) => {
+router.post("/notifications/mark-all-read", requireRole("operator"), async (req, res) => {
   try {
-    await db.update(notificationsTable).set({ isRead: true }).where(eq(notificationsTable.isRead, false));
+    await db.update(notificationsTable).set({ isRead: true }).where(and(eq(notificationsTable.workspaceId, req.workspaceId!), eq(notificationsTable.isRead, false)));
     res.json({ message: "All notifications marked as read" });
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }
 });
 
-router.delete("/notifications/:id", async (req, res) => {
+router.delete("/notifications/:id", requireRole("manager"), async (req, res) => {
   try {
-    await db.delete(notificationsTable).where(eq(notificationsTable.id, Number(req.params.id)));
+    await db.delete(notificationsTable).where(and(eq(notificationsTable.id, Number(req.params.id)), eq(notificationsTable.workspaceId, req.workspaceId!)));
     res.json({ message: "Notification deleted" });
   } catch (err: any) {
     res.status(400).json({ message: err.message });

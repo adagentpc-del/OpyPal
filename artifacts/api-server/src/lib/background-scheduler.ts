@@ -18,9 +18,12 @@ function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-async function getSetting(key: string, defaultValue: string): Promise<string> {
+async function getSetting(workspaceId: number, key: string, defaultValue: string): Promise<string> {
   try {
-    const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, key));
+    const [row] = await db.select().from(settingsTable).where(and(
+      eq(settingsTable.workspaceId, workspaceId),
+      eq(settingsTable.key, key),
+    ));
     return row?.value || defaultValue;
   } catch {
     return defaultValue;
@@ -40,11 +43,6 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
   let failed = 0;
   let skipped = 0;
 
-  const weekdayOnly = await getSetting("weekday_sending_only", "true");
-  if (weekdayOnly === "true" && !isInSendWindow()) {
-    return { sent, failed, skipped };
-  }
-
   const dueEmails = await db.select()
     .from(scheduledEmailsTable)
     .where(and(
@@ -56,14 +54,35 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
 
   if (dueEmails.length === 0) return { sent, failed, skipped };
 
-  const sendProvider = await getSetting("primary_send_provider", "resend");
-  const outlookConn = sendProvider === "outlook" ? await getPrimaryConnection() : null;
+  const providerCache = new Map<number, string>();
+  const connCache = new Map<number, { id: number; emailAddress: string } | null>();
+  const windowCache = new Map<number, boolean>();
 
   for (const email of dueEmails) {
     try {
+      const ws = email.workspaceId;
+
+      if (!windowCache.has(ws)) {
+        const weekdayOnly = await getSetting(ws, "weekday_sending_only", "true");
+        windowCache.set(ws, !(weekdayOnly === "true" && !isInSendWindow()));
+      }
+      if (!windowCache.get(ws)) {
+        skipped++;
+        continue;
+      }
+
+      if (!providerCache.has(ws)) {
+        providerCache.set(ws, await getSetting(ws, "primary_send_provider", "resend"));
+      }
+      const sendProvider = providerCache.get(ws)!;
+      if (!connCache.has(ws)) {
+        connCache.set(ws, sendProvider === "outlook" ? await getPrimaryConnection(ws) : null);
+      }
+      const outlookConn = connCache.get(ws)!;
+
       const [lead] = await db.select({ email: leadsTable.email, status: leadsTable.status, isUnsubscribed: leadsTable.isUnsubscribed, isBounced: leadsTable.isBounced })
         .from(leadsTable)
-        .where(eq(leadsTable.id, email.leadId));
+        .where(and(eq(leadsTable.id, email.leadId), eq(leadsTable.workspaceId, ws)));
 
       if (!lead || !lead.email) {
         await db.update(scheduledEmailsTable).set({ status: "failed", sendError: "Lead not found or no email", updatedAt: new Date() }).where(eq(scheduledEmailsTable.id, email.id));
@@ -85,7 +104,10 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
 
       const [suppressed] = await db.select({ id: suppressionListTable.id })
         .from(suppressionListTable)
-        .where(eq(suppressionListTable.email, lead.email.toLowerCase()))
+        .where(and(
+          eq(suppressionListTable.workspaceId, ws),
+          eq(suppressionListTable.email, lead.email.toLowerCase()),
+        ))
         .limit(1);
       if (suppressed) {
         await db.update(scheduledEmailsTable).set({
@@ -151,6 +173,7 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
         await db.update(scheduledEmailsTable).set(updates).where(eq(scheduledEmailsTable.id, email.id));
 
         await db.insert(activityTable).values({
+          workspaceId: ws,
           type: "email_sent",
           description: `Follow-up sent: "${email.subject}"`,
           leadId: email.leadId,
@@ -163,7 +186,7 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
         await db.update(leadsTable).set({
           lastContactDate: new Date().toISOString().split("T")[0],
           updatedAt: new Date(),
-        }).where(eq(leadsTable.id, email.leadId));
+        }).where(and(eq(leadsTable.id, email.leadId), eq(leadsTable.workspaceId, ws)));
 
         sent++;
         console.log(`[Scheduler] Sent follow-up ${email.id} to lead ${email.leadId} via ${outlookConn ? "outlook" : "resend"}`);
@@ -299,9 +322,9 @@ export async function getSchedulerStatus(): Promise<{
       lte(scheduledEmailsTable.scheduledFor, new Date()),
     ));
 
-  const sendProvider = await getSetting("primary_send_provider", "resend");
+  const sendProvider = await getSetting(1, "primary_send_provider", "resend");
   const outlookConfigured = isOutlookConfigured();
-  const conn = outlookConfigured ? await getPrimaryConnection() : null;
+  const conn = outlookConfigured ? await getPrimaryConnection(1) : null;
 
   return {
     running: schedulerRunning,

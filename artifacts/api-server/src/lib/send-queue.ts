@@ -128,6 +128,10 @@ export async function startQueueProcessor(
     updatedAt: new Date(),
   }).where(eq(bulkSendCampaignsTable.id, campaignId));
 
+  const [campaignRow] = await db.select({ workspaceId: bulkSendCampaignsTable.workspaceId })
+    .from(bulkSendCampaignsTable).where(eq(bulkSendCampaignsTable.id, campaignId));
+  const workspaceId = campaignRow?.workspaceId ?? 1;
+
   const counters = await loadCampaignCounters(campaignId);
   let totalSent = counters.totalSent;
   let totalFailed = counters.totalFailed;
@@ -205,6 +209,7 @@ export async function startQueueProcessor(
           }).where(eq(scheduledEmailsTable.id, email.id));
 
           await db.insert(activityTable).values({
+            workspaceId,
             type: "email_sent",
             description: `Email sent: "${email.subject}"`,
             leadId: email.leadId,
@@ -218,7 +223,7 @@ export async function startQueueProcessor(
             lastContactDate: new Date().toISOString().split("T")[0],
             status: "Contacted",
             updatedAt: new Date(),
-          }).where(eq(leadsTable.id, email.leadId));
+          }).where(and(eq(leadsTable.id, email.leadId), eq(leadsTable.workspaceId, workspaceId)));
 
           totalSent++;
           console.log(`[SendQueue] Sent email ${email.id} to lead ${email.leadId} (pos ${email.queuePosition})`);
@@ -249,6 +254,7 @@ export async function startQueueProcessor(
             }).where(eq(scheduledEmailsTable.id, email.id));
 
             await db.insert(activityTable).values({
+              workspaceId,
               type: "email_failed",
               description: `Email failed: ${result.error}`,
               leadId: email.leadId,

@@ -1,12 +1,13 @@
 import { Router, type IRouter } from "express";
 import { db, scheduledEmailsTable, activityTable, leadsTable } from "@workspace/db";
 import { eq, and, desc, gte, lte, sql, inArray } from "drizzle-orm";
+import { requireRole } from "../middleware/clerk-auth";
 
 const router: IRouter = Router();
 
 router.get("/scheduled-emails", async (req, res) => {
   try {
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(scheduledEmailsTable.workspaceId, req.workspaceId!)];
     if (req.query.leadId) conditions.push(eq(scheduledEmailsTable.leadId, Number(req.query.leadId)));
     if (req.query.status) conditions.push(eq(scheduledEmailsTable.status, String(req.query.status)));
     if (req.query.sequenceId) conditions.push(eq(scheduledEmailsTable.sequenceId, Number(req.query.sequenceId)));
@@ -38,7 +39,7 @@ router.get("/scheduled-emails", async (req, res) => {
   }
 });
 
-router.post("/scheduled-emails", async (req, res) => {
+router.post("/scheduled-emails", requireRole("operator"), async (req, res) => {
   try {
     const { leadId, templateId, subject, body, scheduledFor, sequenceId, sequenceStepNumber, sequenceStepId, source } = req.body;
     const [email] = await db.insert(scheduledEmailsTable).values({
@@ -54,6 +55,7 @@ router.post("/scheduled-emails", async (req, res) => {
       sequenceStepNumber: sequenceStepNumber || null,
       sequenceStepId: sequenceStepId || null,
       source: source || "manual",
+      workspaceId: req.workspaceId!,
     }).returning();
 
     await db.insert(activityTable).values({
@@ -64,6 +66,7 @@ router.post("/scheduled-emails", async (req, res) => {
       relatedSequenceId: sequenceId || null,
       relatedScheduledEmailId: email.id,
       createdBy: req.body.createdBy || "user",
+      workspaceId: req.workspaceId!,
     });
 
     res.status(201).json(email);
@@ -72,10 +75,10 @@ router.post("/scheduled-emails", async (req, res) => {
   }
 });
 
-router.patch("/scheduled-emails/:id", async (req, res) => {
+router.patch("/scheduled-emails/:id", requireRole("operator"), async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const existing = await db.select().from(scheduledEmailsTable).where(eq(scheduledEmailsTable.id, id)).limit(1);
+    const existing = await db.select().from(scheduledEmailsTable).where(and(eq(scheduledEmailsTable.id, id), eq(scheduledEmailsTable.workspaceId, req.workspaceId!))).limit(1);
     if (!existing.length) return res.status(404).json({ message: "Scheduled email not found" });
     const prev = existing[0];
 
@@ -98,7 +101,7 @@ router.patch("/scheduled-emails/:id", async (req, res) => {
 
     const [email] = await db.update(scheduledEmailsTable)
       .set(updates)
-      .where(eq(scheduledEmailsTable.id, id))
+      .where(and(eq(scheduledEmailsTable.id, id), eq(scheduledEmailsTable.workspaceId, req.workspaceId!)))
       .returning();
 
     if (email.leadId) {
@@ -119,6 +122,7 @@ router.patch("/scheduled-emails/:id", async (req, res) => {
           relatedScheduledEmailId: email.id,
           relatedSequenceId: email.sequenceId,
           createdBy: req.body.createdBy || "user",
+          workspaceId: req.workspaceId!,
         });
       }
     }
@@ -129,7 +133,7 @@ router.patch("/scheduled-emails/:id", async (req, res) => {
   }
 });
 
-router.post("/scheduled-emails/bulk-action", async (req, res) => {
+router.post("/scheduled-emails/bulk-action", requireRole("manager"), async (req, res) => {
   try {
     const { leadId, sequenceId, action, reason } = req.body;
     if (!leadId || !action) return res.status(400).json({ message: "leadId and action are required" });
@@ -137,6 +141,7 @@ router.post("/scheduled-emails/bulk-action", async (req, res) => {
     const conditions: any[] = [
       eq(scheduledEmailsTable.leadId, Number(leadId)),
       inArray(scheduledEmailsTable.status, action === "resume" ? ["paused"] : ["scheduled", "paused"]),
+      eq(scheduledEmailsTable.workspaceId, req.workspaceId!),
     ];
     if (sequenceId) conditions.push(eq(scheduledEmailsTable.sequenceId, Number(sequenceId)));
 
@@ -167,7 +172,7 @@ router.post("/scheduled-emails/bulk-action", async (req, res) => {
 
     if (emails.length > 0) {
       const ids = emails.map(e => e.id);
-      await db.update(scheduledEmailsTable).set(updates).where(inArray(scheduledEmailsTable.id, ids));
+      await db.update(scheduledEmailsTable).set(updates).where(and(inArray(scheduledEmailsTable.id, ids), eq(scheduledEmailsTable.workspaceId, req.workspaceId!)));
 
       await db.insert(activityTable).values({
         type: activityType,
@@ -176,6 +181,7 @@ router.post("/scheduled-emails/bulk-action", async (req, res) => {
         relatedSequenceId: sequenceId ? Number(sequenceId) : null,
         createdBy: req.body.createdBy || "user",
         metadata: { emailIds: ids, action, reason: reason || null },
+        workspaceId: req.workspaceId!,
       });
     }
 
@@ -185,10 +191,10 @@ router.post("/scheduled-emails/bulk-action", async (req, res) => {
   }
 });
 
-router.delete("/scheduled-emails/:id", async (req, res) => {
+router.delete("/scheduled-emails/:id", requireRole("manager"), async (req, res) => {
   try {
     const id = Number(req.params.id);
-    await db.delete(scheduledEmailsTable).where(eq(scheduledEmailsTable.id, id));
+    await db.delete(scheduledEmailsTable).where(and(eq(scheduledEmailsTable.id, id), eq(scheduledEmailsTable.workspaceId, req.workspaceId!)));
     res.json({ message: "Scheduled email deleted" });
   } catch (err: any) {
     res.status(400).json({ message: err.message });

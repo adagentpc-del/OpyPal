@@ -1,16 +1,27 @@
 import { Router, type IRouter } from "express";
-import { db, leadEngagementEventsTable } from "@workspace/db";
+import { db, leadEngagementEventsTable, leadsTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { processEngagementEvent, getSmartRules } from "../lib/smart-followup-engine";
+import { requireAuth, resolveWorkspace, requireRole, isPublicMixedRoutePath } from "../middleware/clerk-auth";
 
 const router: IRouter = Router();
 
+const WEBHOOK_SECRET = process.env.ENGAGEMENT_WEBHOOK_SECRET || "";
+
+router.use((req, res, next) => {
+  if (isPublicMixedRoutePath(req.path)) return next();
+  requireAuth(req, res, (authErr?: any) => {
+    if (authErr) return next(authErr);
+    resolveWorkspace(req, res, next);
+  });
+});
+
 router.get("/engagement-events", async (req, res) => {
   try {
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(leadEngagementEventsTable.workspaceId, req.workspaceId!)];
     if (req.query.leadId) conditions.push(eq(leadEngagementEventsTable.leadId, Number(req.query.leadId)));
     if (req.query.eventType) conditions.push(eq(leadEngagementEventsTable.eventType, String(req.query.eventType)));
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const where = and(...conditions);
 
     const events = await db.select().from(leadEngagementEventsTable)
       .where(where)
@@ -23,10 +34,14 @@ router.get("/engagement-events", async (req, res) => {
   }
 });
 
-router.post("/engagement-events", async (req, res) => {
+router.post("/engagement-events", requireRole("operator"), async (req, res) => {
   try {
     const { leadId, eventType, scheduledEmailId, templateId, sequenceId, campaignId, providerEventId, metadata: extra } = req.body;
     if (!leadId || !eventType) return res.status(400).json({ message: "leadId and eventType are required" });
+
+    const [lead] = await db.select({ id: leadsTable.id }).from(leadsTable)
+      .where(and(eq(leadsTable.id, Number(leadId)), eq(leadsTable.workspaceId, req.workspaceId!)));
+    if (!lead) return res.status(404).json({ message: "Lead not found" });
 
     const result = await processEngagementEvent(Number(leadId), eventType, {
       scheduledEmailId: scheduledEmailId ? Number(scheduledEmailId) : undefined,
@@ -45,6 +60,13 @@ router.post("/engagement-events", async (req, res) => {
 
 router.post("/engagement-events/webhook", async (req, res) => {
   try {
+    if (WEBHOOK_SECRET) {
+      const providedSecret = req.headers["x-webhook-secret"] || req.query.secret;
+      if (providedSecret !== WEBHOOK_SECRET) {
+        return res.status(401).json({ message: "unauthorized" });
+      }
+    }
+
     const events = Array.isArray(req.body) ? req.body : [req.body];
     const results = [];
     const errors = [];
