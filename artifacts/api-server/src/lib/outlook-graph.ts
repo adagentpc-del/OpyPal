@@ -395,6 +395,11 @@ async function matchOutboundToLead(senderEmail: string, msg: any): Promise<boole
   return false;
 }
 
+// Outlook/Microsoft connections only. The mailbox_connections table is shared
+// with other providers (e.g. Gmail), so every query filters on provider to
+// avoid cross-provider leakage.
+export const OUTLOOK_PROVIDER = "microsoft";
+
 export async function getPrimaryConnection(workspaceId = 1): Promise<{ id: number; emailAddress: string } | null> {
   const [conn] = await db.select({
     id: mailboxConnectionsTable.id,
@@ -403,6 +408,7 @@ export async function getPrimaryConnection(workspaceId = 1): Promise<{ id: numbe
     .from(mailboxConnectionsTable)
     .where(and(
       eq(mailboxConnectionsTable.workspaceId, workspaceId),
+      eq(mailboxConnectionsTable.provider, OUTLOOK_PROVIDER),
       eq(mailboxConnectionsTable.isActive, true),
       eq(mailboxConnectionsTable.isPrimary, true),
     ))
@@ -417,6 +423,7 @@ export async function getPrimaryConnection(workspaceId = 1): Promise<{ id: numbe
     .from(mailboxConnectionsTable)
     .where(and(
       eq(mailboxConnectionsTable.workspaceId, workspaceId),
+      eq(mailboxConnectionsTable.provider, OUTLOOK_PROVIDER),
       eq(mailboxConnectionsTable.isActive, true),
     ))
     .limit(1);
@@ -428,6 +435,7 @@ export async function getActiveConnections(workspaceId = 1) {
   return db.select().from(mailboxConnectionsTable)
     .where(and(
       eq(mailboxConnectionsTable.workspaceId, workspaceId),
+      eq(mailboxConnectionsTable.provider, OUTLOOK_PROVIDER),
       eq(mailboxConnectionsTable.isActive, true),
     ))
     .orderBy(desc(mailboxConnectionsTable.createdAt));

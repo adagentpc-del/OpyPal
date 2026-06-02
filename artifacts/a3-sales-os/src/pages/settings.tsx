@@ -297,6 +297,7 @@ export default function SettingsPage() {
               >
                 <option value="resend">Resend (default)</option>
                 <option value="outlook">Outlook / Microsoft 365</option>
+                <option value="gmail">Gmail / Google Workspace</option>
               </select>
             </div>
 

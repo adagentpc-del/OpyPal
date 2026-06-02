@@ -13,12 +13,27 @@ export interface WorkspaceBranding {
   fontFamily?: string | null;
 }
 
-// Default outbound sender identity placeholders for a workspace.
+// Supported outbound email providers. "forwarding" is inbound-only (a manual
+// forwarding inbox fallback) and is never used as an outbound send provider.
+export type ProviderType = "outlook" | "gmail" | "resend" | "forwarding";
+
+// Default outbound sender identity + provider routing config for a workspace.
+// Stored as JSONB on workspaces.sender_identity (no dedicated columns), so new
+// optional fields can be added here without a migration.
 export interface WorkspaceSenderIdentity {
   fromName?: string;
   fromEmail?: string;
   replyToEmail?: string;
   signature?: string;
+  // Preferred outbound provider for this workspace. When unset the workspace
+  // settings.primary_send_provider (then resend) is used.
+  defaultProvider?: ProviderType;
+  // Ordered provider fallback chain. The sender tries each in turn until one
+  // succeeds. Resend is always appended as a final fallback when configured.
+  providerPriority?: ProviderType[];
+  // Manual forwarding inbox address. Inbound mail forwarded to this address is
+  // attributed to this workspace and parsed for the original sender/reply.
+  forwardingInbox?: string;
 }
 
 // Which product modules are enabled for a workspace.

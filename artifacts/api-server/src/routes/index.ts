@@ -25,6 +25,8 @@ import partnersRouter from "./partners";
 import partnerRequestsRouter from "./partner-requests";
 import pricingRulesRouter from "./pricing-rules";
 import outlookRouter from "./outlook";
+import gmailRouter from "./gmail";
+import providersRouter from "./providers";
 import companiesRouter from "./companies";
 import replyReviewRouter from "./reply-review";
 import settingsRouter from "./settings";
@@ -52,6 +54,7 @@ router.use(outboundRouter);
 router.use(engagementEventsRouter);
 router.use(inboundEmailRouter);
 router.use(outlookRouter);
+router.use(gmailRouter);
 
 // Fully authenticated, workspace-scoped CRM / Sales OS routers. requireAuth +
 // resolveWorkspace run here so every handler has a validated req.workspaceId
@@ -74,6 +77,7 @@ router.use(...scoped, bulkSendRouter);
 router.use(...scoped, companiesRouter);
 router.use(...scoped, replyReviewRouter);
 router.use(...scoped, settingsRouter);
+router.use(...scoped, providersRouter);
 router.use(...scoped, seedRouter);
 
 export default router;

@@ -22,7 +22,8 @@ export function isPublicMixedRoutePath(path: string): boolean {
     path.startsWith("/track") ||
     path === "/inbound-email" ||
     path === "/engagement-events/webhook" ||
-    path === "/outlook/callback"
+    path === "/outlook/callback" ||
+    path === "/gmail/callback"
   );
 }
 

@@ -50,6 +50,7 @@ import IntentSignals from "./pages/intent-signals";
 import LeadScoring from "./pages/lead-scoring";
 import Segments from "./pages/segments";
 import SettingsPage from "./pages/settings";
+import ProvidersPage from "./pages/providers";
 import TeamNotes from "./pages/team-notes";
 import ActivityLog from "./pages/activity-log";
 import ReplyReview from "./pages/reply-review";
@@ -306,6 +307,7 @@ function AppRoutes() {
 
       {/* Admin */}
       <Route path="/settings" component={roleRoute(SettingsPage, { min: "manager" })} />
+      <Route path="/providers" component={roleRoute(ProvidersPage, { min: "manager" })} />
       <Route path="/reply-review" component={protectedRoute(ReplyReview)} />
       <Route path="/team-notes" component={protectedRoute(TeamNotes)} />
       <Route path="/activity-log" component={roleRoute(ActivityLog, { min: "manager" })} />

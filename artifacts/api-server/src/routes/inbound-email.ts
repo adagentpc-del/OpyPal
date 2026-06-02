@@ -1,12 +1,76 @@
 import { Router, type IRouter } from "express";
-import { db, inboundEmailsTable, leadsTable } from "@workspace/db";
-import { eq, desc, and, isNull } from "drizzle-orm";
+import { db, inboundEmailsTable, leadsTable, workspacesTable } from "@workspace/db";
+import { eq, desc, and, isNull, sql } from "drizzle-orm";
 import { processInboundEmail, getConversationThread } from "../lib/reply-processor";
 import { requireAuth, resolveWorkspace, isPublicMixedRoutePath } from "../middleware/clerk-auth";
 
 const router: IRouter = Router();
 
 const WEBHOOK_SECRET = process.env.INBOUND_EMAIL_WEBHOOK_SECRET || "";
+
+function normalizeEmail(raw: string): string {
+  const match = raw.match(/<([^>]+)>/);
+  return (match ? match[1] : raw).trim().toLowerCase();
+}
+
+// Looks up the workspace whose senderIdentity.forwardingInbox matches the
+// recipient address. Returns the workspace id, or null if none is configured
+// for that address.
+async function resolveForwardingWorkspace(recipient: string): Promise<number | null> {
+  const addr = normalizeEmail(recipient);
+  if (!addr) return null;
+  const [row] = await db.select({ id: workspacesTable.id })
+    .from(workspacesTable)
+    .where(sql`lower(${workspacesTable.senderIdentity}->>'forwardingInbox') = ${addr}`)
+    .limit(1);
+  return row?.id ?? null;
+}
+
+// Parses a manually-forwarded email body to recover the ORIGINAL sender,
+// subject, and body. Supports common "---------- Forwarded message ----------"
+// blocks emitted by Gmail/Outlook. Returns null when no forwarded header is
+// detected so the caller keeps the original values.
+function parseForwardedEmail(body: string): { sender?: string; subject?: string; body?: string } | null {
+  if (!body) return null;
+  const fwdIdx = body.search(/-{2,}\s*Forwarded message\s*-{2,}/i);
+  const hasFrom = /^\s*From:\s*.+/im.test(body);
+  if (fwdIdx === -1 && !hasFrom) return null;
+
+  const region = fwdIdx >= 0 ? body.slice(fwdIdx) : body;
+  const fromMatch = region.match(/^\s*From:\s*(.+)$/im);
+  const subjectMatch = region.match(/^\s*Subject:\s*(.+)$/im);
+
+  let sender: string | undefined;
+  if (fromMatch) {
+    const emailMatch = fromMatch[1].match(/<([^>]+)>/) || fromMatch[1].match(/([^\s<>]+@[^\s<>]+)/);
+    if (emailMatch) sender = emailMatch[1].trim();
+  }
+
+  // The original body starts after the contiguous forwarded-header block. Locate
+  // the first recognized header line, advance past the run of header lines
+  // (From/Date/Subject/To/Cc/Reply-To/Sent), then skip the blank separator.
+  let originalBody = region;
+  const lines = region.split(/\r?\n/);
+  const headerRe = /^\s*(From|Date|Sent|Subject|To|Cc|Bcc|Reply-To):\s*/i;
+  let firstHeaderIdx = lines.findIndex(l => headerRe.test(l));
+  // Skip the forwarded marker line itself if it was the first match region.
+  if (firstHeaderIdx >= 0) {
+    let i = firstHeaderIdx;
+    // Walk forward while lines are headers or continuation/whitespace-only lines
+    // that belong to the header block (but stop at the first blank line, which
+    // separates headers from the body).
+    while (i < lines.length && headerRe.test(lines[i])) i++;
+    // Skip a single blank separator line if present.
+    if (i < lines.length && lines[i].trim() === "") i++;
+    originalBody = lines.slice(i).join("\n").trim();
+  }
+
+  return {
+    sender,
+    subject: subjectMatch ? subjectMatch[1].trim() : undefined,
+    body: originalBody || undefined,
+  };
+}
 
 router.use((req, res, next) => {
   if (isPublicMixedRoutePath(req.path)) return next();
@@ -37,28 +101,45 @@ router.post("/inbound-email", async (req, res) => {
       message_id, messageId,
     } = req.body;
 
-    const resolvedSender = senderEmail || sender_email || sender || from || "";
+    let resolvedSender = senderEmail || sender_email || sender || from || "";
     const resolvedRecipient = recipientEmail || recipient_email || recipient || to || "";
-    const resolvedBodyText = bodyTextAlt || bodyText || body_text || plainText || "";
+    let resolvedBodyText = bodyTextAlt || bodyText || body_text || plainText || "";
     const resolvedBodyHtml = bodyHtmlAlt || bodyHtml || body_html || "";
     const resolvedHeaders = rawHeaders || raw_headers || (typeof headers === "string" ? headers : JSON.stringify(headers || ""));
     const resolvedInReplyTo = inReplyTo || in_reply_to || "";
     const resolvedReferences = references || message_references || "";
+    let resolvedSubject = subject || "";
 
     if (!resolvedSender) {
       return res.status(400).json({ message: "sender email is required" });
     }
 
+    // Manual forwarding fallback: if the recipient matches a workspace's
+    // configured forwarding inbox, attribute the mail to that workspace and
+    // recover the ORIGINAL sender/subject/body from the forwarded payload so
+    // lead matching works against the real correspondent rather than the
+    // forwarder.
+    const forwardingWorkspaceId = await resolveForwardingWorkspace(resolvedRecipient);
+    if (forwardingWorkspaceId) {
+      const parsed = parseForwardedEmail(resolvedBodyText);
+      if (parsed) {
+        if (parsed.sender) resolvedSender = parsed.sender;
+        if (parsed.subject) resolvedSubject = parsed.subject;
+        if (parsed.body) resolvedBodyText = parsed.body;
+      }
+    }
+
     const result = await processInboundEmail({
       senderEmail: resolvedSender,
       recipientEmail: resolvedRecipient,
-      subject: subject || "",
+      subject: resolvedSubject,
       bodyText: resolvedBodyText,
       bodyHtml: resolvedBodyHtml,
       rawHeaders: resolvedHeaders,
       inReplyTo: resolvedInReplyTo,
       references: resolvedReferences,
       messageId: messageId || message_id,
+      workspaceHint: forwardingWorkspaceId,
     });
 
     res.json({

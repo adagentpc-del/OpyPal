@@ -116,6 +116,9 @@ interface InboundEmailData {
   references?: string;
   messageId?: string;
   outlookMessageId?: string;
+  // Workspace resolved upstream (e.g. via a workspace's forwarding inbox). Used
+  // as the fallback tenant for unmatched mail instead of the hardcoded ws=1.
+  workspaceHint?: number | null;
 }
 
 interface ProcessResult {
@@ -202,15 +205,16 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
   }
 
   // Derive the workspace server-side from the matched lead. Unmatched inbound
-  // mail (no lead) falls back to workspace 1 (A3 Visual) so it is never
-  // silently attributed to another tenant.
+  // mail (no lead) falls back to the upstream workspaceHint (e.g. resolved from
+  // a workspace forwarding inbox), then to workspace 1 (A3 Visual) so it is
+  // never silently attributed to another tenant.
   let derivedWorkspaceId: number | null = null;
   if (leadId) {
     const [wsRow] = await db.select({ workspaceId: leadsTable.workspaceId })
       .from(leadsTable).where(eq(leadsTable.id, leadId)).limit(1);
     derivedWorkspaceId = wsRow?.workspaceId ?? null;
   }
-  const ws = derivedWorkspaceId ?? 1;
+  const ws = derivedWorkspaceId ?? data.workspaceHint ?? 1;
 
   const [inboundRecord] = await db.insert(inboundEmailsTable).values({
     workspaceId: ws,

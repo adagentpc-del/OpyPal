@@ -1,23 +1,24 @@
 import { Router, type IRouter } from "express";
 import { db, mailboxConnectionsTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
-  isOutlookConfigured,
+  isGmailConfigured,
   getAuthorizationUrl,
   exchangeCodeForTokens,
   refreshAccessToken,
-  syncInbox,
-  getActiveConnections,
-  getPrimaryConnection,
-} from "../lib/outlook-graph";
+  syncGmailInbox,
+  getActiveGmailConnections,
+  getPrimaryGmailConnection,
+  GMAIL_PROVIDER,
+} from "../lib/gmail-api";
 import { requireAuth, resolveWorkspace, requireRole, isPublicMixedRoutePath } from "../middleware/clerk-auth";
 import { writeAudit } from "../lib/audit";
 import { signState, verifyState } from "../lib/oauth-state";
 
-const OUTLOOK_PROVIDER = "microsoft";
-
 const router: IRouter = Router();
 
+// Public callback (no x-workspace-id during the OAuth redirect); every other
+// route requires auth + workspace resolution.
 router.use((req, res, next) => {
   if (isPublicMixedRoutePath(req.path)) return next();
   requireAuth(req, res, (authErr?: any) => {
@@ -27,23 +28,23 @@ router.use((req, res, next) => {
 });
 
 async function getOwnedConnection(id: number, workspaceId: number) {
-  const [conn] = await db.select({ id: mailboxConnectionsTable.id })
+  const [conn] = await db.select({ id: mailboxConnectionsTable.id, emailAddress: mailboxConnectionsTable.emailAddress })
     .from(mailboxConnectionsTable)
     .where(and(
       eq(mailboxConnectionsTable.id, id),
       eq(mailboxConnectionsTable.workspaceId, workspaceId),
-      eq(mailboxConnectionsTable.provider, OUTLOOK_PROVIDER),
+      eq(mailboxConnectionsTable.provider, GMAIL_PROVIDER),
     ))
     .limit(1);
   return conn || null;
 }
 
-router.get("/outlook/status", requireRole("manager"), async (req, res) => {
+router.get("/gmail/status", requireRole("manager"), async (req, res) => {
   try {
     const ws = req.workspaceId!;
-    const configured = isOutlookConfigured();
-    const connections = configured ? await getActiveConnections(ws) : [];
-    const primary = configured ? await getPrimaryConnection(ws) : null;
+    const configured = isGmailConfigured();
+    const connections = configured ? await getActiveGmailConnections(ws) : [];
+    const primary = configured ? await getPrimaryGmailConnection(ws) : null;
 
     res.json({
       configured,
@@ -66,10 +67,10 @@ router.get("/outlook/status", requireRole("manager"), async (req, res) => {
   }
 });
 
-router.get("/outlook/auth-url", requireRole("workspace_admin"), async (req, res) => {
+router.get("/gmail/auth-url", requireRole("workspace_admin"), async (req, res) => {
   try {
-    if (!isOutlookConfigured()) {
-      return res.status(400).json({ message: "Outlook not configured. Set OUTLOOK_CLIENT_ID and OUTLOOK_CLIENT_SECRET." });
+    if (!isGmailConfigured()) {
+      return res.status(400).json({ message: "Gmail not configured. Set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET." });
     }
     const url = getAuthorizationUrl(signState(req.workspaceId!));
     res.json({ url });
@@ -78,12 +79,10 @@ router.get("/outlook/auth-url", requireRole("workspace_admin"), async (req, res)
   }
 });
 
-router.get("/outlook/callback", async (req, res) => {
+router.get("/gmail/callback", async (req, res) => {
   try {
     const code = req.query.code as string;
-    if (!code) {
-      return res.status(400).json({ message: "Authorization code missing" });
-    }
+    if (!code) return res.status(400).json({ message: "Authorization code missing" });
 
     const ws = verifyState(req.query.state as string);
     if (!ws) return res.status(400).json({ message: "Invalid or expired OAuth state" });
@@ -94,7 +93,7 @@ router.get("/outlook/callback", async (req, res) => {
     const existing = await db.select().from(mailboxConnectionsTable)
       .where(and(
         eq(mailboxConnectionsTable.workspaceId, ws),
-        eq(mailboxConnectionsTable.provider, OUTLOOK_PROVIDER),
+        eq(mailboxConnectionsTable.provider, GMAIL_PROVIDER),
         eq(mailboxConnectionsTable.emailAddress, tokens.email),
       ))
       .limit(1);
@@ -102,7 +101,7 @@ router.get("/outlook/callback", async (req, res) => {
     if (existing.length > 0) {
       await db.update(mailboxConnectionsTable).set({
         accessToken: tokens.accessToken,
-        // Keep the existing refresh token if the provider didn't return a new one.
+        // Keep the existing refresh token if Google didn't return a new one.
         refreshToken: tokens.refreshToken || existing[0].refreshToken,
         tokenExpiresAt: expiresAt,
         displayName: tokens.displayName,
@@ -114,20 +113,20 @@ router.get("/outlook/callback", async (req, res) => {
         eq(mailboxConnectionsTable.workspaceId, ws),
       ));
     } else {
-      const outlookConns = await db.select({ id: mailboxConnectionsTable.id }).from(mailboxConnectionsTable)
+      const gmailConns = await db.select({ id: mailboxConnectionsTable.id }).from(mailboxConnectionsTable)
         .where(and(
           eq(mailboxConnectionsTable.workspaceId, ws),
-          eq(mailboxConnectionsTable.provider, OUTLOOK_PROVIDER),
+          eq(mailboxConnectionsTable.provider, GMAIL_PROVIDER),
         ));
       await db.insert(mailboxConnectionsTable).values({
-        provider: OUTLOOK_PROVIDER,
+        provider: GMAIL_PROVIDER,
         emailAddress: tokens.email,
         displayName: tokens.displayName,
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         tokenExpiresAt: expiresAt,
         isActive: true,
-        isPrimary: outlookConns.length === 0,
+        isPrimary: gmailConns.length === 0,
         workspaceId: ws,
       });
     }
@@ -135,52 +134,52 @@ router.get("/outlook/callback", async (req, res) => {
     await writeAudit({
       workspaceId: ws,
       type: "provider_connected",
-      description: `Outlook mailbox connected: ${tokens.email}`,
-      createdBy: "outlook-oauth",
-      metadata: { provider: "outlook", emailAddress: tokens.email },
+      description: `Gmail mailbox connected: ${tokens.email}`,
+      createdBy: "gmail-oauth",
+      metadata: { provider: "gmail", emailAddress: tokens.email },
     });
 
     const redirectUrl = process.env.APP_BASE_URL
-      ? `${process.env.APP_BASE_URL}/a3-sales-os/settings?outlook=connected`
-      : `/a3-sales-os/settings?outlook=connected`;
-
+      ? `${process.env.APP_BASE_URL}/a3-sales-os/providers?gmail=connected`
+      : `/a3-sales-os/providers?gmail=connected`;
     res.redirect(redirectUrl);
   } catch (err: any) {
-    console.error("[Outlook] OAuth callback error:", err.message);
+    console.error("[Gmail] OAuth callback error:", err.message);
     res.status(500).json({ message: err.message });
   }
 });
 
-router.post("/outlook/connections/:id/sync", requireRole("manager"), async (req, res) => {
+router.post("/gmail/connections/:id/sync", requireRole("manager"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (!(await getOwnedConnection(id, req.workspaceId!))) return res.status(404).json({ message: "Connection not found" });
-    const result = await syncInbox(id);
+    const result = await syncGmailInbox(id);
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
 });
 
-router.patch("/outlook/connections/:id/primary", requireRole("workspace_admin"), async (req, res) => {
+router.patch("/gmail/connections/:id/primary", requireRole("workspace_admin"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const ws = req.workspaceId!;
-    if (!(await getOwnedConnection(id, ws))) return res.status(404).json({ message: "Connection not found" });
+    const conn = await getOwnedConnection(id, ws);
+    if (!conn) return res.status(404).json({ message: "Connection not found" });
     await db.update(mailboxConnectionsTable).set({ isPrimary: false, updatedAt: new Date() })
       .where(and(
         eq(mailboxConnectionsTable.isPrimary, true),
         eq(mailboxConnectionsTable.workspaceId, ws),
-        eq(mailboxConnectionsTable.provider, "microsoft"),
+        eq(mailboxConnectionsTable.provider, GMAIL_PROVIDER),
       ));
     await db.update(mailboxConnectionsTable).set({ isPrimary: true, updatedAt: new Date() })
       .where(and(eq(mailboxConnectionsTable.id, id), eq(mailboxConnectionsTable.workspaceId, ws)));
     await writeAudit({
       workspaceId: ws,
       type: "provider_primary_changed",
-      description: `Outlook primary mailbox changed (connection ${id})`,
+      description: `Gmail primary mailbox set to ${conn.emailAddress}`,
       createdBy: req.authContext?.email ?? null,
-      metadata: { provider: "outlook", connectionId: id },
+      metadata: { provider: "gmail", connectionId: id, emailAddress: conn.emailAddress },
     });
     res.json({ success: true });
   } catch (err: any) {
@@ -188,11 +187,12 @@ router.patch("/outlook/connections/:id/primary", requireRole("workspace_admin"),
   }
 });
 
-router.delete("/outlook/connections/:id", requireRole("workspace_admin"), async (req, res) => {
+router.delete("/gmail/connections/:id", requireRole("workspace_admin"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const ws = req.workspaceId!;
-    if (!(await getOwnedConnection(id, ws))) return res.status(404).json({ message: "Connection not found" });
+    const conn = await getOwnedConnection(id, ws);
+    if (!conn) return res.status(404).json({ message: "Connection not found" });
     await db.update(mailboxConnectionsTable).set({
       isActive: false,
       accessToken: null,
@@ -202,9 +202,9 @@ router.delete("/outlook/connections/:id", requireRole("workspace_admin"), async 
     await writeAudit({
       workspaceId: ws,
       type: "provider_disconnected",
-      description: `Outlook mailbox disconnected (connection ${id})`,
+      description: `Gmail mailbox disconnected: ${conn.emailAddress}`,
       createdBy: req.authContext?.email ?? null,
-      metadata: { provider: "outlook", connectionId: id },
+      metadata: { provider: "gmail", connectionId: id, emailAddress: conn.emailAddress },
     });
     res.json({ success: true });
   } catch (err: any) {
@@ -212,7 +212,7 @@ router.delete("/outlook/connections/:id", requireRole("workspace_admin"), async 
   }
 });
 
-router.post("/outlook/connections/:id/refresh", requireRole("manager"), async (req, res) => {
+router.post("/gmail/connections/:id/refresh", requireRole("manager"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (!(await getOwnedConnection(id, req.workspaceId!))) return res.status(404).json({ message: "Connection not found" });

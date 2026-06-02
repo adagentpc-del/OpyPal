@@ -1,8 +1,9 @@
 import { db, scheduledEmailsTable, leadsTable, activityTable, settingsTable, mailboxConnectionsTable, suppressionListTable } from "@workspace/db";
-import { eq, and, lte, inArray, asc, sql, or } from "drizzle-orm";
-import { sendEmail } from "./resend";
-import { sendViaOutlook, getPrimaryConnection, syncInbox, isOutlookConfigured } from "./outlook-graph";
-import { generateTaggedReplyTo } from "./reply-processor";
+import { eq, and, lte, inArray, asc, sql } from "drizzle-orm";
+import { getPrimaryConnection, syncInbox, isOutlookConfigured, OUTLOOK_PROVIDER } from "./outlook-graph";
+import { syncGmailInbox, isGmailConfigured, getPrimaryGmailConnection, GMAIL_PROVIDER } from "./gmail-api";
+import { sendForWorkspace, resolveSendChain } from "./providers";
+import type { ProviderType } from "@workspace/db";
 
 let schedulerRunning = false;
 let schedulerInterval: NodeJS.Timeout | null = null;
@@ -54,8 +55,6 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
 
   if (dueEmails.length === 0) return { sent, failed, skipped };
 
-  const providerCache = new Map<number, string>();
-  const connCache = new Map<number, { id: number; emailAddress: string } | null>();
   const windowCache = new Map<number, boolean>();
 
   for (const email of dueEmails) {
@@ -70,15 +69,6 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
         skipped++;
         continue;
       }
-
-      if (!providerCache.has(ws)) {
-        providerCache.set(ws, await getSetting(ws, "primary_send_provider", "resend"));
-      }
-      const sendProvider = providerCache.get(ws)!;
-      if (!connCache.has(ws)) {
-        connCache.set(ws, sendProvider === "outlook" ? await getPrimaryConnection(ws) : null);
-      }
-      const outlookConn = connCache.get(ws)!;
 
       const [lead] = await db.select({ email: leadsTable.email, status: leadsTable.status, isUnsubscribed: leadsTable.isUnsubscribed, isBounced: leadsTable.isBounced })
         .from(leadsTable)
@@ -128,44 +118,37 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
         .replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>")
         .replace(/^/, "<p>").replace(/$/, "</p>");
 
-      let result: { success: boolean; id?: string; error?: string; messageId?: string; conversationId?: string; internetMessageId?: string };
+      // A per-email sendVia override forces a single provider (no fallback);
+      // otherwise the workspace's resolved provider chain (with fallback) runs.
+      const forceProvider = (email.sendVia && email.sendVia !== "auto")
+        ? (email.sendVia as ProviderType)
+        : undefined;
 
-      if (outlookConn && (email.sendVia === "outlook" || sendProvider === "outlook")) {
-        const outlookResult = await sendViaOutlook(outlookConn.id, {
-          to: lead.email,
-          subject: email.subject,
-          bodyHtml: htmlBody,
-          inReplyTo: email.outlookMessageId || undefined,
-        });
-        result = {
-          success: outlookResult.success,
-          id: outlookResult.messageId,
-          error: outlookResult.error,
-          messageId: outlookResult.messageId,
-          conversationId: outlookResult.conversationId,
-          internetMessageId: outlookResult.internetMessageId,
-        };
-      } else {
-        const taggedReplyTo = generateTaggedReplyTo(email.leadId, email.id);
-        const resendResult = await sendEmail({
-          to: lead.email,
-          from: email.fromEmail || undefined,
-          subject: email.subject,
-          html: htmlBody,
-          text: textBody,
-          replyTo: taggedReplyTo,
-        });
-        result = { success: resendResult.success, id: resendResult.id, error: resendResult.error };
-      }
+      const result = await sendForWorkspace(ws, {
+        to: lead.email,
+        subject: email.subject,
+        html: htmlBody,
+        text: textBody,
+        fromEmail: email.fromEmail || undefined,
+        leadId: email.leadId,
+        scheduledEmailId: email.id,
+        threadOutlookMessageId: email.outlookMessageId,
+        threadGmailMessageId: email.outlookInternetMessageId,
+        threadGmailThreadId: email.outlookConversationId,
+        forceProvider: forceProvider === "forwarding" ? undefined : forceProvider as any,
+      });
 
       if (result.success) {
         const updates: any = {
           status: "sent",
           sentAt: new Date(),
           sendError: null,
+          sendVia: result.providerUsed,
           updatedAt: new Date(),
         };
-        if (result.id) updates.resendMessageId = result.id;
+        // resendMessageId for resend; the generic outlook* columns hold the
+        // provider message id / thread id / RFC822 id for outlook & gmail.
+        if (result.providerUsed === "resend" && result.messageId) updates.resendMessageId = result.messageId;
         if (result.messageId) updates.outlookMessageId = result.messageId;
         if (result.conversationId) updates.outlookConversationId = result.conversationId;
         if (result.internetMessageId) updates.outlookInternetMessageId = result.internetMessageId;
@@ -177,7 +160,7 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
           type: "email_sent",
           description: `Follow-up sent: "${email.subject}"`,
           leadId: email.leadId,
-          metadata: { scheduledEmailId: email.id, sendVia: outlookConn ? "outlook" : "resend" },
+          metadata: { scheduledEmailId: email.id, sendVia: result.providerUsed, attempts: result.attempts },
           relatedTemplateId: email.templateId,
           relatedSequenceId: email.sequenceId,
           createdBy: "scheduler",
@@ -189,7 +172,7 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
         }).where(and(eq(leadsTable.id, email.leadId), eq(leadsTable.workspaceId, ws)));
 
         sent++;
-        console.log(`[Scheduler] Sent follow-up ${email.id} to lead ${email.leadId} via ${outlookConn ? "outlook" : "resend"}`);
+        console.log(`[Scheduler] Sent follow-up ${email.id} to lead ${email.leadId} via ${result.providerUsed}`);
       } else {
         const retryCount = (email.retryCount || 0) + 1;
         if (retryCount <= 3) {
@@ -228,8 +211,13 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
   return { sent, failed, skipped };
 }
 
-async function runOutlookSync(): Promise<void> {
-  if (!isOutlookConfigured()) return;
+// Provider-aware mailbox sync. Each active connection is synced through the
+// matching provider's sync routine (Outlook via Graph, Gmail via Gmail API).
+// A connection of one provider must never be synced through another's client.
+async function runProviderSync(): Promise<void> {
+  const outlookOn = isOutlookConfigured();
+  const gmailOn = isGmailConfigured();
+  if (!outlookOn && !gmailOn) return;
 
   try {
     const connections = await db.select()
@@ -238,16 +226,21 @@ async function runOutlookSync(): Promise<void> {
 
     for (const conn of connections) {
       try {
-        const result = await syncInbox(conn.id);
-        if (result.newMessages > 0 || result.syncedOutbound > 0) {
-          console.log(`[Scheduler] Synced mailbox ${conn.emailAddress}: ${result.newMessages} inbound, ${result.syncedOutbound} outbound`);
+        let result: { newMessages: number; syncedOutbound: number; errors: string[] } | null = null;
+        if (conn.provider === GMAIL_PROVIDER && gmailOn) {
+          result = await syncGmailInbox(conn.id);
+        } else if (conn.provider === OUTLOOK_PROVIDER && outlookOn) {
+          result = await syncInbox(conn.id);
+        }
+        if (result && (result.newMessages > 0 || result.syncedOutbound > 0)) {
+          console.log(`[Scheduler] Synced ${conn.provider} mailbox ${conn.emailAddress}: ${result.newMessages} inbound, ${result.syncedOutbound} outbound`);
         }
       } catch (err: any) {
-        console.error(`[Scheduler] Sync failed for ${conn.emailAddress}:`, err.message);
+        console.error(`[Scheduler] Sync failed for ${conn.provider} ${conn.emailAddress}:`, err.message);
       }
     }
   } catch (err: any) {
-    console.error("[Scheduler] Outlook sync error:", err.message);
+    console.error("[Scheduler] Provider sync error:", err.message);
   }
 }
 
@@ -268,7 +261,7 @@ async function schedulerTick(): Promise<void> {
 
   if (now - lastSyncRun >= SYNC_INTERVAL_MS) {
     lastSyncRun = now;
-    await runOutlookSync();
+    await runProviderSync();
   }
 }
 
@@ -282,7 +275,7 @@ export function startScheduler(): void {
   lastFollowUpRun = 0;
   lastSyncRun = 0;
 
-  console.log("[Scheduler] Started — follow-ups every 60s, Outlook sync every 120s");
+  console.log("[Scheduler] Started — follow-ups every 60s, mailbox sync every 120s");
 
   schedulerTick();
 
@@ -314,6 +307,8 @@ export async function getSchedulerStatus(): Promise<{
   sendProvider: string;
   outlookConfigured: boolean;
   outlookConnected: boolean;
+  gmailConfigured: boolean;
+  gmailConnected: boolean;
 }> {
   const [pending] = await db.select({ count: sql<number>`count(*)` })
     .from(scheduledEmailsTable)
@@ -325,6 +320,8 @@ export async function getSchedulerStatus(): Promise<{
   const sendProvider = await getSetting(1, "primary_send_provider", "resend");
   const outlookConfigured = isOutlookConfigured();
   const conn = outlookConfigured ? await getPrimaryConnection(1) : null;
+  const gmailConfigured = isGmailConfigured();
+  const gmailConn = gmailConfigured ? await getPrimaryGmailConnection(1) : null;
 
   return {
     running: schedulerRunning,
@@ -334,5 +331,7 @@ export async function getSchedulerStatus(): Promise<{
     sendProvider,
     outlookConfigured,
     outlookConnected: !!conn,
+    gmailConfigured,
+    gmailConnected: !!gmailConn,
   };
 }

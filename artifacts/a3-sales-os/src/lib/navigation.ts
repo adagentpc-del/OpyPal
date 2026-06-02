@@ -11,6 +11,7 @@ import {
   CalendarClock,
   PhoneForwarded,
   Shield,
+  Mail,
   MousePointerClick,
   UserX,
   Zap,
@@ -83,6 +84,7 @@ export const navigationConfig: NavGroup[] = [
     label: "Admin",
     items: [
       { name: "Settings", href: "/settings", icon: Settings, description: "Application settings", minRole: "manager" },
+      { name: "Email Providers", href: "/providers", icon: Mail, description: "Connect mailboxes and configure sending", minRole: "manager" },
       { name: "Reply Review", href: "/reply-review", icon: MessageCircle, description: "Review uncertain email replies" },
       { name: "Team Notes", href: "/team-notes", icon: StickyNote, description: "Shared notes and documentation" },
       { name: "Activity Log", href: "/activity-log", icon: Activity, description: "System activity history", minRole: "manager" },

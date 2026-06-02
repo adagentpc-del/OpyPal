@@ -1,0 +1,122 @@
+Next, build the provider connection and sending layer for Opypal.
+
+This must be multi-workspace and role-aware.
+
+Implement the following in the Sales OS / Opypal codebase only:
+
+1. Multi-provider sending architecture
+Create a provider abstraction layer so each workspace can independently connect and use:
+- Outlook / Microsoft 365 via OAuth
+- Gmail / Google Workspace via OAuth
+- Resend via API key
+Keep the architecture extensible for future SMTP / SendGrid.
+
+2. Workspace-specific provider settings
+Each workspace should have its own provider configuration, including:
+- provider type
+- auth type
+- sender display name
+- default sender email
+- reply-to email
+- forwarding inbox email if used
+- active / inactive status
+- token or secret storage
+- last sync time
+- connection health / status
+
+3. Outlook support
+Implement:
+- Microsoft Graph OAuth connect flow
+- token storage
+- token refresh
+- mailbox connection UI
+- send email through Outlook
+- sync inbound and outbound mail
+- preserve thread / conversation metadata
+- log sent and received messages into CRM
+- stop or pause sequences on real reply detection
+
+4. Gmail support
+Implement:
+- Google OAuth connect flow for Gmail / Google Workspace
+- token storage
+- token refresh
+- mailbox connection UI
+- send email through Gmail
+- sync inbound and outbound mail
+- preserve thread metadata where possible
+- log sent and received messages into CRM
+- stop or pause sequences on real reply detection
+
+5. Manual forwarding inbox fallback
+Implement support for a workspace-level manual forwarding email option.
+
+Requirements:
+- each workspace can define an inbound forwarding email address
+- replies forwarded to that address can be processed into the CRM
+- workspace mapping must be reliable
+- forwarded email parsing should identify the original sender, subject, and reply content when possible
+- use this as a fallback when native Outlook/Gmail sync is not available
+
+6. Workspace-specific sender identity
+Allow each workspace to configure:
+- sender name
+- sender email
+- reply-to email
+- email signature / footer
+- default provider
+- provider priority / fallback
+
+7. Provider connection UI
+Build real UI pages/components for:
+- Provider Connections
+- Connect Outlook
+- Connect Gmail
+- Connect Resend
+- Sender Identity Settings
+- Forwarding Inbox Settings
+- Connection Status / Health
+
+8. Role permissions
+- only super_admin and workspace_admin can manage provider connections
+- managers may view but not edit unless explicitly allowed
+- operators and viewers cannot change provider settings
+- super_admin can access all workspace provider settings
+- workspace admins can only access their own workspace provider settings
+
+9. CRM integration
+Ensure the provider layer integrates with:
+- contacts
+- companies
+- sequences
+- scheduled emails
+- reply detection
+- activity timeline
+- queue processor
+- suppression rules
+- workspace isolation
+
+10. Fallback rules
+Add provider fallback logic:
+- if native workspace provider is active, use it
+- if not, allow Resend where configured
+- manual forwarding inbox can still process inbound replies even if sending uses another provider
+
+11. Audit logging
+Log:
+- provider connection
+- provider disconnect
+- token refresh failures
+- sender identity changes
+- forwarding inbox changes
+- outbound send provider used
+- inbound sync events
+
+12. Deliverables after implementation
+Provide:
+a. exact files changed
+b. which provider types are now fully implemented
+c. what UI pages were added
+d. what env vars are required for Outlook and Gmail
+e. how forwarding inbox processing works
+f. any remaining gaps before production readiness
