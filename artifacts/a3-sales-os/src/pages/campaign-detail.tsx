@@ -27,6 +27,10 @@ import {
   Play,
   ExternalLink,
   Loader2,
+  SendHorizontal,
+  CheckCircle2,
+  AlertTriangle,
+  MinusCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -55,6 +59,7 @@ import {
   type CampaignAsset,
   type CampaignSchedule,
   type Performance,
+  type SendAllResult,
 } from "@/lib/campaign-api";
 
 function PerfBar({ p }: { p: Performance }) {
@@ -264,7 +269,7 @@ function SegmentsTab({
 }) {
   const { data: segments, isLoading } = useSegments(campaignId);
   const { data: contactTypes } = useContactTypes();
-  const { create, update, remove, send } = useSegmentMutations(campaignId);
+  const { create, update, remove, send, sendAll } = useSegmentMutations(campaignId);
   const preview = usePreviewAudience(campaignId);
   const { toast } = useToast();
 
@@ -272,6 +277,14 @@ function SegmentsTab({
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState({ ...EMPTY_SEGMENT_FORM });
   const [previewCount, setPreviewCount] = useState<number | null>(null);
+  const [showSendAll, setShowSendAll] = useState(false);
+  const [sendAllForm, setSendAllForm] = useState<{ mode: "send_now" | "schedule"; scheduledFor: string }>({
+    mode: "send_now",
+    scheduledFor: "",
+  });
+  const [sendAllResult, setSendAllResult] = useState<SendAllResult | null>(null);
+
+  const segmentCount = segments?.length ?? 0;
 
   const openNew = () => {
     setForm({ ...EMPTY_SEGMENT_FORM });
@@ -356,18 +369,112 @@ function SegmentsTab({
     );
   };
 
+  const openSendAll = () => {
+    setSendAllForm({ mode: "send_now", scheduledFor: "" });
+    setSendAllResult(null);
+    setShowSendAll(true);
+  };
+
+  const handleSendAll = () => {
+    if (sendAllForm.mode === "schedule" && !sendAllForm.scheduledFor) {
+      return toast({ title: "Pick a date/time", variant: "destructive" });
+    }
+    sendAll.mutate(
+      {
+        mode: sendAllForm.mode,
+        scheduledFor:
+          sendAllForm.mode === "schedule" ? new Date(sendAllForm.scheduledFor).toISOString() : null,
+      },
+      {
+        onSuccess: (r) => {
+          setSendAllResult(r);
+          setShowSendAll(false);
+          const { sent, scheduled, skipped, failed } = r.summary;
+          const parts = [
+            r.mode === "schedule" ? `${scheduled} scheduled` : `${sent} sent`,
+            skipped ? `${skipped} skipped` : null,
+            failed ? `${failed} failed` : null,
+          ].filter(Boolean);
+          toast({
+            title: "Campaign send finished",
+            description: parts.join(" · "),
+            variant: failed ? "destructive" : "default",
+          });
+        },
+        onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
+      },
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
           Each segment targets its own audience with its own template, sender, and schedule.
         </p>
-        {canMutate && (
-          <Button onClick={openNew} className="rounded-xl gap-2">
-            <Plus className="h-4 w-4" /> New Segment
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canManage && segmentCount > 0 && (
+            <Button
+              variant="outline"
+              onClick={openSendAll}
+              disabled={sendAll.isPending}
+              className="rounded-xl gap-2"
+            >
+              {sendAll.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
+              Send all segments
+            </Button>
+          )}
+          {canMutate && (
+            <Button onClick={openNew} className="rounded-xl gap-2">
+              <Plus className="h-4 w-4" /> New Segment
+            </Button>
+          )}
+        </div>
       </div>
+
+      {sendAllResult && (
+        <Card className="p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">
+              {sendAllResult.mode === "schedule" ? "Schedule all segments" : "Send all segments"} — results
+            </h3>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSendAllResult(null)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            {sendAllResult.mode === "schedule" ? (
+              <span className="text-blue-700"><span className="font-semibold">{sendAllResult.summary.scheduled}</span> scheduled</span>
+            ) : (
+              <span className="text-green-700"><span className="font-semibold">{sendAllResult.summary.sent}</span> sent</span>
+            )}
+            <span className="text-amber-700"><span className="font-semibold">{sendAllResult.summary.skipped}</span> skipped</span>
+            <span className="text-red-700"><span className="font-semibold">{sendAllResult.summary.failed}</span> failed</span>
+            <span className="text-muted-foreground">of {sendAllResult.summary.total} segments</span>
+          </div>
+          <ul className="space-y-1.5">
+            {sendAllResult.results.map((r) => (
+              <li key={r.segmentId} className="flex items-start gap-2 text-sm border-b border-border/40 pb-1.5">
+                {r.status === "sent" || r.status === "scheduled" ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                ) : r.status === "skipped" ? (
+                  <MinusCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <span className="font-medium">{r.name}</span>{" "}
+                  <span className="text-muted-foreground">— {r.status}</span>
+                  {r.message && <span className="text-muted-foreground"> · {r.message}</span>}
+                  {r.totalSkipped ? (
+                    <span className="text-muted-foreground"> ({r.totalSkipped} recipient{r.totalSkipped === 1 ? "" : "s"} suppressed)</span>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {isLoading && <p className="text-sm text-muted-foreground">Loading segments…</p>}
 
@@ -497,6 +604,44 @@ function SegmentsTab({
             </div>
           </div>
           <ModalFooter onCancel={() => setShowModal(false)} onSave={handleSave} saving={create.isPending || update.isPending} saveLabel={editId ? "Update" : "Create"} />
+        </Modal>
+      )}
+
+      {showSendAll && (
+        <Modal title="Send all segments" onClose={() => setShowSendAll(false)}>
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This runs a send for every segment in this campaign ({segmentCount}), using each
+              segment's own template, sender, and audience. Segments with no template or an empty
+              audience are skipped.
+            </p>
+            <Field label="When">
+              <select
+                className={inputCls}
+                value={sendAllForm.mode}
+                onChange={(e) => setSendAllForm({ ...sendAllForm, mode: e.target.value as "send_now" | "schedule" })}
+              >
+                <option value="send_now">Send now</option>
+                <option value="schedule">Schedule for later</option>
+              </select>
+            </Field>
+            {sendAllForm.mode === "schedule" && (
+              <Field label="Send at *">
+                <input
+                  type="datetime-local"
+                  className={inputCls}
+                  value={sendAllForm.scheduledFor}
+                  onChange={(e) => setSendAllForm({ ...sendAllForm, scheduledFor: e.target.value })}
+                />
+              </Field>
+            )}
+          </div>
+          <ModalFooter
+            onCancel={() => setShowSendAll(false)}
+            onSave={handleSendAll}
+            saving={sendAll.isPending}
+            saveLabel={sendAllForm.mode === "schedule" ? "Schedule all" : "Send all"}
+          />
         </Modal>
       )}
     </div>

@@ -191,6 +191,22 @@ export interface CampaignPerformance {
   segments: Array<{ segmentId: number; name: string; performance: Performance }>;
 }
 
+export interface SegmentSendResult {
+  segmentId: number;
+  name: string;
+  status: "sent" | "scheduled" | "skipped" | "error";
+  message?: string;
+  campaignId?: number;
+  totalSkipped?: number;
+}
+
+export interface SendAllResult {
+  campaignId: number;
+  mode: "send_now" | "schedule";
+  summary: { total: number; sent: number; scheduled: number; skipped: number; failed: number };
+  results: SegmentSendResult[];
+}
+
 // ---------------------------------------------------------------------------
 // Query keys
 // ---------------------------------------------------------------------------
@@ -293,8 +309,13 @@ export function useSegmentMutations(campaignId: number) {
       apiSend(`/campaign-segments/${id}/send`, "POST", scheduledFor ? { scheduledFor } : {}),
     onSuccess: invalidate,
   });
+  const sendAll = useMutation({
+    mutationFn: (vars: { mode: "send_now" | "schedule"; scheduledFor?: string | null }) =>
+      apiSend<SendAllResult>(`/campaigns/${campaignId}/send-all-segments`, "POST", vars),
+    onSuccess: invalidate,
+  });
 
-  return { create, update, remove, send };
+  return { create, update, remove, send, sendAll };
 }
 
 export function usePreviewAudience(campaignId: number) {

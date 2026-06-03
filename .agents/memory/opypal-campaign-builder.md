@@ -20,3 +20,7 @@ description: Durable design decisions for the multi-segment campaign builder in 
 - **Schedules must reference a segment.**
   **Why:** the schedule run path resolves its audience from the segment, so a segment-less ("whole campaign") schedule can never execute. Creation rejects null `segmentId`; the segment must belong to the schedule's campaign + workspace (validated via `segmentBelongsToCampaign`). Asset `segmentId` is validated the same way.
   **How to apply:** validate relational refs (segment↔campaign↔workspace) on schedule/asset writes; don't expose UI paths that the backend can't run.
+
+- **Campaign-wide send fans out over per-segment sends; it does NOT bypass them.**
+  **Why:** "send/schedule all segments" loops the campaign's segments and calls the same `executeSegmentSend` used by the single-segment path, so each segment keeps its own template/sender/audience and the same suppression/validation rules. Unsendable segments (no template, empty audience, all-suppressed, or schedule mode with no time) are collected as per-segment `skipped`/`error` results instead of aborting the batch — the loop never throws out the whole run for one bad segment.
+  **How to apply:** any new batch action over segments should reuse the per-segment executor and report per-item outcomes, not reimplement the send.

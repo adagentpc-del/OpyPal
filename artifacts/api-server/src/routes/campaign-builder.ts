@@ -710,6 +710,119 @@ router.post("/campaign-segments/:id/send", requireRole("manager"), async (req, r
   }
 });
 
+// Campaign-wide fan-out: runs the existing per-segment send for every segment in
+// the campaign, using each segment's own template/sender/audience. Segments that
+// can't run (no template, empty audience, all suppressed, or — in schedule mode —
+// no scheduled time) are reported as "skipped" with a reason rather than failing
+// the whole batch. An unexpected error on one segment is reported as "error" and
+// does not abort the remaining segments.
+router.post("/campaigns/:campaignId/send-all-segments", requireRole("manager"), async (req, res) => {
+  try {
+    const campaign = await getCampaignOr404(req, res);
+    if (!campaign) return;
+
+    const mode: "send_now" | "schedule" = req.body?.mode === "schedule" ? "schedule" : "send_now";
+
+    if (mode === "send_now") {
+      const conn = await checkResendConnection();
+      if (!conn.connected) return res.status(400).json({ message: `Email provider not configured: ${conn.error}` });
+    }
+
+    const segments = await db
+      .select()
+      .from(campaignSegmentsTable)
+      .where(eq(campaignSegmentsTable.campaignId, campaign.id))
+      .orderBy(campaignSegmentsTable.id);
+
+    if (segments.length === 0) {
+      return res.status(400).json({ message: "Campaign has no segments to send" });
+    }
+
+    type SegmentResult = {
+      segmentId: number;
+      name: string;
+      status: "sent" | "scheduled" | "skipped" | "error";
+      message?: string;
+      campaignId?: number;
+      totalSkipped?: number;
+    };
+    const results: SegmentResult[] = [];
+    const summary = { total: segments.length, sent: 0, scheduled: 0, skipped: 0, failed: 0 };
+
+    for (const segment of segments) {
+      const scheduledFor =
+        mode === "schedule" ? (req.body?.scheduledFor ?? segment.scheduledFor ?? null) : null;
+
+      if (mode === "schedule" && !scheduledFor) {
+        summary.skipped++;
+        results.push({
+          segmentId: segment.id,
+          name: segment.name,
+          status: "skipped",
+          message: "No scheduled time set for this segment",
+        });
+        continue;
+      }
+
+      try {
+        const outcome = await executeSegmentSend({
+          req,
+          campaign,
+          segment,
+          templateId: null,
+          sequenceId: null,
+          mode,
+          scheduledFor,
+        });
+
+        if ("error" in outcome) {
+          summary.skipped++;
+          results.push({
+            segmentId: segment.id,
+            name: segment.name,
+            status: "skipped",
+            message: outcome.error,
+            totalSkipped: (outcome as any).totalSkipped,
+          });
+          continue;
+        }
+
+        await db
+          .update(campaignSegmentsTable)
+          .set({
+            lastBulkCampaignId: outcome.result.campaignId,
+            lastRunAt: new Date(),
+            status: mode === "schedule" ? "scheduled" : "sending",
+            updatedAt: new Date(),
+          })
+          .where(eq(campaignSegmentsTable.id, segment.id));
+
+        if (mode === "schedule") summary.scheduled++;
+        else summary.sent++;
+        results.push({
+          segmentId: segment.id,
+          name: segment.name,
+          status: mode === "schedule" ? "scheduled" : "sent",
+          campaignId: outcome.result.campaignId,
+          totalSkipped: outcome.totalSkipped,
+        });
+      } catch (err: any) {
+        summary.failed++;
+        results.push({
+          segmentId: segment.id,
+          name: segment.name,
+          status: "error",
+          message: err?.message || "Unexpected error",
+        });
+      }
+    }
+
+    res.json({ campaignId: campaign.id, mode, summary, results });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Schedules
 // ---------------------------------------------------------------------------
