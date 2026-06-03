@@ -278,9 +278,18 @@ function SegmentsTab({
   const [form, setForm] = useState({ ...EMPTY_SEGMENT_FORM });
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [showSendAll, setShowSendAll] = useState(false);
-  const [sendAllForm, setSendAllForm] = useState<{ mode: "send_now" | "schedule"; scheduledFor: string }>({
+  const [sendAllForm, setSendAllForm] = useState<{
+    mode: "send_now" | "schedule";
+    scheduledFor: string;
+    scheduleStyle: "same" | "stagger" | "custom";
+    staggerMinutes: string;
+    segmentTimes: Record<number, string>;
+  }>({
     mode: "send_now",
     scheduledFor: "",
+    scheduleStyle: "same",
+    staggerMinutes: "30",
+    segmentTimes: {},
   });
   const [sendAllResult, setSendAllResult] = useState<SendAllResult | null>(null);
 
@@ -370,20 +379,54 @@ function SegmentsTab({
   };
 
   const openSendAll = () => {
-    setSendAllForm({ mode: "send_now", scheduledFor: "" });
+    setSendAllForm({
+      mode: "send_now",
+      scheduledFor: "",
+      scheduleStyle: "same",
+      staggerMinutes: "30",
+      segmentTimes: {},
+    });
     setSendAllResult(null);
     setShowSendAll(true);
   };
 
   const handleSendAll = () => {
-    if (sendAllForm.mode === "schedule" && !sendAllForm.scheduledFor) {
+    const isSchedule = sendAllForm.mode === "schedule";
+    const isCustom = isSchedule && sendAllForm.scheduleStyle === "custom";
+
+    if (isSchedule && !isCustom && !sendAllForm.scheduledFor) {
       return toast({ title: "Pick a date/time", variant: "destructive" });
     }
+
+    let staggerMinutes: number | null = null;
+    if (isSchedule && sendAllForm.scheduleStyle === "stagger") {
+      const n = Number(sendAllForm.staggerMinutes);
+      if (!Number.isFinite(n) || n <= 0) {
+        return toast({ title: "Enter a stagger interval greater than 0", variant: "destructive" });
+      }
+      staggerMinutes = Math.floor(n);
+    }
+
+    let segmentSchedules: Array<{ segmentId: number; scheduledFor: string }> | undefined;
+    if (isCustom) {
+      segmentSchedules = (segments || [])
+        .map((s) => ({ segmentId: s.id, raw: sendAllForm.segmentTimes[s.id] }))
+        .filter((e) => !!e.raw)
+        .map((e) => ({ segmentId: e.segmentId, scheduledFor: new Date(e.raw).toISOString() }));
+      if (segmentSchedules.length === 0) {
+        return toast({ title: "Set a time for at least one segment", variant: "destructive" });
+      }
+    }
+
     sendAll.mutate(
       {
         mode: sendAllForm.mode,
         scheduledFor:
-          sendAllForm.mode === "schedule" ? new Date(sendAllForm.scheduledFor).toISOString() : null,
+          isSchedule && !isCustom && sendAllForm.scheduledFor
+            ? new Date(sendAllForm.scheduledFor).toISOString()
+            : null,
+        staggerMinutes,
+        segmentSchedules,
       },
       {
         onSuccess: (r) => {
@@ -465,6 +508,9 @@ function SegmentsTab({
                 <div className="min-w-0">
                   <span className="font-medium">{r.name}</span>{" "}
                   <span className="text-muted-foreground">— {r.status}</span>
+                  {r.status === "scheduled" && r.scheduledFor ? (
+                    <span className="text-muted-foreground"> · {format(new Date(r.scheduledFor), "MMM d, yyyy 'at' h:mm a")}</span>
+                  ) : null}
                   {r.message && <span className="text-muted-foreground"> · {r.message}</span>}
                   {r.totalSkipped ? (
                     <span className="text-muted-foreground"> ({r.totalSkipped} recipient{r.totalSkipped === 1 ? "" : "s"} suppressed)</span>
@@ -626,14 +672,78 @@ function SegmentsTab({
               </select>
             </Field>
             {sendAllForm.mode === "schedule" && (
-              <Field label="Send at *">
-                <input
-                  type="datetime-local"
-                  className={inputCls}
-                  value={sendAllForm.scheduledFor}
-                  onChange={(e) => setSendAllForm({ ...sendAllForm, scheduledFor: e.target.value })}
-                />
-              </Field>
+              <>
+                <Field label="Timing">
+                  <select
+                    className={inputCls}
+                    value={sendAllForm.scheduleStyle}
+                    onChange={(e) =>
+                      setSendAllForm({
+                        ...sendAllForm,
+                        scheduleStyle: e.target.value as "same" | "stagger" | "custom",
+                      })
+                    }
+                  >
+                    <option value="same">Same time for all segments</option>
+                    <option value="stagger">Stagger by interval</option>
+                    <option value="custom">Custom time per segment</option>
+                  </select>
+                </Field>
+
+                {sendAllForm.scheduleStyle !== "custom" && (
+                  <Field label={sendAllForm.scheduleStyle === "stagger" ? "First segment at *" : "Send at *"}>
+                    <input
+                      type="datetime-local"
+                      className={inputCls}
+                      value={sendAllForm.scheduledFor}
+                      onChange={(e) => setSendAllForm({ ...sendAllForm, scheduledFor: e.target.value })}
+                    />
+                  </Field>
+                )}
+
+                {sendAllForm.scheduleStyle === "stagger" && (
+                  <Field label="Stagger between segments (minutes) *">
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      className={inputCls}
+                      value={sendAllForm.staggerMinutes}
+                      onChange={(e) => setSendAllForm({ ...sendAllForm, staggerMinutes: e.target.value })}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Each segment goes out this many minutes after the previous one, in the order
+                      shown below.
+                    </p>
+                  </Field>
+                )}
+
+                {sendAllForm.scheduleStyle === "custom" && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Pick a time for each segment. Segments left blank are skipped.
+                    </p>
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                      {(segments || []).map((s) => (
+                        <div key={s.id} className="grid grid-cols-[1fr_auto] items-center gap-2">
+                          <span className="text-sm truncate">{s.name}</span>
+                          <input
+                            type="datetime-local"
+                            className={inputCls + " w-auto"}
+                            value={sendAllForm.segmentTimes[s.id] || ""}
+                            onChange={(e) =>
+                              setSendAllForm({
+                                ...sendAllForm,
+                                segmentTimes: { ...sendAllForm.segmentTimes, [s.id]: e.target.value },
+                              })
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
           <ModalFooter

@@ -738,6 +738,30 @@ router.post("/campaigns/:campaignId/send-all-segments", requireRole("manager"), 
       return res.status(400).json({ message: "Campaign has no segments to send" });
     }
 
+    // Optional staggering (schedule mode only): managers can either drip segments
+    // out by a fixed interval (base time + N minutes per subsequent segment) or
+    // hand-pick a specific time per segment. `segmentSchedules` (per-segment
+    // overrides) wins over the computed stagger time, which in turn wins over the
+    // segment's own stored scheduledFor. When neither is set we fall back to the
+    // legacy behavior (same base time for every segment).
+    const baseScheduledFor: string | null =
+      mode === "schedule" ? (req.body?.scheduledFor ?? null) : null;
+    const rawStagger = Number(req.body?.staggerMinutes);
+    const staggerMinutes =
+      mode === "schedule" && Number.isFinite(rawStagger) && rawStagger > 0
+        ? Math.floor(rawStagger)
+        : 0;
+    const segmentScheduleOverrides = new Map<number, string>();
+    if (mode === "schedule" && Array.isArray(req.body?.segmentSchedules)) {
+      for (const entry of req.body.segmentSchedules) {
+        const sid = Number(entry?.segmentId);
+        const when = entry?.scheduledFor;
+        if (Number.isFinite(sid) && typeof when === "string" && when) {
+          segmentScheduleOverrides.set(sid, when);
+        }
+      }
+    }
+
     type SegmentResult = {
       segmentId: number;
       name: string;
@@ -745,13 +769,31 @@ router.post("/campaigns/:campaignId/send-all-segments", requireRole("manager"), 
       message?: string;
       campaignId?: number;
       totalSkipped?: number;
+      scheduledFor?: string;
     };
     const results: SegmentResult[] = [];
     const summary = { total: segments.length, sent: 0, scheduled: 0, skipped: 0, failed: 0 };
 
+    let staggerIndex = 0;
     for (const segment of segments) {
-      const scheduledFor =
-        mode === "schedule" ? (req.body?.scheduledFor ?? segment.scheduledFor ?? null) : null;
+      let scheduledFor: string | null = null;
+      if (mode === "schedule") {
+        const override = segmentScheduleOverrides.get(segment.id);
+        if (override) {
+          scheduledFor = override;
+        } else if (baseScheduledFor) {
+          const computed = new Date(baseScheduledFor);
+          if (staggerMinutes > 0) {
+            computed.setMinutes(computed.getMinutes() + staggerIndex * staggerMinutes);
+          }
+          scheduledFor = computed.toISOString();
+        } else {
+          scheduledFor = segment.scheduledFor
+            ? new Date(segment.scheduledFor).toISOString()
+            : null;
+        }
+      }
+      staggerIndex++;
 
       if (mode === "schedule" && !scheduledFor) {
         summary.skipped++;
@@ -805,6 +847,7 @@ router.post("/campaigns/:campaignId/send-all-segments", requireRole("manager"), 
           status: mode === "schedule" ? "scheduled" : "sent",
           campaignId: outcome.result.campaignId,
           totalSkipped: outcome.totalSkipped,
+          scheduledFor: mode === "schedule" && scheduledFor ? scheduledFor : undefined,
         });
       } catch (err: any) {
         summary.failed++;

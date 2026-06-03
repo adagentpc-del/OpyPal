@@ -198,6 +198,7 @@ export interface SegmentSendResult {
   message?: string;
   campaignId?: number;
   totalSkipped?: number;
+  scheduledFor?: string;
 }
 
 export interface SendAllResult {
@@ -310,7 +311,12 @@ export function useSegmentMutations(campaignId: number) {
     onSuccess: invalidate,
   });
   const sendAll = useMutation({
-    mutationFn: (vars: { mode: "send_now" | "schedule"; scheduledFor?: string | null }) =>
+    mutationFn: (vars: {
+      mode: "send_now" | "schedule";
+      scheduledFor?: string | null;
+      staggerMinutes?: number | null;
+      segmentSchedules?: Array<{ segmentId: number; scheduledFor: string }>;
+    }) =>
       apiSend<SendAllResult>(`/campaigns/${campaignId}/send-all-segments`, "POST", vars),
     onSuccess: invalidate,
   });
