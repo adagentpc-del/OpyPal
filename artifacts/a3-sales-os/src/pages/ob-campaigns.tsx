@@ -14,6 +14,8 @@ import { Plus, Edit2, Trash2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { Link } from "wouter";
+import { ArrowRight } from "lucide-react";
 
 export default function ObCampaigns() {
   const { data: campaigns } = useGetCampaigns();
@@ -72,7 +74,10 @@ export default function ObCampaigns() {
             <Card key={c.id} className="p-5">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className="font-semibold text-lg">{c.name}</h3>
+                  <Link href={`/campaigns/${c.id}`} className="inline-flex items-center gap-1 group">
+                    <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">{c.name}</h3>
+                    <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 text-primary transition-opacity" />
+                  </Link>
                   {c.description && <p className="text-sm text-muted-foreground mt-1">{c.description}</p>}
                 </div>
                 <div className="flex gap-1">

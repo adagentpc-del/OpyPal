@@ -13,6 +13,7 @@ import dashboardRouter from "./dashboard";
 import syncRouter from "./sync";
 import contactsRouter from "./contacts";
 import campaignsRouter from "./campaigns";
+import campaignBuilderRouter from "./campaign-builder";
 import templateSetsRouter from "./template-sets";
 import sequenceRouter from "./sequence";
 import outboundRouter from "./outbound";
@@ -31,11 +32,15 @@ import companiesRouter from "./companies";
 import replyReviewRouter from "./reply-review";
 import settingsRouter from "./settings";
 import seedRouter from "./seed-templates";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
 // Public / unauthenticated.
 router.use(healthRouter);
+// Object storage: GET serving is public; the upload endpoint applies
+// auth + workspace + role gating per-route internally.
+router.use(storageRouter);
 router.use(meRouter); // applies requireAuth internally
 router.use(workspacesRouter); // applies requireAuth/requireSuperAdmin internally
 router.use(adminRouter); // platform admin (super-admin only) — global users
@@ -69,6 +74,7 @@ router.use(...scoped, dashboardRouter);
 router.use(...scoped, syncRouter);
 router.use(...scoped, contactsRouter);
 router.use(...scoped, campaignsRouter);
+router.use(...scoped, campaignBuilderRouter);
 router.use(...scoped, templateSetsRouter);
 router.use(...scoped, sequenceRouter);
 router.use(...scoped, scheduledEmailsRouter);

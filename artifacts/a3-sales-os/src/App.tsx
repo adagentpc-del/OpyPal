@@ -36,6 +36,7 @@ import ImportExport from "./pages/import-export";
 import ObContacts from "./pages/ob-contacts";
 import ObUpload from "./pages/ob-upload";
 import ObCampaigns from "./pages/ob-campaigns";
+import CampaignDetail from "./pages/campaign-detail";
 import ObSequences from "./pages/ob-sequences";
 import ObQueue from "./pages/ob-queue";
 import ObReplies from "./pages/ob-replies";
@@ -286,6 +287,7 @@ function AppRoutes() {
       <Route path="/leads" component={protectedRoute(Leads)} />
       <Route path="/companies" component={protectedRoute(Companies)} />
       <Route path="/contacts" component={protectedRoute(ObContacts)} />
+      <Route path="/campaigns/:id" component={protectedRoute(CampaignDetail)} />
       <Route path="/campaigns" component={protectedRoute(ObCampaigns)} />
       <Route path="/templates" component={protectedRoute(Templates)} />
       <Route path="/sequences" component={protectedRoute(ObSequences)} />

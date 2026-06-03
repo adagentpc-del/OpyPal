@@ -17,6 +17,7 @@ export const leadsTable = pgTable("leads", {
   linkedin: text("linkedin"),
   location: text("location"),
   industry: text("industry"),
+  contactType: text("contact_type"),
   venueProperty: text("venue_property"),
   projectType: text("project_type"),
   estimatedBudget: numeric("estimated_budget", { precision: 12, scale: 2 }),
