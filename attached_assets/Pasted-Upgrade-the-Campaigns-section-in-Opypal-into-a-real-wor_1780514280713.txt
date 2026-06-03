@@ -1,0 +1,147 @@
+Upgrade the Campaigns section in Opypal into a real workspace-aware campaign builder.
+
+I need campaigns to support segmented outreach by contact type, image/assets, multiple templates, and future scheduled sends inside the same campaign.
+
+Implement the following in the Sales OS / Opypal codebase only:
+
+1. Campaign builder architecture
+Refactor campaigns so a campaign can contain multiple campaign segments.
+
+Create or update models for:
+- Campaigns
+- CampaignSegments
+- CampaignAssets
+- CampaignSchedules
+
+2. Campaigns
+A campaign should support:
+- workspaceId
+- name
+- description
+- objective
+- owner
+- status
+- start date
+- end date
+- default sender identity
+- default provider
+- createdAt
+- updatedAt
+
+3. Campaign segments
+Each campaign can have multiple segments inside it.
+
+A segment should support:
+- campaignId
+- workspaceId
+- segment name
+- contact type filter
+- saved filter or segment rules
+- templateId
+- sequenceId
+- scheduled send date
+- send window
+- asset set or linked assets
+- status
+- notes
+
+Use case examples:
+- one campaign with Hotels segment
+- one campaign with Venues segment
+- one campaign with Clinics segment
+
+Each segment should be able to use different templates, schedules, and assets.
+
+4. Contact type targeting
+Add support for selecting contacts by type within campaigns.
+
+Examples:
+- Hotels
+- Venues
+- Resorts
+- Realtors
+- Property Managers
+- Clinics
+- Med Spas
+- Coaches
+
+Allow campaign segments to target:
+- one contact type
+- multiple contact types
+- saved filters
+- manual contact selection
+
+5. Image and asset support
+Allow users to:
+- upload images/files inside a campaign
+- attach images to campaign templates
+- reuse existing workspace assets
+- preview images in campaign email content
+- assign different images/assets to different campaign segments
+
+6. Campaign schedule builder
+Inside a campaign, allow users to:
+- schedule an initial send for a future date
+- add another template later in the same campaign
+- add additional scheduled sends
+- schedule different segment sends on different dates
+- choose the follow-up sequence tied to each segment
+
+7. Template logic by segment
+A segment should let the user choose:
+- template
+- follow-up sequence
+- sender identity
+- assets/images
+- scheduled date
+- target contacts count preview
+
+8. Campaign detail UI
+Upgrade the campaign detail page to include tabs or sections for:
+- Overview
+- Segments
+- Assets
+- Schedule
+- Contacts
+- Performance
+- Activity
+
+9. Segment builder UI
+For each campaign segment, allow:
+- add/edit segment name
+- choose contact type or saved filter
+- choose template
+- choose sequence
+- add/upload images
+- choose send date
+- duplicate segment
+- pause segment
+- preview segment email
+- view estimated audience size
+
+10. Performance by segment
+Track campaign performance by segment:
+- sent
+- scheduled
+- replied
+- opened if supported
+- bounced
+- meetings booked if tracked
+- status by segment
+
+11. Workspace isolation and permissions
+Campaigns, segments, assets, and schedules must be workspace-scoped.
+Only authorized users in that workspace can access them.
+Super admin can access all.
+
+12. Keep existing functionality
+Do not break current queue, templates, sequences, or contact workflows.
+Refactor campaigns into a more powerful structure using the existing system where possible.
+
+After implementation, provide:
+a. exact files changed
+b. schema changes
+c. new campaign builder capabilities
+d. how segment-by-contact-type works
+e. how image uploads are handled
+f. any remaining limitations
