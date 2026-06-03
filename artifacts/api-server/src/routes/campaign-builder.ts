@@ -206,26 +206,156 @@ async function getSegmentOr404(req: any, res: any): Promise<any | null> {
   return segment;
 }
 
+type Performance = { total: number; sent: number; scheduled: number; queued: number; failed: number; canceled: number; paused: number };
+
+function emptyPerformance(): Performance {
+  return { total: 0, sent: 0, scheduled: 0, queued: 0, failed: 0, canceled: 0, paused: 0 };
+}
+
+// Folds a single (status, count) row into a performance tally.
+function accumulatePerformance(out: Performance, status: string | null, count: number) {
+  out.total += count;
+  if (status === "sent") out.sent += count;
+  else if (status === "scheduled") out.scheduled += count;
+  else if (status === "queued") out.queued += count;
+  else if (status === "failed") out.failed += count;
+  else if (status === "canceled") out.canceled += count;
+  else if (status === "paused") out.paused += count;
+}
+
 // Status-based performance for a given executed bulk-send campaign id.
 async function performanceForBulkCampaign(workspaceId: number, bulkCampaignId: number | null) {
-  const empty = { total: 0, sent: 0, scheduled: 0, queued: 0, failed: 0, canceled: 0, paused: 0 };
-  if (!bulkCampaignId) return empty;
+  if (!bulkCampaignId) return emptyPerformance();
+  const map = await performanceForBulkCampaigns(workspaceId, [bulkCampaignId]);
+  return map.get(bulkCampaignId) ?? emptyPerformance();
+}
+
+// Batched status-based performance for many bulk-send campaign ids. Computes all
+// per-campaign tallies in a single grouped query (instead of one query per id)
+// so the segments list and Performance tab stay flat as segment count grows.
+// Returns a map keyed by bulk campaign id; every requested non-null id is present
+// (with a zeroed tally when it has no scheduled emails yet).
+async function performanceForBulkCampaigns(
+  workspaceId: number,
+  bulkCampaignIds: (number | null | undefined)[],
+): Promise<Map<number, Performance>> {
+  const ids = Array.from(
+    new Set(bulkCampaignIds.filter((id): id is number => typeof id === "number" && Number.isFinite(id))),
+  );
+  const map = new Map<number, Performance>();
+  for (const id of ids) map.set(id, emptyPerformance());
+  if (ids.length === 0) return map;
+
   const rows = await db
-    .select({ status: scheduledEmailsTable.status, count: sql<number>`count(*)::int` })
+    .select({
+      campaignId: scheduledEmailsTable.campaignId,
+      status: scheduledEmailsTable.status,
+      count: sql<number>`count(*)::int`,
+    })
     .from(scheduledEmailsTable)
-    .where(and(eq(scheduledEmailsTable.workspaceId, workspaceId), eq(scheduledEmailsTable.campaignId, bulkCampaignId)))
-    .groupBy(scheduledEmailsTable.status);
-  const out = { ...empty };
+    .where(and(eq(scheduledEmailsTable.workspaceId, workspaceId), inArray(scheduledEmailsTable.campaignId, ids)))
+    .groupBy(scheduledEmailsTable.campaignId, scheduledEmailsTable.status);
+
   for (const r of rows) {
-    out.total += r.count;
-    if (r.status === "sent") out.sent += r.count;
-    else if (r.status === "scheduled") out.scheduled += r.count;
-    else if (r.status === "queued") out.queued += r.count;
-    else if (r.status === "failed") out.failed += r.count;
-    else if (r.status === "canceled") out.canceled += r.count;
-    else if (r.status === "paused") out.paused += r.count;
+    if (r.campaignId == null) continue;
+    const out = map.get(r.campaignId);
+    if (out) accumulatePerformance(out, r.status, r.count);
   }
-  return out;
+  return map;
+}
+
+// Columns required to evaluate a segment's audience criteria in memory. The
+// segments list resolves audience counts for every segment from a single
+// workspace-wide leads fetch (below) instead of one query per segment.
+type MatchableLead = {
+  id: number;
+  contactType: string | null;
+  industry: string | null;
+  projectType: string | null;
+  status: string | null;
+  pipelineType: string | null;
+  source: string | null;
+  companyName: string | null;
+  contactName: string | null;
+  email: string | null;
+};
+
+async function fetchWorkspaceLeadsForMatching(workspaceId: number): Promise<MatchableLead[]> {
+  return db
+    .select({
+      id: leadsTable.id,
+      contactType: leadsTable.contactType,
+      industry: leadsTable.industry,
+      projectType: leadsTable.projectType,
+      status: leadsTable.status,
+      pipelineType: leadsTable.pipelineType,
+      source: leadsTable.source,
+      companyName: leadsTable.companyName,
+      contactName: leadsTable.contactName,
+      email: leadsTable.email,
+    })
+    .from(leadsTable)
+    .where(eq(leadsTable.workspaceId, workspaceId));
+}
+
+function ciEquals(value: string | null, target: string): boolean {
+  return value != null && value.toLowerCase() === target.toLowerCase();
+}
+
+function ciIncludes(value: string | null, target: string): boolean {
+  return value != null && value.toLowerCase().includes(target.toLowerCase());
+}
+
+// In-memory equivalent of resolveAudience used for batch counting. Given a
+// pre-fetched set of workspace leads, returns the count of leads matching a
+// segment's criteria. Mirrors resolveAudience's SQL semantics: contact-type
+// labels match contact_type (exact, case-insensitive) or industry/project_type
+// (substring, case-insensitive); status/pipelineType/source are exact matches;
+// industry/search are case-insensitive substring matches; manual ids are unioned.
+function countAudienceForCriteria(leads: MatchableLead[], criteria: AudienceCriteria): number {
+  const contactTypes = (criteria.contactTypes ?? []).filter((t) => typeof t === "string" && t.trim());
+  const rules = criteria.filterRules ?? {};
+  const manualIds = new Set(
+    (criteria.manualLeadIds ?? []).map((n) => Number(n)).filter((n) => Number.isFinite(n)),
+  );
+
+  const hasRuleCriteria =
+    contactTypes.length > 0 ||
+    !!rules.status ||
+    !!rules.pipelineType ||
+    !!rules.source ||
+    !!rules.industry ||
+    !!rules.search;
+
+  const matched = new Set<number>();
+
+  if (hasRuleCriteria) {
+    for (const lead of leads) {
+      if (contactTypes.length > 0) {
+        const ok = contactTypes.some(
+          (t) => ciEquals(lead.contactType, t) || ciIncludes(lead.industry, t) || ciIncludes(lead.projectType, t),
+        );
+        if (!ok) continue;
+      }
+      if (rules.status && lead.status !== String(rules.status)) continue;
+      if (rules.pipelineType && lead.pipelineType !== String(rules.pipelineType)) continue;
+      if (rules.source && lead.source !== String(rules.source)) continue;
+      if (rules.industry && !ciIncludes(lead.industry, String(rules.industry))) continue;
+      if (rules.search) {
+        const s = String(rules.search);
+        if (!(ciIncludes(lead.companyName, s) || ciIncludes(lead.contactName, s) || ciIncludes(lead.email, s))) continue;
+      }
+      matched.add(lead.id);
+    }
+  }
+
+  if (manualIds.size > 0) {
+    for (const lead of leads) {
+      if (manualIds.has(lead.id)) matched.add(lead.id);
+    }
+  }
+
+  return matched.size;
 }
 
 // ---------------------------------------------------------------------------
@@ -258,16 +388,27 @@ router.get("/campaigns/:campaignId/segments", async (req, res) => {
       .where(eq(campaignSegmentsTable.campaignId, campaign.id))
       .orderBy(campaignSegmentsTable.id);
 
-    const result = [];
-    for (const seg of segments) {
-      const audience = await resolveAudience(req.workspaceId!, {
+    // Resolve every segment's audience count and performance from two batched
+    // queries (one leads fetch + one grouped scheduled-emails query) regardless
+    // of segment count, instead of two queries per segment.
+    const [leads, perfMap] = await Promise.all([
+      fetchWorkspaceLeadsForMatching(req.workspaceId!),
+      performanceForBulkCampaigns(
+        req.workspaceId!,
+        segments.map((s) => s.lastBulkCampaignId),
+      ),
+    ]);
+
+    const result = segments.map((seg) => {
+      const audienceCount = countAudienceForCriteria(leads, {
         contactTypes: parseJsonArray(seg.contactTypes),
         filterRules: parseJsonObject(seg.filterRules),
         manualLeadIds: parseJsonArray(seg.manualLeadIds),
       });
-      const performance = await performanceForBulkCampaign(req.workspaceId!, seg.lastBulkCampaignId);
-      result.push({ ...seg, audienceCount: audience.length, performance });
-    }
+      const performance =
+        (seg.lastBulkCampaignId != null ? perfMap.get(seg.lastBulkCampaignId) : undefined) ?? emptyPerformance();
+      return { ...seg, audienceCount, performance };
+    });
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
@@ -801,13 +942,20 @@ router.get("/campaigns/:campaignId/performance", async (req, res) => {
       .from(campaignSegmentsTable)
       .where(eq(campaignSegmentsTable.campaignId, campaign.id));
 
-    const totals = { total: 0, sent: 0, scheduled: 0, queued: 0, failed: 0, canceled: 0, paused: 0 };
-    const perSegment = [];
-    for (const seg of segments) {
-      const performance = await performanceForBulkCampaign(req.workspaceId!, seg.lastBulkCampaignId);
-      perSegment.push({ segmentId: seg.id, name: seg.name, performance });
-      for (const k of Object.keys(totals) as (keyof typeof totals)[]) totals[k] += performance[k];
-    }
+    // One grouped query covers every segment's last send, instead of one query
+    // per segment, so the Performance tab stays flat as segment count grows.
+    const perfMap = await performanceForBulkCampaigns(
+      req.workspaceId!,
+      segments.map((s) => s.lastBulkCampaignId),
+    );
+
+    const totals = emptyPerformance();
+    const perSegment = segments.map((seg) => {
+      const performance =
+        (seg.lastBulkCampaignId != null ? perfMap.get(seg.lastBulkCampaignId) : undefined) ?? emptyPerformance();
+      for (const k of Object.keys(totals) as (keyof Performance)[]) totals[k] += performance[k];
+      return { segmentId: seg.id, name: seg.name, performance };
+    });
     res.json({ campaignId: campaign.id, totals, segments: perSegment });
   } catch (err: any) {
     res.status(400).json({ message: err.message });
