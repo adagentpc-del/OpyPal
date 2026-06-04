@@ -3,6 +3,7 @@ import { requireAuth, resolveWorkspace } from "../middleware/clerk-auth";
 import meRouter from "./me";
 import workspacesRouter from "./workspaces";
 import adminRouter from "./admin";
+import adminOverviewRouter from "./admin-overview";
 import membersRouter from "./members";
 import healthRouter from "./health";
 import leadsRouter from "./leads";
@@ -44,6 +45,7 @@ router.use(storageRouter);
 router.use(meRouter); // applies requireAuth internally
 router.use(workspacesRouter); // applies requireAuth/requireSuperAdmin internally
 router.use(adminRouter); // platform admin (super-admin only) — global users
+router.use(adminOverviewRouter); // platform aggregate overview (super-admin only)
 
 // Partner-portal routers manage their own auth + workspace resolution
 // internally (they expose public partner pages and intake endpoints).

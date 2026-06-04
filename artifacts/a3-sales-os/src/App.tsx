@@ -59,6 +59,15 @@ import Members from "./pages/members";
 import Users from "./pages/users";
 import Access from "./pages/access";
 
+import PlatformDashboard from "./pages/platform-dashboard";
+import WorkspacesPage from "./pages/workspaces";
+import PlatformProviders from "./pages/platform-providers";
+import PlatformTemplates from "./pages/platform-templates";
+import PlatformSequences from "./pages/platform-sequences";
+import PlatformAnalytics from "./pages/platform-analytics";
+import PlatformAuditLog from "./pages/platform-audit-log";
+import PlatformSettings from "./pages/platform-settings";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -141,13 +150,33 @@ function LandingPage() {
   );
 }
 
+function SignedInHome() {
+  const { isLoading, me, scope } = useWorkspace();
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+      </div>
+    );
+  }
+  // Super admins land on the platform dashboard when in the platform shell, or
+  // whenever they have no workspace to fall back to (so they're never stranded
+  // on the "No workspace access" screen).
+  if (me?.isSuperAdmin && (scope === "platform" || me.workspaces.length === 0)) {
+    return <Redirect to="/platform" />;
+  }
+  return (
+    <RequireWorkspace>
+      <Dashboard />
+    </RequireWorkspace>
+  );
+}
+
 function HomeRedirect() {
   return (
     <>
       <Show when="signed-in">
-        <RequireWorkspace>
-          <Dashboard />
-        </RequireWorkspace>
+        <SignedInHome />
       </Show>
       <Show when="signed-out">
         <LandingPage />
@@ -240,6 +269,41 @@ function protectedRoute(Component: React.ComponentType) {
   );
 }
 
+// Cross-workspace pages reused by the platform shell (/users, /access). Super
+// admins reach these even with zero workspaces, so they bypass the workspace
+// requirement; everyone else is still gated on workspace membership.
+function RequireWorkspaceOrSuper({ children }: { children: ReactNode }) {
+  const { isLoading, me } = useWorkspace();
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+      </div>
+    );
+  }
+  if (me?.isSuperAdmin) return <>{children}</>;
+  return <RequireWorkspace>{children}</RequireWorkspace>;
+}
+
+function sharedRoute(
+  Component: React.ComponentType,
+  opts: { superAdminOnly?: boolean } = {},
+) {
+  return () => (
+    <RequireAuth>
+      <RequireWorkspaceOrSuper>
+        {opts.superAdminOnly ? (
+          <RequireRole superAdminOnly>
+            <Component />
+          </RequireRole>
+        ) : (
+          <Component />
+        )}
+      </RequireWorkspaceOrSuper>
+    </RequireAuth>
+  );
+}
+
 // Gates a page on a minimum role (super admins always pass). Renders a clear
 // "no access" message rather than redirecting, so the URL stays put.
 function RequireRole({
@@ -289,6 +353,35 @@ function roleRoute(
   );
 }
 
+// Platform (super-admin only) routes. Unlike workspace routes these do NOT
+// require a workspace — a super admin manages the platform even with zero
+// workspaces. Non-super-admins are redirected home so they never see platform
+// chrome or URLs.
+function RequirePlatform({ children }: { children: ReactNode }) {
+  const { isLoading, me } = useWorkspace();
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+      </div>
+    );
+  }
+  if (!me?.isSuperAdmin) {
+    return <Redirect to="/" />;
+  }
+  return <>{children}</>;
+}
+
+function platformRoute(Component: React.ComponentType) {
+  return () => (
+    <RequireAuth>
+      <RequirePlatform>
+        <Component />
+      </RequirePlatform>
+    </RequireAuth>
+  );
+}
+
 function AppRoutes() {
   return (
     <Switch>
@@ -296,6 +389,16 @@ function AppRoutes() {
       <Route path="/" component={HomeRedirect} />
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
+
+      {/* Platform (super-admin only) */}
+      <Route path="/platform" component={platformRoute(PlatformDashboard)} />
+      <Route path="/platform/workspaces" component={platformRoute(WorkspacesPage)} />
+      <Route path="/platform/providers" component={platformRoute(PlatformProviders)} />
+      <Route path="/platform/templates" component={platformRoute(PlatformTemplates)} />
+      <Route path="/platform/sequences" component={platformRoute(PlatformSequences)} />
+      <Route path="/platform/analytics" component={platformRoute(PlatformAnalytics)} />
+      <Route path="/platform/audit-log" component={platformRoute(PlatformAuditLog)} />
+      <Route path="/platform/settings" component={platformRoute(PlatformSettings)} />
 
       <Route path="/leads" component={protectedRoute(Leads)} />
       <Route path="/companies" component={protectedRoute(Companies)} />
@@ -329,8 +432,8 @@ function AppRoutes() {
 
       {/* User management */}
       <Route path="/members" component={roleRoute(Members, { min: "workspace_admin" })} />
-      <Route path="/access" component={protectedRoute(Access)} />
-      <Route path="/users" component={roleRoute(Users, { superAdminOnly: true })} />
+      <Route path="/access" component={sharedRoute(Access)} />
+      <Route path="/users" component={sharedRoute(Users, { superAdminOnly: true })} />
 
       {/* Legacy routes — keep existing URLs working */}
       <Route path="/outreach" component={protectedRoute(OutreachQueue)} />

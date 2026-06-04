@@ -1,0 +1,99 @@
+Update the white-label UX and navigation structure for Opypal.
+
+I need a two-level navigation model:
+
+1. Super Admin level
+2. Workspace / company level
+
+Requirements:
+
+1. Super Admin dashboard
+When logged in as super_admin, the main dashboard should show all workspaces / companies across the platform.
+
+This dashboard should include:
+- all workspaces
+- summary metrics by workspace
+- user counts
+- contact counts
+- campaign counts
+- queue / reply summaries
+- provider connection status
+- recent activity
+- alerts or issues by workspace
+
+2. Super Admin left sidebar
+When in super_admin mode, the left sidebar should show platform-level navigation, not the current workspace sidebar.
+
+Suggested super admin sidebar sections:
+- Dashboard
+- Workspaces
+- Users
+- Provider Connections
+- Global Templates
+- Global Sequences
+- Platform Analytics
+- Permissions
+- Audit Log
+- Platform Settings
+
+3. Workspace entry behavior
+When I click into a workspace/company such as:
+- A3 Visual
+- Move Mi
+- StrataLogic
+- Alyssa Advisory
+
+the app should switch into that workspace context.
+
+4. Workspace-level sidebar
+Once inside a specific workspace, the left sidebar should switch to the current workspace navigation structure, similar to what the app already uses now.
+
+This workspace sidebar should show the workspace-scoped modules such as:
+- Dashboard
+- CRM
+- Companies
+- Outreach
+- Templates
+- Sequences
+- Queue
+- Campaigns
+- Analytics
+- Users
+- Settings
+- Provider Connections
+- Activity Log
+
+Only show modules allowed by that user’s role.
+
+5. White-label branding
+When entering a workspace:
+- show that workspace’s logo
+- show that workspace’s name
+- apply that workspace’s branding/colors where appropriate
+- use that workspace’s sender identities, templates, and settings
+- keep the data fully isolated to that workspace
+
+6. Super admin visibility
+As super_admin, I should still be able to:
+- switch between workspaces
+- return to the Opypal platform dashboard
+- access platform-level settings
+- manage all users and workspaces
+
+7. Security
+Workspace users must never see the super_admin platform navigation.
+They should only see their own workspace and workspace-level sidebar.
+
+8. Implementation goal
+Refactor the layout, sidebar logic, routing, and dashboard views to support:
+- platform-level shell for super admin
+- workspace-level shell for company-specific use
+- white-label workspace branding
+- clean switching between platform and workspace contexts
+
+After implementation, provide:
+a. exact files changed
+b. layout/routing changes
+c. sidebar behavior changes
+d. how workspace branding is applied
+e. any remaining white-label UX gaps

@@ -2,3 +2,4 @@
 - [Opypal API constraints](opypal-api-constraints.md) — never edit lib/api-spec or lib/api-zod; new endpoints use inline Zod in routes + a raw-fetch client module on the frontend.
 - [runTest per-task run cap](testing-runtest-cap.md) — runTest rejects in <10ms with "Maximum testing iterations (10) reached" once the ~10-run/task cap is hit; not a bug, resets only in a fresh session.
 - [API router-mounting trap](opypal-router-mounting-trap.md) — scoped routers mount at root "/", so a path-less router.use(gate) gates ALL traffic; also per-request Clerk getUser caused spurious 401 bursts (now cached).
+- [Platform/workspace two-level shell](opypal-platform-workspace-shell.md) — route is source of truth for shell; scope synced to route; super admins with zero workspaces bypass workspace gating; white-label theme only in workspace shell.
