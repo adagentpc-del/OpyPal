@@ -718,6 +718,44 @@ function SegmentsTab({
                   </Field>
                 )}
 
+                {sendAllForm.scheduleStyle === "stagger" && (() => {
+                  const base = sendAllForm.scheduledFor ? new Date(sendAllForm.scheduledFor) : null;
+                  const stagger = Number(sendAllForm.staggerMinutes);
+                  const validBase = base && !isNaN(base.getTime());
+                  const validStagger = Number.isFinite(stagger) && stagger > 0;
+                  const ordered = [...(segments || [])].sort((a, b) => a.id - b.id);
+                  if (ordered.length === 0) return null;
+                  return (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Schedule preview</p>
+                      {validBase && validStagger ? (
+                        <ul className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                          {ordered.map((s, i) => {
+                            const when = new Date(base!.getTime());
+                            when.setMinutes(when.getMinutes() + i * Math.floor(stagger));
+                            return (
+                              <li
+                                key={s.id}
+                                className="flex items-center justify-between gap-3 text-sm border-b border-border/40 pb-1.5"
+                              >
+                                <span className="truncate">{s.name}</span>
+                                <span className="shrink-0 tabular-nums text-muted-foreground">
+                                  {format(when, "MMM d, h:mm a")}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Set a first send time and a stagger interval to preview each segment's
+                          send time.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {sendAllForm.scheduleStyle === "custom" && (
                   <div className="space-y-2">
                     <p className="text-xs text-muted-foreground">
