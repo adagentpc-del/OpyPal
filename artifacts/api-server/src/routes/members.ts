@@ -14,7 +14,12 @@ import { writeAudit } from "../lib/audit";
 // ever manage members of their own workspace.
 const router: IRouter = Router();
 
-router.use(requireRole("workspace_admin"));
+// Gate the member-management routes to workspace admins. This MUST be scoped to
+// the "/members" path: every scoped router is mounted at the same root "/" in
+// routes/index.ts, so a path-less router.use() here would run on ALL API traffic
+// passing through (e.g. /campaigns/*) and 403 every non-admin caller before the
+// request ever reached its real router.
+router.use("/members", requireRole("workspace_admin"));
 
 const roleEnum = z.enum(
   ALL_WORKSPACE_ROLES as [string, ...string[]],

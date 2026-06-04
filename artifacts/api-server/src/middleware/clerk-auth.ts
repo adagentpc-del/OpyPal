@@ -48,6 +48,53 @@ declare global {
   }
 }
 
+// Cache of Clerk userId -> primary email. The verified session token already
+// gives us the userId without a network call, but resolving the email requires
+// a Clerk API call. Calling clerkClient.users.getUser on EVERY request means a
+// single page load (which fires many parallel API requests) produces a burst of
+// concurrent Clerk lookups; under that burst Clerk can rate-limit / transiently
+// fail, surfacing as spurious 401s. We cache the email per user and coalesce
+// concurrent misses into a single in-flight call so each user costs at most one
+// Clerk lookup per TTL window.
+const EMAIL_CACHE_TTL_MS = 5 * 60 * 1000;
+const emailCache = new Map<string, { email: string; expiresAt: number }>();
+const emailInflight = new Map<string, Promise<string>>();
+
+// Resolves a Clerk userId to a lowercased primary email. Returns a cached value
+// when fresh, coalesces concurrent misses, and falls back to a stale cached
+// value if a fresh Clerk lookup transiently fails. Throws only when there is no
+// usable value at all (no cache and the lookup failed).
+async function resolveUserEmail(userId: string): Promise<string> {
+  const cached = emailCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) return cached.email;
+
+  const existing = emailInflight.get(userId);
+  if (existing) return existing;
+
+  const lookup = (async () => {
+    try {
+      const user = await clerkClient.users.getUser(userId);
+      const email = (
+        user.primaryEmailAddress?.emailAddress ||
+        user.emailAddresses?.[0]?.emailAddress ||
+        ""
+      ).toLowerCase();
+      emailCache.set(userId, { email, expiresAt: Date.now() + EMAIL_CACHE_TTL_MS });
+      return email;
+    } catch (err) {
+      // Transient Clerk failure (e.g. rate limit): prefer a stale cached value
+      // over forcing a 401 on an otherwise-valid session.
+      if (cached) return cached.email;
+      throw err;
+    } finally {
+      emailInflight.delete(userId);
+    }
+  })();
+
+  emailInflight.set(userId, lookup);
+  return lookup;
+}
+
 // Resolves the signed-in Clerk user, their email, super-admin status, and
 // workspace memberships, attaching them to req.authContext. Responds 401 when
 // there is no valid session. Use as the base guard on protected routes.
@@ -65,12 +112,7 @@ export async function loadAuthContext(
 
   let email = "";
   try {
-    const user = await clerkClient.users.getUser(userId);
-    email = (
-      user.primaryEmailAddress?.emailAddress ||
-      user.emailAddresses?.[0]?.emailAddress ||
-      ""
-    ).toLowerCase();
+    email = await resolveUserEmail(userId);
   } catch {
     res.status(401).json({ message: "Could not resolve authenticated user" });
     return;
