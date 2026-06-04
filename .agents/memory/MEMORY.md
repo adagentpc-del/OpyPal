@@ -2,5 +2,6 @@
 - [Opypal API constraints](opypal-api-constraints.md) — never edit lib/api-spec or lib/api-zod; new endpoints use inline Zod in routes + a raw-fetch client module on the frontend.
 - [runTest per-task run cap](testing-runtest-cap.md) — runTest rejects in <10ms with "Maximum testing iterations (10) reached" once the ~10-run/task cap is hit; not a bug, resets only in a fresh session.
 - [API router-mounting trap](opypal-router-mounting-trap.md) — scoped routers mount at root "/", so a path-less router.use(gate) gates ALL traffic; also per-request Clerk getUser caused spurious 401 bursts (now cached).
+- [Dev/prod DB separation & recovery](opypal-prod-db-separation.md) — dev & live are separate DBs; checkpoints protect dev only; live-site data lost on redeploy isn't rollback-recoverable (re-import file or Replit Support); use _id_seq to prove if rows ever existed.
 - [Data-visibility audit](opypal-data-visibility-audit.md) — "data wiped" reports = workspace scoping not deletion; real data lives in workspace 1 (A3 Visual); use sequence is_called to prove never-existed vs deleted.
 - [Platform/workspace two-level shell](opypal-platform-workspace-shell.md) — route is source of truth for shell; scope synced to route; super admins with zero workspaces bypass workspace gating; white-label theme only in workspace shell.
