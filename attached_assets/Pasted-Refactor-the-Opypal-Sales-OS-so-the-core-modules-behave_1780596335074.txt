@@ -1,0 +1,202 @@
+Refactor the Opypal Sales OS so the core modules behave like one connected operating system rather than disconnected tabs.
+
+I need Leads, Contacts, Companies, Segments, Campaigns, Scheduled Emails, Queue, Templates, Activity, and Reply Handling to update each other automatically.
+
+Implement the following in the Sales OS / Opypal codebase only:
+
+1. Core connected workflow
+Make the system support this operating flow:
+- upload contacts
+- segment them
+- assign campaign/template/sequence rules
+- automatically create scheduled emails
+- show them in Scheduled Emails
+- allow me to press Start Sending Queue
+- update send history, next follow-up, and status everywhere
+- stop or pause sequence on reply
+
+2. Contacts upload behavior
+When contacts are uploaded:
+- allow segmentation during upload or immediately after
+- allow assigning contact type
+- allow assigning campaign/template/sequence
+- once segmented and assigned, create scheduled email records automatically
+- make them visible in Scheduled Emails and Queue
+
+3. Leads behavior
+Leads are my personal/manual adds.
+
+Add or confirm these fields on Leads:
+- first name
+- last name
+- title
+- email
+- phone
+- company
+- company website
+- event
+- referral checkbox
+- contact type
+- segment
+- status
+- notes
+- uploads / attachments
+
+From a Lead record, I need to be able to:
+- assign segment
+- assign campaign
+- assign template
+- assign sequence
+- schedule send
+- push into queue
+- press send
+- track sent history and next follow-up
+
+4. Contacts behavior
+Contacts should contain:
+- contact details
+- title
+- referral checkbox/status
+- company association
+- segment
+- campaign association
+- email history
+- scheduled emails
+- queue status
+- send status
+- follow-up status
+- notes
+- uploads
+
+All uploads tied to a contact should be visible from the contact profile.
+
+5. Segment behavior
+Segments should be real operational buckets that can drive:
+- template assignment
+- campaign assignment
+- sequence assignment
+- scheduled email creation
+- queue enrollment
+
+Allow one contact or lead to be assigned to a segment and then flow into the correct campaign/send logic automatically.
+
+6. Scheduled Emails page
+This page must show:
+- contact name
+- company
+- segment
+- campaign
+- template
+- send date
+- provider
+- queue status
+- send status
+- follow-up status
+- last sent date
+- next follow-up date
+- reply status
+
+This page must reflect the actual data created by uploads, leads, and campaign assignments.
+
+7. Queue behavior
+Queue must be connected to Scheduled Emails and Contact/Lead state.
+
+Allow:
+- Start Sending Queue
+- pause queue
+- resume queue
+- skip email
+- send now
+- see pending vs sent vs paused vs failed
+- see follow-up scheduled after send
+- see if reply stopped the sequence
+
+8. Shared status model
+Use a unified lifecycle/status flow across Leads, Contacts, Scheduled Emails, Queue, and Campaigns:
+- Draft
+- Segmented
+- Campaign Assigned
+- Scheduled
+- Queued
+- Sent
+- Follow-Up Active
+- Replied
+- Meeting Booked
+- Paused
+- Closed Won
+- Closed Lost
+- Do Not Contact
+
+9. Company profiles
+Each company profile must support:
+- company name
+- website
+- notes
+- event/project notes
+- linked leads
+- linked contacts
+- linked campaigns
+- linked templates where relevant
+- uploaded pictures
+- uploaded documents
+- uploaded assets
+
+Company uploads/assets must be attachable to:
+- templates
+- campaigns
+- outreach records
+- company profile itself
+
+10. Referral support
+Add referral support to Leads, Contacts, and Companies:
+- referral checkbox
+- referral notes
+- referred by
+- referral partner status
+- referral fee applicable if needed later
+
+11. Reply routing / forwarding health
+I need to verify that email forwarding and responses go to the correct place.
+
+Add a provider/reply routing health section showing:
+- connected provider
+- sender email
+- reply-to email
+- forwarding inbox
+- inbound endpoint status
+- last inbound sync
+- last outbound send
+- webhook / endpoint health
+- test send button
+- test reply routing button
+
+12. Cross-tab synchronization
+Actions in one module must update the others.
+Examples:
+- upload contact → shows in contacts and can be segmented
+- assign segment → creates or updates scheduled emails and queue eligibility
+- send email → updates contact history, queue status, campaign metrics, activity log
+- schedule follow-up → visible in contact, scheduled emails, queue, and campaign
+- upload files → visible in contact/company and attachable to campaigns/templates
+- reply received → visible in contact, queue, scheduled emails, and activity
+
+13. UX goal
+This should feel like one connected operating system.
+I should be able to:
+- upload
+- add a lead
+- segment
+- queue
+- schedule
+- send
+- see status
+- see follow-up
+- see uploads
+without guessing which tab owns the record.
+
+After implementation, provide:
+a. exact files changed
+b. schema changes
+c. which pages are now connected
+d. how uploads/segments/scheduled emails/queue now sync
+e. any remaining disconnects or gaps
