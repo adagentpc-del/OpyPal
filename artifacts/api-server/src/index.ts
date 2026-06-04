@@ -6,6 +6,7 @@ import { startScheduler } from "./lib/background-scheduler";
 import { seedTemplatesIfEmpty } from "./lib/seed-templates-on-boot";
 import { seedWorkspacesIfNeeded } from "./lib/seed-workspaces-on-boot";
 import { seedWorkspaceTemplatesIfNeeded } from "./lib/seed-workspace-templates-on-boot";
+import { seedA3PremiumTemplatesIfNeeded } from "./lib/seed-a3-premium-templates-on-boot";
 
 const rawPort = process.env["PORT"];
 
@@ -93,6 +94,12 @@ app.listen(port, async () => {
     await seedWorkspaceTemplatesIfNeeded();
   } catch (err: any) {
     logger.warn({ err: err.message }, "Workspace template seed failed");
+  }
+
+  try {
+    await seedA3PremiumTemplatesIfNeeded();
+  } catch (err: any) {
+    logger.warn({ err: err.message }, "A3 premium template seed failed");
   }
 
   try {

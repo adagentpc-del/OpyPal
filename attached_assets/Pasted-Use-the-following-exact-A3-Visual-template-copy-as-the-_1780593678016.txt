@@ -1,0 +1,556 @@
+Use the following exact A3 Visual template copy as the seeded content for the A3 workspace template library.
+
+Workspace:
+A3 Visual
+
+Requirements:
+- Create editable seeded records for these categories
+- Store each initial template with subject line and body copy
+- Store the shared premium follow-up sequence with steps at 3 days, 7 days, 14 days, 1 month, 3 months, 6 months, and 1 year
+- Keep merge token support for:
+  - {{firstName}}
+  - {{companyName}}
+  - {{city}}
+  - {{senderName}}
+  - {{senderTitle}}
+  - {{calendarLink}}
+  - {{customNote}}
+  - {{originalSubject}}
+
+==================================================
+CATEGORY 1: HOTELS AND HOSPITALITY
+==================================================
+
+Template Name:
+Hospitality Executive Intro
+
+Subject:
+A3 Visual for hospitality environments and events
+
+Body:
+Hi {{firstName}},
+
+I wanted to introduce A3 Visual.
+
+We support hospitality properties and event-driven environments with large-format print, fabrication, signage, branded installations, and visual execution that needs to look elevated and come together cleanly.
+
+Reaching out in case {{companyName}} ever needs a strong partner for property branding, launches, seasonal moments, event graphics, wayfinding, or custom visual production.
+
+If relevant, I’d be glad to connect briefly.
+
+Best,
+{{senderName}}
+
+---
+
+Template Name:
+Hospitality Value Intro
+
+Subject:
+Visual execution support for hospitality teams
+
+Body:
+Hi {{firstName}},
+
+Hospitality teams often need visual partners who can support both presentation and execution without adding more friction internally.
+
+A3 Visual helps with branded environments, print, fabrication, signage, installs, and event-related visual production where quality and timing both matter.
+
+Happy to send a short overview if useful.
+
+Best,
+{{senderName}}
+
+==================================================
+CATEGORY 2: VENUES AND CONVENTION CENTERS
+==================================================
+
+Template Name:
+Venue Direct Intro
+
+Subject:
+A3 Visual for venue branding and event production
+
+Body:
+Hi {{firstName}},
+
+I wanted to introduce A3 Visual.
+
+We support venues with event graphics, sponsor branding, signage, fabrication, branded environments, and installation support across fast-moving event calendars.
+
+Reaching out in case {{companyName}} ever needs a reliable visual production partner for sponsor deliverables, temporary branding, wayfinding, or event execution.
+
+Would be glad to connect if helpful.
+
+Best,
+{{senderName}}
+
+---
+
+Template Name:
+Venue Operational Value Intro
+
+Subject:
+Support for venue graphics and branded execution
+
+Body:
+Hi {{firstName}},
+
+Venue teams usually need partners who can execute quickly, stay organized, and deliver a polished visual result without creating unnecessary back-and-forth.
+
+That is where A3 Visual tends to fit well.
+
+We support signage, sponsor assets, branded environments, fabrication, and installation across live events and venue activations.
+
+Happy to share more context if helpful.
+
+Best,
+{{senderName}}
+
+==================================================
+CATEGORY 3: AGENCIES AND BRAND ACTIVATIONS
+==================================================
+
+Template Name:
+Agency Strategic Intro
+
+Subject:
+Production support for branded activations
+
+Body:
+Hi {{firstName}},
+
+I wanted to introduce A3 Visual.
+
+We work with agencies and brand teams on large-format print, fabrication, branded environments, installations, and visual execution for activations, events, and campaign moments.
+
+Reaching out in case you ever need a partner who can help translate strong creative into polished real-world execution.
+
+Would be glad to connect if useful.
+
+Best,
+{{senderName}}
+
+---
+
+Template Name:
+Agency Creative Operations Intro
+
+Subject:
+A strong execution partner for brand environments
+
+Body:
+Hi {{firstName}},
+
+When a concept moves from deck to execution, the quality of the production partner matters.
+
+A3 Visual supports agencies and brand teams with print, fabrication, signage, installation, and custom visual production for activations and branded environments that need to land well both visually and operationally.
+
+Happy to send a short overview if useful.
+
+Best,
+{{senderName}}
+
+==================================================
+CATEGORY 4: DEVELOPERS AND COMMERCIAL REAL ESTATE
+==================================================
+
+Template Name:
+Developer Direct Intro
+
+Subject:
+A3 Visual for property branding and launches
+
+Body:
+Hi {{firstName}},
+
+I wanted to introduce A3 Visual.
+
+We support developers and commercial real estate teams with signage, branded environments, large-format graphics, fabrication, and installation for launches, sales environments, property branding, and special events.
+
+Reaching out in case {{companyName}} ever needs a visual production partner who can support presentation-heavy environments with strong execution.
+
+Would be glad to connect if relevant.
+
+Best,
+{{senderName}}
+
+---
+
+Template Name:
+Developer Launch Support Intro
+
+Subject:
+Visual support for development and property teams
+
+Body:
+Hi {{firstName}},
+
+For property and development teams, visual execution often needs to do more than just look good. It has to support the brand, the environment, and the moment.
+
+A3 Visual helps with that through large-format graphics, fabrication, signage, installation, and branded environments for launches, leasing, presentations, and property-related events.
+
+Happy to share more context if helpful.
+
+Best,
+{{senderName}}
+
+==================================================
+CATEGORY 5: SPORTS AND ENTERTAINMENT
+==================================================
+
+Template Name:
+Sports Direct Intro
+
+Subject:
+A3 Visual for sports and live environments
+
+Body:
+Hi {{firstName}},
+
+I wanted to introduce A3 Visual.
+
+We support sports and entertainment environments with sponsor graphics, branded assets, fabrication, large-format print, signage, and installation support for high-visibility live experiences.
+
+Reaching out in case {{companyName}} ever needs a trusted partner for event visuals, sponsor environments, or branded production that has to move quickly and land cleanly.
+
+Would be glad to connect if useful.
+
+Best,
+{{senderName}}
+
+---
+
+Template Name:
+Sports Operational Support Intro
+
+Subject:
+Sponsor and event production support
+
+Body:
+Hi {{firstName}},
+
+Sports and entertainment teams often need visual partners who understand both speed and presentation.
+
+A3 Visual supports sponsor graphics, venue branding, fabrication, and installation for live event environments where visibility, timing, and execution all matter.
+
+Happy to send a quick overview if helpful.
+
+Best,
+{{senderName}}
+
+==================================================
+CATEGORY 6: EVENT PRODUCERS AND FESTIVALS
+==================================================
+
+Template Name:
+Event Producer Direct Intro
+
+Subject:
+Visual production support for events and festivals
+
+Body:
+Hi {{firstName}},
+
+I wanted to introduce A3 Visual.
+
+We support events, festivals, and production teams with signage, sponsor assets, branded graphics, fabrication, large-format print, and install support across live environments.
+
+Reaching out in case {{companyName}} ever needs a strong production partner for event branding, sponsor integration, or on-site visual execution.
+
+Would be glad to connect if relevant.
+
+Best,
+{{senderName}}
+
+---
+
+Template Name:
+Event Producer Execution Intro
+
+Subject:
+A3 Visual for event branding and execution
+
+Body:
+Hi {{firstName}},
+
+Event teams often need partners who can execute across multiple visual needs without creating extra complexity.
+
+A3 Visual supports that with print, graphics, fabrication, sponsor visuals, and install coordination for events and festival environments that need to feel polished and well-run.
+
+Happy to send more context if useful.
+
+Best,
+{{senderName}}
+
+==================================================
+CATEGORY 7: PRINTING AND PRODUCTION PARTNERS
+==================================================
+
+Template Name:
+Production Partner Intro
+
+Subject:
+Potential production partnership
+
+Body:
+Hi {{firstName}},
+
+I wanted to introduce A3 Visual.
+
+We often support projects involving large-format print, fabrication, installation, event graphics, and specialty execution, and I thought it may be worth connecting in case there is an opportunity to support one another where capabilities, timing, geography, or scope align.
+
+Open to a brief intro if useful.
+
+Best,
+{{senderName}}
+
+---
+
+Template Name:
+Overflow Support Intro
+
+Subject:
+Overflow and specialty production support
+
+Body:
+Hi {{firstName}},
+
+Reaching out because A3 Visual is often brought in where a partner needs additional support around fabrication, large-format production, installation, or more specialized visual execution.
+
+Thought it could be useful to connect in case there is room for a reciprocal relationship around overflow, regional support, or select project types.
+
+Best,
+{{senderName}}
+
+==================================================
+CATEGORY 8: GENERAL INTRO
+==================================================
+
+Template Name:
+General Clean Intro
+
+Subject:
+Intro from A3 Visual
+
+Body:
+Hi {{firstName}},
+
+I wanted to introduce A3 Visual.
+
+We support brands, venues, agencies, hospitality groups, event teams, and commercial environments with large-format print, fabrication, signage, branded environments, installations, and specialty visual production.
+
+Reaching out in case there may be a fit now or down the road.
+
+Would be glad to connect if useful.
+
+Best,
+{{senderName}}
+
+---
+
+Template Name:
+General Premium Intro
+
+Subject:
+Visual production and execution support
+
+Body:
+Hi {{firstName}},
+
+Many teams need a reliable partner once a project moves from concept into production and execution.
+
+A3 Visual supports that with print, graphics, fabrication, installations, branded environments, and custom visual work across a wide range of projects and environments.
+
+Happy to send a short overview if helpful.
+
+Best,
+{{senderName}}
+
+==================================================
+CATEGORY 9: REACTIVATION
+==================================================
+
+Template Name:
+Reactivation Polished Reconnect
+
+Subject:
+Reconnecting from A3 Visual
+
+Body:
+Hi {{firstName}},
+
+Wanted to reconnect and reintroduce A3 Visual.
+
+We continue to support clients with large-format print, fabrication, signage, branded installations, event graphics, and custom visual production across a range of environments.
+
+If you are reviewing partners or have anything upcoming where an additional resource could be useful, I’d be glad to reconnect.
+
+Best,
+{{senderName}}
+
+---
+
+Template Name:
+Reactivation Seasonal Reconnect
+
+Subject:
+Quick reconnect
+
+Body:
+Hi {{firstName}},
+
+Reaching back out in case the timing is better now.
+
+If visual production, signage, branded installations, fabrication, or event-related graphics are relevant for your team this season, A3 is worth keeping in mind.
+
+Best,
+{{senderName}}
+
+==================================================
+SHARED PREMIUM FOLLOW-UP SEQUENCE
+==================================================
+
+Sequence Name:
+A3 Premium Default Follow-Up Sequence
+
+Step 1
+Delay:
+3 days
+
+Subject:
+Re: {{originalSubject}}
+
+Body:
+Hi {{firstName}},
+
+Just wanted to move this back up in case it got buried.
+
+Thought A3 could be a useful resource if visual production, signage, fabrication, or branded execution support ever becomes relevant for {{companyName}}.
+
+Best,
+{{senderName}}
+
+---
+
+Step 2
+Delay:
+7 days
+
+Subject:
+Re: {{originalSubject}}
+
+Body:
+Hi {{firstName}},
+
+Following up here.
+
+A3 typically supports teams that need a partner capable of handling both presentation and execution across print, fabrication, installs, and branded environments.
+
+Happy to send a short overview if useful.
+
+Best,
+{{senderName}}
+
+---
+
+Step 3
+Delay:
+14 days
+
+Subject:
+Re: {{originalSubject}}
+
+Body:
+Hi {{firstName}},
+
+Wanted to reach out once more.
+
+If your team ever needs a visual production partner that can support fast-moving or presentation-sensitive work cleanly, A3 is worth keeping in mind.
+
+Best,
+{{senderName}}
+
+---
+
+Step 4
+Delay:
+1 month
+
+Subject:
+Re: {{originalSubject}}
+
+Body:
+Hi {{firstName}},
+
+Checking back in here in case the timing is better now.
+
+If this is relevant for anything upcoming, I’d be glad to reconnect.
+
+Best,
+{{senderName}}
+
+---
+
+Step 5
+Delay:
+3 months
+
+Subject:
+Reconnecting on A3 Visual
+
+Body:
+Hi {{firstName}},
+
+Wanted to circle back and reintroduce A3 Visual.
+
+If you are reviewing partners for print, fabrication, signage, branded environments, or event-related visual execution, I’d be glad to reconnect.
+
+Best,
+{{senderName}}
+
+---
+
+Step 6
+Delay:
+6 months
+
+Subject:
+Quick check-in
+
+Body:
+Hi {{firstName}},
+
+Reaching back out in case this is more relevant now.
+
+A3 continues to support teams that need high-quality visual execution across environments where timing and presentation both matter.
+
+Best,
+{{senderName}}
+
+---
+
+Step 7
+Delay:
+1 year
+
+Subject:
+Reconnecting this year
+
+Body:
+Hi {{firstName}},
+
+I had reached out previously and wanted to reconnect in case the timing is better now.
+
+If an additional visual production partner would be useful this year, I’d be glad to connect.
+
+Best,
+{{senderName}}
+
+Assign this shared premium follow-up sequence as the default sequence for all A3 initial templates unless a category-specific override already exists.
+
+After seeding, report:
+1. number of A3 templates created or updated
+2. number of A3 sequence steps created or updated
+3. exact files changed
+4. any merge tokens added or updated

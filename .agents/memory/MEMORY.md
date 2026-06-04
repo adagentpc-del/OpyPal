@@ -5,3 +5,4 @@
 - [Dev/prod DB separation & recovery](opypal-prod-db-separation.md) — dev & live are separate DBs; checkpoints protect dev only; live-site data lost on redeploy isn't rollback-recoverable (re-import file or Replit Support); use _id_seq to prove if rows ever existed.
 - [Data-visibility audit](opypal-data-visibility-audit.md) — "data wiped" reports = workspace scoping not deletion; real data lives in workspace 1 (A3 Visual); use sequence is_called to prove never-existed vs deleted.
 - [Platform/workspace two-level shell](opypal-platform-workspace-shell.md) — route is source of truth for shell; scope synced to route; super admins with zero workspaces bypass workspace gating; white-label theme only in workspace shell.
+- [A3 additive template seeding](a3-premium-seed.md) — A3 (ws1) library built by multiple idempotent name-keyed boot seeders; never overwrite editable records; link default sequence only where linked_template_set_id IS NULL.

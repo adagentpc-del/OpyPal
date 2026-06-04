@@ -94,6 +94,7 @@ export function renderTemplate(
     "{{industry}}": contact.industry || "",
     "{{intent_signal}}": contact.intentSignal || "",
     "{{custom_line}}": contact.customLine || "",
+    "{{customNote}}": contact.customLine || "",
     "{{greeting}}": greeting,
     "{{intent_line}}": intentLine,
     "{{company_line}}": companyLine,

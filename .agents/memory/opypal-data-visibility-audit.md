@@ -14,7 +14,7 @@ timestamps, `is_active=true`. The newer workspaces (Move Mi=2, StrataLogic=3,
 Alyssa Advisory=4) are mostly empty / freshly seeded.
 
 **Why it looks empty:**
-- Super-admin `alyssadeltorre@gmail.com` is **not** a `workspace_members` row; `/api/me`
+- The super-admin account is **not** a `workspace_members` row; `/api/me`
   returns all workspaces *only because* `isSuperAdmin` short-circuits membership.
 - Frontend `scope` defaults to **"platform"** (localStorage `opypal_scope`), so a
   super-admin lands on the platform shell, away from workspace data.
