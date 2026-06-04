@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/layout";
 import { useGetDashboard, useGetActivity, useGetTasks } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, PieChart, Pie, Cell, Legend } from "recharts";
-import { Users, DollarSign, CalendarCheck, Clock, Activity, TrendingUp, Mail, MessageSquare, Handshake, Target, AlertTriangle, CheckCircle2, XCircle, Repeat, Zap, PauseCircle, ShieldAlert } from "lucide-react";
+import { Users, DollarSign, CalendarCheck, Clock, Activity, TrendingUp, Mail, MessageSquare, Handshake, Target, AlertTriangle, CheckCircle2, XCircle, Repeat, Zap, PauseCircle, ShieldAlert, Building2 } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
 import { CURRENT_WORKSPACE } from "@/config/branding";
@@ -16,10 +16,12 @@ export default function Dashboard() {
   const { data: allTasks } = useGetTasks();
   const [taskSummary, setTaskSummary] = useState<any>(null);
   const [alerts, setAlerts] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
 
   useEffect(() => {
     fetch(`${API_BASE}/tasks/summary`).then(r => r.ok ? r.json() : null).then(d => d && setTaskSummary(d)).catch(() => {});
     fetch(`${API_BASE}/notifications?unreadOnly=true&limit=20`).then(r => r.ok ? r.json() : []).then(setAlerts).catch(() => {});
+    fetch(`${API_BASE}/companies`).then(r => r.ok ? r.json() : []).then(d => Array.isArray(d) && setCompanies(d)).catch(() => {});
   }, []);
 
   if (dashboardLoading || !dashboard) {
@@ -145,6 +147,48 @@ export default function Dashboard() {
             </div>
           </Card>
         </div>
+
+        <Card className="p-5 border-border/50 bg-card rounded-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-bold flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-primary" /> Companies ({companies.length})
+            </h3>
+            <Link href="/companies" className="text-xs text-primary font-medium hover:underline">View all</Link>
+          </div>
+          <div className="divide-y divide-border/50 max-h-[460px] overflow-auto -mx-2">
+            {companies.length === 0 ? (
+              <p className="text-center py-6 text-muted-foreground text-sm">No companies yet</p>
+            ) : (
+              [...companies]
+                .sort((a, b) => (b.totalValue || 0) - (a.totalValue || 0))
+                .map((c) => {
+                  const location = [c.city, c.state].filter(Boolean).join(", ");
+                  const meta = [c.industry, location].filter(Boolean).join(" · ");
+                  return (
+                    <Link
+                      key={c.id}
+                      href="/companies"
+                      className="flex items-center gap-3 px-2 py-2.5 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                        <Building2 className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{c.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{meta || "—"}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-semibold">${(c.totalValue || 0).toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(c.actualLeadCount ?? c.leadCount ?? 0)} lead{(c.actualLeadCount ?? c.leadCount ?? 0) === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })
+            )}
+          </div>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <Card className="p-5 border-border/50 bg-card rounded-2xl">

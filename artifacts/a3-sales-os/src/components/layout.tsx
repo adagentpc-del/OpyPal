@@ -47,6 +47,23 @@ function useCollapsed() {
   return [collapsed, toggle] as const;
 }
 
+function BrandMark({ collapsed }: { collapsed: boolean }) {
+  if (collapsed) {
+    return (
+      <div className="h-9 w-9 bg-primary rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+        <div className="h-4 w-4 rounded-full border-[3px] border-accent" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={`${basePath}/logo.svg`}
+      alt={PLATFORM.name}
+      className="h-9 w-auto"
+    />
+  );
+}
+
 function NavLink({
   item,
   isActive,
@@ -108,8 +125,6 @@ function SidebarContent({
   const workspaces = me?.workspaces ?? [];
   const canSwitch = workspaces.length > 1;
   const wsName = currentWorkspace?.name ?? CURRENT_WORKSPACE.name;
-  const wsShortCode =
-    currentWorkspace?.shortCode ?? currentWorkspace?.initials ?? CURRENT_WORKSPACE.shortCode;
   const wsInitials = currentWorkspace?.initials ?? CURRENT_WORKSPACE.initials;
   const wsRoleLabel = me?.isSuperAdmin
     ? "Super Admin"
@@ -126,21 +141,9 @@ function SidebarContent({
                 className={`flex items-center gap-3 rounded-lg transition-colors hover:bg-sidebar-accent/60 ${collapsed ? "p-1" : "-mx-2 px-2 py-1.5 w-full"}`}
                 aria-label="Switch workspace"
               >
-                <div className="h-9 w-9 bg-primary rounded-lg flex items-center justify-center font-bold text-sm text-white shadow-md flex-shrink-0">
-                  {wsShortCode}
-                </div>
+                <BrandMark collapsed={collapsed} />
                 {!collapsed && (
-                  <>
-                    <div className="flex flex-col min-w-0 text-left">
-                      <span className="font-bold text-xl tracking-tight text-sidebar-foreground whitespace-nowrap leading-none">
-                        {wsName}
-                      </span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mt-1">
-                        {PLATFORM.foundation}
-                      </span>
-                    </div>
-                    <ChevronsUpDown className="ml-auto h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  </>
+                  <ChevronsUpDown className="ml-auto h-4 w-4 text-muted-foreground flex-shrink-0" />
                 )}
               </button>
             </DropdownMenuTrigger>
@@ -168,19 +171,7 @@ function SidebarContent({
           </DropdownMenu>
         ) : (
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 bg-primary rounded-lg flex items-center justify-center font-bold text-sm text-white shadow-md flex-shrink-0">
-              {wsShortCode}
-            </div>
-            {!collapsed && (
-              <div className="flex flex-col min-w-0">
-                <span className="font-bold text-xl tracking-tight text-sidebar-foreground whitespace-nowrap leading-none">
-                  {wsName}
-                </span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mt-1">
-                  {PLATFORM.foundation}
-                </span>
-              </div>
-            )}
+            <BrandMark collapsed={collapsed} />
           </div>
         )}
       </div>
