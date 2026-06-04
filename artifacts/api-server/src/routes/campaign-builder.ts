@@ -806,6 +806,30 @@ router.post("/campaigns/:campaignId/send-all-segments", requireRole("manager"), 
         continue;
       }
 
+      // Guard against scheduling sends in the past. A base time close to now
+      // combined with a (possibly large) stagger can still land later segments
+      // in the future, but a past base time, a small/zero stagger, or a custom
+      // per-segment override in the past would otherwise be enqueued with a
+      // scheduledFor earlier than now (the send pipeline would treat it as
+      // immediately due). Skip those segments with a clear reason rather than
+      // silently scheduling them in the past.
+      if (mode === "schedule" && scheduledFor) {
+        const when = new Date(scheduledFor);
+        if (Number.isNaN(when.getTime()) || when.getTime() < Date.now()) {
+          summary.skipped++;
+          results.push({
+            segmentId: segment.id,
+            name: segment.name,
+            status: "skipped",
+            message: Number.isNaN(when.getTime())
+              ? "Invalid scheduled time"
+              : "Scheduled time is in the past",
+            scheduledFor: Number.isNaN(when.getTime()) ? undefined : scheduledFor,
+          });
+          continue;
+        }
+      }
+
       try {
         const outcome = await executeSegmentSend({
           req,
