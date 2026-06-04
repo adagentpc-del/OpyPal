@@ -175,13 +175,19 @@ function ClerkQueryClientCacheInvalidator() {
   useEffect(() => {
     const unsubscribe = addListener(({ user }) => {
       const userId = user?.id ?? null;
-      if (
-        prevUserIdRef.current !== undefined &&
-        prevUserIdRef.current !== userId
-      ) {
+      const prev = prevUserIdRef.current;
+      // Only clear the cache when a genuinely different signed-in user takes
+      // over. We ignore null/undefined transitions, which fire repeatedly
+      // during Clerk's auth handshake (token refresh, tab focus) and would
+      // otherwise wipe the cache in a loop, causing a refetch storm that
+      // flashes pages empty. We remember only signed-in ids so that
+      // sign-out -> sign-in as a different user is still detected.
+      if (prev != null && userId != null && prev !== userId) {
         qc.clear();
       }
-      prevUserIdRef.current = userId;
+      if (userId != null) {
+        prevUserIdRef.current = userId;
+      }
     });
     return unsubscribe;
   }, [addListener, qc]);
