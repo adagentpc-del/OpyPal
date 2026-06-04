@@ -197,6 +197,7 @@ function ClerkQueryClientCacheInvalidator() {
 
 function RequireWorkspace({ children }: { children: ReactNode }) {
   const { isLoading, me, currentWorkspace } = useWorkspace();
+  const { signOut } = useClerk();
 
   if (isLoading) {
     return (
@@ -214,8 +215,14 @@ function RequireWorkspace({ children }: { children: ReactNode }) {
         </h1>
         <p className="mt-2 max-w-md text-sm text-muted-foreground">
           Your account isn’t a member of any workspace yet. Ask your workspace
-          administrator to invite you.
+          administrator to invite you, or sign in with a different account.
         </p>
+        <Button
+          className="mt-6"
+          onClick={() => signOut({ redirectUrl: `${basePath}/sign-in` })}
+        >
+          Back to sign in
+        </Button>
       </div>
     );
   }
