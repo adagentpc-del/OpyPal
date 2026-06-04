@@ -731,6 +731,15 @@ function SegmentsTab({
                       {validBase && validStagger ? (
                         <ul className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
                           {ordered.map((s, i) => {
+                            // Mirror the backend skip rules (executeSegmentSend):
+                            // a segment with no template or an empty audience will
+                            // be skipped at send time. Skipped segments still
+                            // consume a stagger slot on the backend, so non-skipped
+                            // segments keep their position-based (i) send time.
+                            const willSkip = !s.templateId || s.audienceCount === 0;
+                            const skipReason = !s.templateId
+                              ? "no template"
+                              : "empty audience";
                             const when = new Date(base!.getTime());
                             when.setMinutes(when.getMinutes() + i * Math.floor(stagger));
                             return (
@@ -738,10 +747,18 @@ function SegmentsTab({
                                 key={s.id}
                                 className="flex items-center justify-between gap-3 text-sm border-b border-border/40 pb-1.5"
                               >
-                                <span className="truncate">{s.name}</span>
-                                <span className="shrink-0 tabular-nums text-muted-foreground">
-                                  {format(when, "MMM d, h:mm a")}
+                                <span className={`truncate ${willSkip ? "text-muted-foreground/60" : ""}`}>
+                                  {s.name}
                                 </span>
+                                {willSkip ? (
+                                  <span className="shrink-0 text-xs italic text-muted-foreground/60">
+                                    will be skipped — {skipReason}
+                                  </span>
+                                ) : (
+                                  <span className="shrink-0 tabular-nums text-muted-foreground">
+                                    {format(when, "MMM d, h:mm a")}
+                                  </span>
+                                )}
                               </li>
                             );
                           })}
