@@ -34,6 +34,15 @@ Alyssa Advisory=4) are mostly empty / freshly seeded.
 - Compare row `created_at` against the suspected migration/boot date: April timestamps on
   A3 Visual rows prove the June boot seeders never reseeded/clobbered them.
 
+**Live published app runs a SEPARATE, near-empty production DB:**
+- `executeSql({environment:"production"})` showed prod = only boot-seeded templates;
+  **0** leads/companies/assets/activity/campaigns/sequence_templates. Real data exists
+  ONLY in the development DB (all under A3 Visual). Publishing copies schema, NOT data.
+- To get dev data onto the live app: user must re-publish and enable the Publish UI
+  **"Overwrite data"** option (replace prod data with dev wholesale). Agent cannot write
+  to prod (read-only) and must NOT script a prod data migration. Deployed at
+  a3visualcontact.com (autoscale).
+
 **Boot seeders are safe (idempotent, never destructive to existing data):**
 - `seed-templates-on-boot.ts` seeds workspace 1 only when empty (`existingTemplates.length===0`),
   others via `onConflictDoNothing`.
