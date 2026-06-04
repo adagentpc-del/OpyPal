@@ -67,7 +67,7 @@ router.get("/companies/:id", async (req, res) => {
 
 router.post("/companies", requireRole("operator"), async (req, res) => {
   try {
-    const { name, website, industry, subIndustry, city, state, country, phone, notes } = req.body;
+    const { name, website, industry, subIndustry, city, state, country, phone, notes, eventProjectNotes, referral, referredBy, referralNotes, referralPartnerStatus } = req.body;
     if (!name) return res.status(400).json({ message: "Company name is required" });
 
     const [company] = await db.insert(companiesTable).values({
@@ -80,6 +80,11 @@ router.post("/companies", requireRole("operator"), async (req, res) => {
       country: country || null,
       phone: phone || null,
       notes: notes || null,
+      eventProjectNotes: eventProjectNotes || null,
+      referral: referral ?? false,
+      referredBy: referredBy || null,
+      referralNotes: referralNotes || null,
+      referralPartnerStatus: referralPartnerStatus || null,
       workspaceId: req.workspaceId!,
     }).returning();
 
@@ -92,7 +97,7 @@ router.post("/companies", requireRole("operator"), async (req, res) => {
 router.put("/companies/:id", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { name, website, industry, subIndustry, city, state, country, phone, notes } = req.body;
+    const { name, website, industry, subIndustry, city, state, country, phone, notes, eventProjectNotes, referral, referredBy, referralNotes, referralPartnerStatus } = req.body;
 
     const [updated] = await db.update(companiesTable).set({
       name,
@@ -104,6 +109,11 @@ router.put("/companies/:id", requireRole("operator"), async (req, res) => {
       country: country || null,
       phone: phone || null,
       notes: notes || null,
+      eventProjectNotes: eventProjectNotes || null,
+      referral: referral ?? false,
+      referredBy: referredBy || null,
+      referralNotes: referralNotes || null,
+      referralPartnerStatus: referralPartnerStatus || null,
       updatedAt: new Date(),
     }).where(and(eq(companiesTable.id, id), eq(companiesTable.workspaceId, req.workspaceId!))).returning();
 

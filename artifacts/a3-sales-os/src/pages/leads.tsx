@@ -1,18 +1,23 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/layout";
-import { useGetLeads, useCreateLead, useUpdateLead, useDeleteLead, useDuplicateLead, useUpdateLeadStatus, useGetSyncStatus, useGetTemplates, useGetAssets, useGetLeadHistory, useCreateLeadHistory, useGetScheduledEmails, useCreateScheduledEmail, useUpdateScheduledEmail, useGetLeadActivities, useGetTemplateSets, getGetLeadsQueryKey, getGetDashboardQueryKey, getGetLeadHistoryQueryKey, getGetScheduledEmailsQueryKey, getGetLeadActivitiesQueryKey } from "@workspace/api-client-react";
+import { useGetLeads, useCreateLead, useUpdateLead, useDeleteLead, useDuplicateLead, useUpdateLeadStatus, useGetSyncStatus, useGetTemplates, useGetAssets, useGetLeadHistory, useCreateLeadHistory, useGetScheduledEmails, useCreateScheduledEmail, useUpdateScheduledEmail, useGetLeadActivities, useGetTemplateSets, getGetLeadsQueryKey, getGetDashboardQueryKey, getGetLeadHistoryQueryKey, getGetScheduledEmailsQueryKey, getGetLeadActivitiesQueryKey, getGetAssetsQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Search, Trash2, Edit2, Building2, Copy, X, Filter, Mail, Check, Clock, Send, FileText, Paperclip, History, ChevronDown, ChevronUp, Calendar, Save, ExternalLink, Loader2, AlertCircle, Link2, Play, Eye, XCircle, RefreshCw, Zap, TrendingUp, MousePointerClick, MessageSquare, PauseCircle, SkipForward, RotateCcw, Sparkles, StickyNote, CheckSquare, CheckCircle2, Circle, AlertTriangle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search, Trash2, Edit2, Building2, Copy, X, Filter, Mail, Check, Clock, Send, FileText, Paperclip, History, ChevronDown, ChevronUp, Calendar, Save, ExternalLink, Loader2, AlertCircle, Link2, Play, Eye, XCircle, RefreshCw, Zap, TrendingUp, MousePointerClick, MessageSquare, PauseCircle, SkipForward, RotateCcw, Sparkles, StickyNote, CheckSquare, CheckCircle2, Circle, AlertTriangle, Tag, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { BulkOutreachModal } from "@/components/bulk-outreach-modal";
+import { deriveLifecycleStatus, LIFECYCLE_COLORS } from "@/lib/lifecycle";
+import { assignSegment } from "@/lib/segments-api";
+import { uploadCampaignFile, storageObjectUrl } from "@/lib/campaign-api";
 
 const STATUSES = ["New Lead", "Contacted", "Replied", "Qualified", "Meeting Booked", "Meeting Completed", "Proposal Sent", "Negotiation", "Closed Won", "Closed Lost", "Nurture"];
 const PIPELINE_TYPES = ["Event", "Agency"];
 const PROJECT_TYPES = ["Event Activation", "Conference", "Hotel Event", "Brand Activation", "Experiential Install", "Fabrication", "Large Format Printing", "Projection Mapping", "Ongoing Partnership"];
 const SOURCES = ["ZoomInfo", "LinkedIn", "Referral", "Website", "Cold Call", "Email", "Existing Relationship", "Other"];
+const REFERRAL_STATUSES = ["Prospect", "Active", "Inactive", "Declined"];
 
 const emptyLead = {
   pipelineType: "Event", companyName: "", contactName: "", title: "", email: "", phone: "",
@@ -20,6 +25,8 @@ const emptyLead = {
   estimatedBudget: undefined as number | undefined, status: "New Lead", lastContactDate: "",
   nextStep: "", nextFollowUpDate: "", notes: "", dealValueEstimate: undefined as number | undefined,
   proposalValue: undefined as number | undefined, closeProbability: undefined as number | undefined, source: "",
+  event: "", companyWebsite: "", segmentId: undefined as number | undefined,
+  referral: false, referredBy: "", referralNotes: "", referralPartnerStatus: "",
 };
 
 function addBusinessDays(days: number): string {
@@ -72,6 +79,8 @@ export default function Leads() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showBulkOutreach, setShowBulkOutreach] = useState(false);
+  const [assignLead, setAssignLead] = useState<any>(null);
+  const [assigning, setAssigning] = useState(false);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -91,6 +100,22 @@ export default function Leads() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: getGetLeadsQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+  };
+
+  const handleAssignSegment = async (subject: string, body: string, scheduledFor?: string) => {
+    if (!assignLead) return;
+    setAssigning(true);
+    try {
+      const res = await assignSegment({ leadIds: [assignLead.id], subject, body, scheduledFor: scheduledFor || undefined });
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: getGetScheduledEmailsQueryKey() });
+      toast({ title: "Assigned to segment", description: `${res.emailsCreated ?? 0} email(s) scheduled, ${res.skipped ?? 0} skipped` });
+      setAssignLead(null);
+    } catch (err: any) {
+      toast({ title: "Assign failed", description: err.message, variant: "destructive" });
+    } finally {
+      setAssigning(false);
+    }
   };
 
   const openNew = () => {
@@ -113,6 +138,10 @@ export default function Leads() {
       proposalValue: lead.proposalValue ? Number(lead.proposalValue) : undefined,
       closeProbability: lead.closeProbability ? Number(lead.closeProbability) : undefined,
       source: lead.source || "",
+      event: lead.event || "", companyWebsite: lead.companyWebsite || "",
+      segmentId: lead.segmentId ?? undefined,
+      referral: !!lead.referral, referredBy: lead.referredBy || "",
+      referralNotes: lead.referralNotes || "", referralPartnerStatus: lead.referralPartnerStatus || "",
     });
   };
 
@@ -124,7 +153,7 @@ export default function Leads() {
     }
     if (drawerLead && drawerMode === "edit") {
       updateMutation.mutate({ id: drawerLead.id, data: payload }, {
-        onSuccess: (updated) => { invalidate(); setDrawerLead(updated); setDrawerMode("view"); toast({ title: "Lead updated" }); },
+        onSuccess: (updated: any) => { invalidate(); setDrawerLead(updated); setDrawerMode("view"); toast({ title: "Lead updated" }); },
         onError: () => toast({ title: "Failed to update", variant: "destructive" }),
       });
     } else {
@@ -262,6 +291,7 @@ export default function Leads() {
                     <th className="px-4 py-3 font-semibold hidden xl:table-cell">Location</th>
                     <th className="px-4 py-3 font-semibold hidden md:table-cell">Pipeline</th>
                     <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold hidden md:table-cell">Lifecycle</th>
                     <th className="px-4 py-3 font-semibold hidden lg:table-cell">Next Step</th>
                     <th className="px-4 py-3 font-semibold hidden lg:table-cell">Follow-Up</th>
                     <th className="px-4 py-3 font-semibold hidden xl:table-cell">Source</th>
@@ -270,14 +300,14 @@ export default function Leads() {
                 </thead>
                 <tbody className="divide-y divide-border/50">
                   {isLoading ? (
-                    <tr><td colSpan={12} className="text-center py-8 text-muted-foreground">Loading...</td></tr>
+                    <tr><td colSpan={13} className="text-center py-8 text-muted-foreground">Loading...</td></tr>
                   ) : leads?.length === 0 ? (
-                    <tr><td colSpan={12} className="text-center py-12 text-muted-foreground">
+                    <tr><td colSpan={13} className="text-center py-12 text-muted-foreground">
                       <Building2 className="h-10 w-10 text-border mx-auto mb-2" />
                       <p>No leads found.</p>
                     </td></tr>
                   ) : (
-                    leads?.map((lead) => {
+                    leads?.map((lead: any) => {
                       const isOverdue = lead.nextFollowUpDate && lead.nextFollowUpDate < today && lead.status !== "Closed Won" && lead.status !== "Closed Lost";
                       return (
                         <tr key={lead.id} className={`hover:bg-muted/30 transition-colors cursor-pointer ${isOverdue ? "bg-destructive/5" : ""} ${selectedIds.has(lead.id) ? "bg-primary/5" : ""}`}
@@ -334,6 +364,11 @@ export default function Leads() {
                               {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                             </select>
                           </td>
+                          <td className="px-4 py-3 hidden md:table-cell">
+                            <Badge variant="outline" className={`text-xs font-medium ${LIFECYCLE_COLORS[deriveLifecycleStatus(lead)]}`}>
+                              {deriveLifecycleStatus(lead)}
+                            </Badge>
+                          </td>
                           <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell max-w-[140px] truncate">{lead.nextStep || "-"}</td>
                           <td className={`px-4 py-3 hidden lg:table-cell ${isOverdue ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
                             {lead.nextFollowUpDate ? format(new Date(lead.nextFollowUpDate + "T12:00:00"), "MMM d") : "-"}
@@ -347,6 +382,9 @@ export default function Leads() {
                                   <Mail className="h-4 w-4" />
                                 </Button>
                               )}
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setAssignLead(lead)} title="Assign to segment">
+                                <Tag className="h-4 w-4" />
+                              </Button>
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDuplicate(lead.id)} title="Duplicate">
                                 <Copy className="h-4 w-4" />
                               </Button>
@@ -388,7 +426,148 @@ export default function Leads() {
           onComplete={() => { setSelectedIds(new Set()); invalidate(); toast({ title: "Bulk outreach complete" }); }}
         />
       )}
+
+      {assignLead && (
+        <AssignSegmentModal
+          recordName={assignLead.companyName}
+          onClose={() => setAssignLead(null)}
+          onAssign={handleAssignSegment}
+          assigning={assigning}
+        />
+      )}
     </AppLayout>
+  );
+}
+
+function AssignSegmentModal({ recordName, onClose, onAssign, assigning }: any) {
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [scheduledFor, setScheduledFor] = useState("");
+  const canSubmit = subject.trim() && body.trim();
+  return (
+    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-16 px-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border z-10">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <h2 className="text-lg font-bold flex items-center gap-2"><Tag className="h-4 w-4" /> Assign to Segment</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
+        </div>
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-muted-foreground">Stamp a segment + lifecycle and schedule an email for <span className="font-medium text-foreground">{recordName}</span>.</p>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Subject</label>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)}
+              className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none" />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Email Body</label>
+            <textarea value={body} onChange={(e) => setBody(e.target.value)}
+              className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none min-h-[120px] resize-y" />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Schedule For (optional)</label>
+            <input type="datetime-local" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)}
+              className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose} className="rounded-xl">Cancel</Button>
+          <Button onClick={() => onAssign(subject, body, scheduledFor ? new Date(scheduledFor).toISOString() : undefined)}
+            disabled={!canSubmit || assigning} className="rounded-xl bg-primary text-white hover:bg-primary/90">
+            {assigning ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Tag className="h-4 w-4 mr-1" />} Assign
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeadExtraFields({ form, setForm }: any) {
+  return (
+    <>
+      <Field label="Event" value={form.event} onChange={(v: string) => setForm({ ...form, event: v })} />
+      <Field label="Company Website" value={form.companyWebsite} onChange={(v: string) => setForm({ ...form, companyWebsite: v })} />
+      <Field label="Segment ID" value={form.segmentId != null ? String(form.segmentId) : ""} type="number"
+        onChange={(v: string) => setForm({ ...form, segmentId: v ? Number(v) : undefined })} />
+    </>
+  );
+}
+
+function ReferralFields({ form, setForm }: any) {
+  return (
+    <div className="sm:col-span-2 border border-border/60 rounded-xl p-3 space-y-3">
+      <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+        <input type="checkbox" checked={!!form.referral} onChange={(e) => setForm({ ...form, referral: e.target.checked })}
+          className="h-4 w-4 rounded border-border text-primary cursor-pointer" />
+        Referral
+      </label>
+      {form.referral && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Referred By" value={form.referredBy} onChange={(v: string) => setForm({ ...form, referredBy: v })} />
+          <SelectField label="Referral Partner Status" value={form.referralPartnerStatus} options={REFERRAL_STATUSES}
+            onChange={(v: string) => setForm({ ...form, referralPartnerStatus: v })} allowEmpty />
+          <div className="sm:col-span-2">
+            <label className="text-sm font-medium text-foreground block mb-1.5">Referral Notes</label>
+            <textarea value={form.referralNotes || ""} onChange={(e) => setForm({ ...form, referralNotes: e.target.value })}
+              className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none min-h-[60px] resize-y" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RecordUploads({ leadId }: { leadId: number }) {
+  const { data: assets } = useGetAssets();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [uploading, setUploading] = useState(false);
+  const linked = ((assets as any[]) || []).filter((a) => a.linkedLeadId === leadId);
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const up = await uploadCampaignFile(file);
+      const res = await fetch(`${import.meta.env.BASE_URL}api/assets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: up.name, category: "Upload", url: storageObjectUrl(up.objectPath),
+          contentType: up.contentType, objectPath: up.objectPath, linkedLeadId: leadId,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Upload failed");
+      queryClient.invalidateQueries({ queryKey: getGetAssetsQueryKey() });
+      toast({ title: "File uploaded", description: up.name });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+  return (
+    <div className="space-y-2">
+      {linked.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No files uploaded yet.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {linked.map((a) => (
+            <li key={a.id} className="flex items-center gap-2 text-sm">
+              <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <a href={a.url || storageObjectUrl(a.objectPath || "")} target="_blank" rel="noreferrer"
+                className="text-primary hover:underline truncate">{a.title}</a>
+            </li>
+          ))}
+        </ul>
+      )}
+      <label className="inline-flex items-center gap-2 text-sm font-medium text-primary cursor-pointer hover:underline">
+        {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        {uploading ? "Uploading..." : "Upload file"}
+        <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
+      </label>
+    </div>
   );
 }
 
@@ -412,6 +591,8 @@ function NewLeadModal({ form, setForm, onSave, onClose, saving }: any) {
             </div>
             <SelectField label="Pipeline" value={form.pipelineType} options={PIPELINE_TYPES} onChange={(v: string) => setForm({ ...form, pipelineType: v })} />
             <SelectField label="Source" value={form.source} options={SOURCES} onChange={(v: string) => setForm({ ...form, source: v })} allowEmpty />
+            <LeadExtraFields form={form} setForm={setForm} />
+            <ReferralFields form={form} setForm={setForm} />
           </div>
         </div>
         <div className="sticky bottom-0 bg-card border-t border-border px-6 py-4 flex justify-end gap-3 rounded-b-2xl">
@@ -683,7 +864,7 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
     const followUpDate = addBusinessDays(2);
     const payload = buildLeadUpdate(lead, { status: "Contacted", lastContactDate: todayStr, nextStep: "Awaiting reply", nextFollowUpDate: followUpDate });
     updateMutation.mutate({ id: lead.id, data: payload }, {
-      onSuccess: (updated) => { invalidate(); queryClient.invalidateQueries({ queryKey: getGetLeadHistoryQueryKey(lead.id) }); toast({ title: `${lead.companyName} marked as Contacted` }); },
+      onSuccess: (updated: any) => { invalidate(); queryClient.invalidateQueries({ queryKey: getGetLeadHistoryQueryKey(lead.id) }); toast({ title: `${lead.companyName} marked as Contacted` }); },
       onError: () => toast({ title: "Failed to update", variant: "destructive" }),
     });
   };
@@ -694,7 +875,7 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
       const followUpDate = addBusinessDays(2);
       const payload = buildLeadUpdate(lead, { status: "Contacted", lastContactDate: todayStr, nextStep: "Awaiting reply", nextFollowUpDate: followUpDate });
       updateMutation.mutate({ id: lead.id, data: payload }, {
-        onSuccess: (updated) => { invalidate(); if (onLeadUpdate) onLeadUpdate(updated); toast({ title: "Lead updated to Contacted", description: `Follow-up set for ${followUpDate}` }); },
+        onSuccess: (updated: any) => { invalidate(); if (onLeadUpdate) onLeadUpdate(updated); toast({ title: "Lead updated to Contacted", description: `Follow-up set for ${followUpDate}` }); },
         onError: () => toast({ title: "Failed to update lead", variant: "destructive" }),
       });
 
@@ -895,6 +1076,7 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                   <InfoGrid items={[
                     { label: "Pipeline", value: lead.pipelineType, badge: true, badgeColor: lead.pipelineType === "Event" ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-700" },
                     { label: "Status", value: lead.status, badge: true, badgeColor: lead.status === "Closed Won" ? "bg-emerald-100 text-emerald-700" : lead.status === "Closed Lost" ? "bg-red-100 text-red-700" : "bg-primary/10 text-primary" },
+                    { label: "Lifecycle", value: deriveLifecycleStatus(lead), badge: true, badgeColor: LIFECYCLE_COLORS[deriveLifecycleStatus(lead)] },
                     { label: "Last Contact", value: lead.lastContactDate ? format(new Date(lead.lastContactDate + "T12:00:00"), "MMM d, yyyy") : "-" },
                     { label: "Next Step", value: lead.nextStep || "-" },
                     { label: "Follow-Up", value: lead.nextFollowUpDate ? format(new Date(lead.nextFollowUpDate + "T12:00:00"), "MMM d, yyyy") : "-" },
@@ -1462,13 +1644,31 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                     { label: "Proposal Value", value: lead.proposalValue ? `$${Number(lead.proposalValue).toLocaleString()}` : "-" },
                     { label: "Close Probability", value: lead.closeProbability ? `${Number(lead.closeProbability)}%` : "-" },
                     { label: "Forecast", value: lead.forecastValue ? `$${Number(lead.forecastValue).toLocaleString()}` : "-" },
+                    { label: "Event", value: lead.event || "-" },
+                    { label: "Company Website", value: lead.companyWebsite || "-", type: "url" },
+                    { label: "Segment", value: lead.segmentId != null ? `#${lead.segmentId}` : "-" },
+                    { label: "Referral", value: lead.referral ? "Yes" : "No" },
+                    ...(lead.referral ? [
+                      { label: "Referred By", value: lead.referredBy || "-" },
+                      { label: "Referral Partner Status", value: lead.referralPartnerStatus || "-" },
+                    ] : []),
                   ]} />
+                  {lead.referral && lead.referralNotes && (
+                    <div className="mt-3">
+                      <span className="text-xs font-medium text-muted-foreground">Referral Notes</span>
+                      <p className="text-sm mt-1 whitespace-pre-wrap">{lead.referralNotes}</p>
+                    </div>
+                  )}
                   {lead.notes && (
                     <div className="mt-3">
                       <span className="text-xs font-medium text-muted-foreground">Notes</span>
                       <p className="text-sm mt-1 whitespace-pre-wrap">{lead.notes}</p>
                     </div>
                   )}
+                </DrawerSection>
+
+                <DrawerSection title="Uploads" icon={<Paperclip className="h-4 w-4" />}>
+                  <RecordUploads leadId={lead.id} />
                 </DrawerSection>
 
                 <div className="pt-2">
@@ -1516,7 +1716,9 @@ function LeadDrawer({ lead, form, setForm, mode, onSetMode, onSave, saving, onCl
                     <Field label="Deal Value Estimate" value={form.dealValueEstimate?.toString() || ""} onChange={(v: string) => setForm({ ...form, dealValueEstimate: v ? Number(v) : undefined })} type="number" />
                     <Field label="Proposal Value" value={form.proposalValue?.toString() || ""} onChange={(v: string) => setForm({ ...form, proposalValue: v ? Number(v) : undefined })} type="number" />
                     <Field label="Close Probability (%)" value={form.closeProbability?.toString() || ""} onChange={(v: string) => setForm({ ...form, closeProbability: v ? Number(v) : undefined })} type="number" />
+                    <LeadExtraFields form={form} setForm={setForm} />
                     {forecast > 0 && <p className="text-sm text-primary font-semibold sm:col-span-2">Forecast: ${forecast.toLocaleString()}</p>}
+                    <ReferralFields form={form} setForm={setForm} />
                   </div>
                   <div className="mt-3">
                     <label className="text-sm font-medium text-foreground block mb-1.5">Notes</label>

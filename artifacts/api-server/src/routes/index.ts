@@ -34,6 +34,7 @@ import replyReviewRouter from "./reply-review";
 import settingsRouter from "./settings";
 import seedRouter from "./seed-templates";
 import storageRouter from "./storage";
+import segmentsOpsRouter from "./segments-ops";
 
 const router: IRouter = Router();
 
@@ -87,5 +88,6 @@ router.use(...scoped, replyReviewRouter);
 router.use(...scoped, settingsRouter);
 router.use(...scoped, providersRouter);
 router.use(...scoped, seedRouter);
+router.use(...scoped, segmentsOpsRouter);
 
 export default router;

@@ -4,10 +4,20 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Plus, Edit2, Trash2, X, Search, Globe, Phone, MapPin, Users, DollarSign, RefreshCw, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
-import { Link } from "wouter";
+import { Building2, Plus, Edit2, Trash2, X, Search, Globe, Phone, MapPin, RefreshCw, ChevronDown, ChevronUp, Upload, FileText, Download, Users, Gift } from "lucide-react";
+import { deriveLifecycleStatus, LIFECYCLE_COLORS } from "@/lib/lifecycle";
+import { uploadCampaignFile, storageObjectUrl } from "@/lib/campaign-api";
 
 const API_BASE = import.meta.env.BASE_URL + "api";
+
+interface CompanyLead {
+  id: number;
+  contactName: string;
+  status: string;
+  email: string;
+  dealValueEstimate: string | null;
+  lifecycleStatus?: string | null;
+}
 
 interface Company {
   id: number;
@@ -20,17 +30,62 @@ interface Company {
   country: string | null;
   phone: string | null;
   notes: string | null;
+  eventProjectNotes: string | null;
+  referral: boolean | null;
+  referredBy: string | null;
+  referralNotes: string | null;
+  referralPartnerStatus: string | null;
   leadCount: number;
   totalDealValue: string | null;
-  leads: Array<{ id: number; contactName: string; status: string; email: string; dealValueEstimate: string | null }>;
+  leads: CompanyLead[];
   actualLeadCount: number;
   totalValue: number;
 }
 
-const emptyForm = { name: "", website: "", industry: "", subIndustry: "", city: "", state: "", country: "", phone: "", notes: "" };
+interface Contact {
+  id: number;
+  fullName: string;
+  email: string;
+  company: string;
+  title: string | null;
+  status?: string | null;
+  sequenceStatus?: string | null;
+  lifecycleStatus?: string | null;
+  lastReplyAt?: string | null;
+  lastEmailSentAt?: string | null;
+}
+
+interface Asset {
+  id: number;
+  title: string;
+  category: string;
+  url: string | null;
+  contentType: string | null;
+  objectPath: string | null;
+  linkedCompanyId: number | null;
+}
+
+const emptyForm = {
+  name: "",
+  website: "",
+  industry: "",
+  subIndustry: "",
+  city: "",
+  state: "",
+  country: "",
+  phone: "",
+  notes: "",
+  eventProjectNotes: "",
+  referral: false,
+  referredBy: "",
+  referralNotes: "",
+  referralPartnerStatus: "",
+};
 
 export default function Companies() {
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -38,16 +93,33 @@ export default function Companies() {
   const [form, setForm] = useState(emptyForm);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [uploadingId, setUploadingId] = useState<number | null>(null);
   const { toast } = useToast();
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/companies`);
-      const data = await res.json();
-      setCompanies(data);
+      const [cRes, ctRes, aRes] = await Promise.all([
+        fetch(`${API_BASE}/companies`),
+        fetch(`${API_BASE}/contacts`),
+        fetch(`${API_BASE}/assets`),
+      ]);
+      const cData = await cRes.json();
+      setCompanies(Array.isArray(cData) ? cData : []);
+      const ctData = ctRes.ok ? await ctRes.json() : [];
+      setContacts(Array.isArray(ctData) ? ctData : []);
+      const aData = aRes.ok ? await aRes.json() : [];
+      setAssets(Array.isArray(aData) ? aData : []);
     } catch { }
     setLoading(false);
+  };
+
+  const loadAssets = async () => {
+    try {
+      const aRes = await fetch(`${API_BASE}/assets`);
+      const aData = aRes.ok ? await aRes.json() : [];
+      setAssets(Array.isArray(aData) ? aData : []);
+    } catch { }
   };
 
   useEffect(() => { load(); }, []);
@@ -62,9 +134,30 @@ export default function Companies() {
     );
   }, [companies, search]);
 
+  const contactsFor = (company: Company) =>
+    contacts.filter(ct => (ct.company || "").trim().toLowerCase() === company.name.trim().toLowerCase());
+
+  const assetsFor = (company: Company) =>
+    assets.filter(a => a.linkedCompanyId === company.id);
+
   const openCreate = () => { setForm(emptyForm); setEditingId(null); setModalOpen(true); };
   const openEdit = (c: Company) => {
-    setForm({ name: c.name, website: c.website || "", industry: c.industry || "", subIndustry: c.subIndustry || "", city: c.city || "", state: c.state || "", country: c.country || "", phone: c.phone || "", notes: c.notes || "" });
+    setForm({
+      name: c.name,
+      website: c.website || "",
+      industry: c.industry || "",
+      subIndustry: c.subIndustry || "",
+      city: c.city || "",
+      state: c.state || "",
+      country: c.country || "",
+      phone: c.phone || "",
+      notes: c.notes || "",
+      eventProjectNotes: c.eventProjectNotes || "",
+      referral: c.referral ?? false,
+      referredBy: c.referredBy || "",
+      referralNotes: c.referralNotes || "",
+      referralPartnerStatus: c.referralPartnerStatus || "",
+    });
     setEditingId(c.id);
     setModalOpen(true);
   };
@@ -108,6 +201,41 @@ export default function Companies() {
     setSyncing(false);
   };
 
+  const handleUpload = async (company: Company, file: File) => {
+    setUploadingId(company.id);
+    try {
+      const result = await uploadCampaignFile(file);
+      const res = await fetch(`${API_BASE}/assets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: result.name,
+          category: "company",
+          contentType: result.contentType,
+          objectPath: result.objectPath,
+          linkedCompanyId: company.id,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast({ title: "File uploaded" });
+      await loadAssets();
+    } catch {
+      toast({ title: "Upload failed", variant: "destructive" });
+    }
+    setUploadingId(null);
+  };
+
+  const removeAsset = async (assetId: number) => {
+    try {
+      const res = await fetch(`${API_BASE}/assets/${assetId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed");
+      toast({ title: "File removed" });
+      await loadAssets();
+    } catch {
+      toast({ title: "Failed to remove file", variant: "destructive" });
+    }
+  };
+
   const totalValue = companies.reduce((s, c) => s + (c.totalValue || 0), 0);
 
   return (
@@ -148,7 +276,10 @@ export default function Companies() {
           </Card>
         ) : (
           <div className="space-y-2">
-            {filtered.map(company => (
+            {filtered.map(company => {
+              const linkedContacts = contactsFor(company);
+              const companyAssets = assetsFor(company);
+              return (
               <Card key={company.id} className="overflow-hidden">
                 <div className="p-4 flex items-center gap-4">
                   <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -158,6 +289,7 @@ export default function Companies() {
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold truncate">{company.name}</h3>
                       {company.industry && <Badge variant="outline" className="text-xs">{company.industry}</Badge>}
+                      {company.referral && <Badge variant="outline" className="text-xs border-violet-200 bg-violet-100 text-violet-700"><Gift className="h-3 w-3 mr-1" />Referral</Badge>}
                     </div>
                     <div className="flex items-center gap-4 mt-0.5 text-sm text-muted-foreground">
                       {(company.city || company.state) && (
@@ -174,8 +306,8 @@ export default function Companies() {
 
                   <div className="flex items-center gap-4 text-sm flex-shrink-0">
                     <div className="text-center">
-                      <div className="font-semibold">{company.actualLeadCount}</div>
-                      <div className="text-xs text-muted-foreground">Leads</div>
+                      <div className="font-semibold">{company.actualLeadCount + linkedContacts.length}</div>
+                      <div className="text-xs text-muted-foreground">Records</div>
                     </div>
                     <div className="text-center">
                       <div className="font-semibold">${(company.totalValue || 0).toLocaleString()}</div>
@@ -197,38 +329,129 @@ export default function Companies() {
                 </div>
 
                 {expandedId === company.id && (
-                  <div className="border-t px-4 py-3 bg-muted/30">
-                    {company.notes && <p className="text-sm text-muted-foreground mb-3">{company.notes}</p>}
-                    {company.leads && company.leads.length > 0 ? (
-                      <div className="space-y-1">
-                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Associated Leads</div>
-                        {company.leads.map(lead => (
-                          <div key={lead.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50">
-                            <div className="flex items-center gap-3">
-                              <span className="font-medium text-sm">{lead.contactName}</span>
-                              <span className="text-xs text-muted-foreground">{lead.email}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">{lead.status}</Badge>
-                              {lead.dealValueEstimate && <span className="text-xs font-medium">${parseFloat(lead.dealValueEstimate).toLocaleString()}</span>}
-                            </div>
-                          </div>
-                        ))}
+                  <div className="border-t px-4 py-3 bg-muted/30 space-y-4">
+                    {company.notes && <p className="text-sm text-muted-foreground">{company.notes}</p>}
+
+                    {company.eventProjectNotes && (
+                      <div>
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Event / Project Notes</div>
+                        <p className="text-sm whitespace-pre-wrap">{company.eventProjectNotes}</p>
                       </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No leads associated with this company.</p>
                     )}
+
+                    {(company.referral || company.referredBy || company.referralNotes || company.referralPartnerStatus) && (
+                      <div>
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1"><Gift className="h-3.5 w-3.5" />Referral</div>
+                        <div className="text-sm space-y-0.5">
+                          {company.referredBy && <div><span className="text-muted-foreground">Referred by:</span> {company.referredBy}</div>}
+                          {company.referralPartnerStatus && <div><span className="text-muted-foreground">Partner status:</span> {company.referralPartnerStatus}</div>}
+                          {company.referralNotes && <div className="whitespace-pre-wrap"><span className="text-muted-foreground">Notes:</span> {company.referralNotes}</div>}
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Associated Leads</div>
+                      {company.leads && company.leads.length > 0 ? (
+                        <div className="space-y-1">
+                          {company.leads.map(lead => (
+                            <div key={lead.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50">
+                              <div className="flex items-center gap-3">
+                                <span className="font-medium text-sm">{lead.contactName}</span>
+                                <span className="text-xs text-muted-foreground">{lead.email}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className={`text-xs ${LIFECYCLE_COLORS[deriveLifecycleStatus(lead)]}`}>{deriveLifecycleStatus(lead)}</Badge>
+                                {lead.dealValueEstimate && <span className="text-xs font-medium">${parseFloat(lead.dealValueEstimate).toLocaleString()}</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No leads associated with this company.</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1"><Users className="h-3.5 w-3.5" />Associated Contacts</div>
+                      {linkedContacts.length > 0 ? (
+                        <div className="space-y-1">
+                          {linkedContacts.map(ct => (
+                            <div key={ct.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50">
+                              <div className="flex items-center gap-3">
+                                <span className="font-medium text-sm">{ct.fullName}</span>
+                                <span className="text-xs text-muted-foreground">{ct.email}</span>
+                                {ct.title && <span className="text-xs text-muted-foreground">· {ct.title}</span>}
+                              </div>
+                              <Badge variant="outline" className={`text-xs ${LIFECYCLE_COLORS[deriveLifecycleStatus(ct)]}`}>{deriveLifecycleStatus(ct)}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No contacts associated with this company.</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1"><FileText className="h-3.5 w-3.5" />Uploads</div>
+                        <label className="inline-flex">
+                          <Button variant="outline" size="sm" disabled={uploadingId === company.id} asChild>
+                            <span className="cursor-pointer">
+                              <Upload className={`h-3.5 w-3.5 mr-1.5 ${uploadingId === company.id ? "animate-pulse" : ""}`} />
+                              {uploadingId === company.id ? "Uploading..." : "Upload File"}
+                            </span>
+                          </Button>
+                          <input
+                            type="file"
+                            className="hidden"
+                            disabled={uploadingId === company.id}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleUpload(company, file);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                      </div>
+                      {companyAssets.length > 0 ? (
+                        <div className="space-y-1">
+                          {companyAssets.map(asset => (
+                            <div key={asset.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                <span className="text-sm truncate">{asset.title}</span>
+                                {asset.contentType && <span className="text-xs text-muted-foreground flex-shrink-0">{asset.contentType}</span>}
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                {(asset.objectPath || asset.url) && (
+                                  <a href={asset.objectPath ? storageObjectUrl(asset.objectPath) : asset.url!} target="_blank" rel="noopener noreferrer">
+                                    <Button variant="ghost" size="sm"><Download className="h-3.5 w-3.5" /></Button>
+                                  </a>
+                                )}
+                                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => removeAsset(asset.id)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No files uploaded for this company.</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setModalOpen(false)}>
-          <Card className="w-full max-w-lg p-6 mx-4" onClick={(e) => e.stopPropagation()}>
+          <Card className="w-full max-w-lg p-6 mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">{editingId ? "Edit Company" : "Add Company"}</h2>
               <Button variant="ghost" size="sm" onClick={() => setModalOpen(false)}><X className="h-4 w-4" /></Button>
@@ -264,7 +487,32 @@ export default function Companies() {
               </div>
               <div>
                 <label className="text-sm font-medium">Notes</label>
-                <textarea value={form.notes} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                <textarea value={form.notes} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Event / Project Notes</label>
+                <textarea value={form.eventProjectNotes} onChange={(e) => setForm(f => ({ ...f, eventProjectNotes: e.target.value }))} rows={3} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" placeholder="Details about the event or project for this company..." />
+              </div>
+
+              <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input type="checkbox" checked={form.referral} onChange={(e) => setForm(f => ({ ...f, referral: e.target.checked }))} className="h-4 w-4 rounded border" />
+                  <span className="flex items-center gap-1"><Gift className="h-4 w-4" />Referral</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium">Referred By</label>
+                    <input value={form.referredBy} onChange={(e) => setForm(f => ({ ...f, referredBy: e.target.value }))} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Referral Partner Status</label>
+                    <input value={form.referralPartnerStatus} onChange={(e) => setForm(f => ({ ...f, referralPartnerStatus: e.target.value }))} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Referral Notes</label>
+                  <textarea value={form.referralNotes} onChange={(e) => setForm(f => ({ ...f, referralNotes: e.target.value }))} rows={2} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-4">

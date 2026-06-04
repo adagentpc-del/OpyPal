@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { workspacesTable } from "./workspaces";
@@ -17,6 +17,11 @@ export const companiesTable = pgTable("companies", {
   country: text("country"),
   phone: text("phone"),
   notes: text("notes"),
+  eventProjectNotes: text("event_project_notes"),
+  referral: boolean("referral").default(false),
+  referredBy: text("referred_by"),
+  referralNotes: text("referral_notes"),
+  referralPartnerStatus: text("referral_partner_status"),
   leadCount: integer("lead_count").default(0),
   totalDealValue: numeric("total_deal_value", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),

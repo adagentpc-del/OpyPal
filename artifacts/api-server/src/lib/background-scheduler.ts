@@ -1,4 +1,4 @@
-import { db, scheduledEmailsTable, leadsTable, activityTable, settingsTable, mailboxConnectionsTable, suppressionListTable } from "@workspace/db";
+import { db, scheduledEmailsTable, leadsTable, contactsTable, activityTable, settingsTable, mailboxConnectionsTable, suppressionListTable } from "@workspace/db";
 import { eq, and, lte, inArray, asc, sql } from "drizzle-orm";
 import { getPrimaryConnection, syncInbox, isOutlookConfigured, OUTLOOK_PROVIDER } from "./outlook-graph";
 import { syncGmailInbox, isGmailConfigured, getPrimaryGmailConnection, GMAIL_PROVIDER } from "./gmail-api";
@@ -70,25 +70,54 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
         continue;
       }
 
-      const [lead] = await db.select({ email: leadsTable.email, status: leadsTable.status, isUnsubscribed: leadsTable.isUnsubscribed, isBounced: leadsTable.isBounced })
-        .from(leadsTable)
-        .where(and(eq(leadsTable.id, email.leadId), eq(leadsTable.workspaceId, ws)));
-
-      if (!lead || !lead.email) {
-        await db.update(scheduledEmailsTable).set({ status: "failed", sendError: "Lead not found or no email", updatedAt: new Date() }).where(eq(scheduledEmailsTable.id, email.id));
+      // Resolve the recipient from either the lead (legacy pipeline) or the
+      // contact (converged pipeline). A scheduled email carries exactly one.
+      let recipientEmail: string | null = null;
+      if (email.leadId) {
+        const [lead] = await db.select({ email: leadsTable.email, status: leadsTable.status, isUnsubscribed: leadsTable.isUnsubscribed, isBounced: leadsTable.isBounced })
+          .from(leadsTable)
+          .where(and(eq(leadsTable.id, email.leadId), eq(leadsTable.workspaceId, ws)));
+        if (!lead || !lead.email) {
+          await db.update(scheduledEmailsTable).set({ status: "failed", sendError: "Lead not found or no email", updatedAt: new Date() }).where(eq(scheduledEmailsTable.id, email.id));
+          failed++;
+          continue;
+        }
+        const stopStatuses = ["Closed Won", "Closed Lost", "Do Not Contact"];
+        if (stopStatuses.includes(lead.status) || lead.isUnsubscribed || lead.isBounced) {
+          await db.update(scheduledEmailsTable).set({
+            status: "canceled",
+            canceledAt: new Date(),
+            canceledReason: `auto_stop: ${lead.isUnsubscribed ? "unsubscribed" : lead.isBounced ? "bounced" : lead.status}`,
+            updatedAt: new Date(),
+          }).where(eq(scheduledEmailsTable.id, email.id));
+          skipped++;
+          continue;
+        }
+        recipientEmail = lead.email;
+      } else if (email.contactId) {
+        const [contact] = await db.select({ email: contactsTable.email, sequenceStatus: contactsTable.sequenceStatus, doNotContact: contactsTable.doNotContact, unsubscribed: contactsTable.unsubscribed, bounced: contactsTable.bounced })
+          .from(contactsTable)
+          .where(and(eq(contactsTable.id, email.contactId), eq(contactsTable.workspaceId, ws)));
+        if (!contact || !contact.email) {
+          await db.update(scheduledEmailsTable).set({ status: "failed", sendError: "Contact not found or no email", updatedAt: new Date() }).where(eq(scheduledEmailsTable.id, email.id));
+          failed++;
+          continue;
+        }
+        const stopSeq = ["paused_replied", "paused_manual", "do_not_contact", "unsubscribed", "bounce"];
+        if (contact.doNotContact || contact.unsubscribed || contact.bounced || stopSeq.includes(contact.sequenceStatus || "")) {
+          await db.update(scheduledEmailsTable).set({
+            status: "canceled",
+            canceledAt: new Date(),
+            canceledReason: `auto_stop: ${contact.doNotContact ? "do_not_contact" : contact.unsubscribed ? "unsubscribed" : contact.bounced ? "bounced" : contact.sequenceStatus}`,
+            updatedAt: new Date(),
+          }).where(eq(scheduledEmailsTable.id, email.id));
+          skipped++;
+          continue;
+        }
+        recipientEmail = contact.email;
+      } else {
+        await db.update(scheduledEmailsTable).set({ status: "failed", sendError: "No lead or contact attached", updatedAt: new Date() }).where(eq(scheduledEmailsTable.id, email.id));
         failed++;
-        continue;
-      }
-
-      const stopStatuses = ["Closed Won", "Closed Lost", "Do Not Contact"];
-      if (stopStatuses.includes(lead.status) || lead.isUnsubscribed || lead.isBounced) {
-        await db.update(scheduledEmailsTable).set({
-          status: "canceled",
-          canceledAt: new Date(),
-          canceledReason: `auto_stop: ${lead.isUnsubscribed ? "unsubscribed" : lead.isBounced ? "bounced" : lead.status}`,
-          updatedAt: new Date(),
-        }).where(eq(scheduledEmailsTable.id, email.id));
-        skipped++;
         continue;
       }
 
@@ -96,7 +125,7 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
         .from(suppressionListTable)
         .where(and(
           eq(suppressionListTable.workspaceId, ws),
-          eq(suppressionListTable.email, lead.email.toLowerCase()),
+          eq(suppressionListTable.email, recipientEmail.toLowerCase()),
         ))
         .limit(1);
       if (suppressed) {
@@ -125,12 +154,12 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
         : undefined;
 
       const result = await sendForWorkspace(ws, {
-        to: lead.email,
+        to: recipientEmail,
         subject: email.subject,
         html: htmlBody,
         text: textBody,
         fromEmail: email.fromEmail || undefined,
-        leadId: email.leadId,
+        leadId: email.leadId ?? undefined,
         scheduledEmailId: email.id,
         threadOutlookMessageId: email.outlookMessageId,
         threadGmailMessageId: email.outlookInternetMessageId,
@@ -159,20 +188,27 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
           workspaceId: ws,
           type: "email_sent",
           description: `Follow-up sent: "${email.subject}"`,
-          leadId: email.leadId,
-          metadata: { scheduledEmailId: email.id, sendVia: result.providerUsed, attempts: result.attempts },
+          leadId: email.leadId ?? null,
+          metadata: { scheduledEmailId: email.id, contactId: email.contactId ?? null, sendVia: result.providerUsed, attempts: result.attempts },
           relatedTemplateId: email.templateId,
           relatedSequenceId: email.sequenceId,
           createdBy: "scheduler",
         });
 
-        await db.update(leadsTable).set({
-          lastContactDate: new Date().toISOString().split("T")[0],
-          updatedAt: new Date(),
-        }).where(and(eq(leadsTable.id, email.leadId), eq(leadsTable.workspaceId, ws)));
+        if (email.leadId) {
+          await db.update(leadsTable).set({
+            lastContactDate: new Date().toISOString().split("T")[0],
+            updatedAt: new Date(),
+          }).where(and(eq(leadsTable.id, email.leadId), eq(leadsTable.workspaceId, ws)));
+        } else if (email.contactId) {
+          await db.update(contactsTable).set({
+            lastEmailSentAt: new Date(),
+            updatedAt: new Date(),
+          }).where(and(eq(contactsTable.id, email.contactId), eq(contactsTable.workspaceId, ws)));
+        }
 
         sent++;
-        console.log(`[Scheduler] Sent follow-up ${email.id} to lead ${email.leadId} via ${result.providerUsed}`);
+        console.log(`[Scheduler] Sent follow-up ${email.id} to ${email.leadId ? `lead ${email.leadId}` : `contact ${email.contactId}`} via ${result.providerUsed}`);
       } else {
         const retryCount = (email.retryCount || 0) + 1;
         if (retryCount <= 3) {

@@ -180,6 +180,20 @@ export default function ProvidersPage() {
         )}
       </div>
 
+      <div className="flex items-start gap-3 text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+        <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600" />
+        <div>
+          <div className="font-medium flex items-center gap-2">
+            Converged pipeline
+            <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Active</Badge>
+          </div>
+          <p className="text-emerald-800/90 mt-0.5">
+            These providers send and receive for both the lead and contact pipelines. Detected replies
+            automatically pause outreach across both — lead scheduled emails and contact sequences alike.
+          </p>
+        </div>
+      </div>
+
       {status?.sendChain && status.sendChain.length > 0 && (
         <div className="border rounded-xl p-4 bg-muted/30">
           <div className="text-sm font-medium mb-2">Active send order (with fallback)</div>

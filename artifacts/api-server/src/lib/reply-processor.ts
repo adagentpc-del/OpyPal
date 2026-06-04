@@ -1,4 +1,4 @@
-import { db, leadsTable, scheduledEmailsTable, activityTable, inboundEmailsTable, notificationsTable, replyReviewQueueTable } from "@workspace/db";
+import { db, leadsTable, contactsTable, sequenceStepsTable, sequenceEnrollmentsTable, scheduledEmailsTable, activityTable, inboundEmailsTable, notificationsTable, replyReviewQueueTable } from "@workspace/db";
 import { eq, and, inArray, desc } from "drizzle-orm";
 
 const REPLY_TO_DOMAIN = "a3visual.com";
@@ -194,9 +194,16 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
   }
 
   if (!leadId && normalizedSender) {
+    // Scope the sender-email fallback to the upstream workspace hint when we
+    // have one (the inbound mailbox/forwarding inbox resolves to a workspace).
+    // Without scoping, an email that exists in several tenants could be matched
+    // to the wrong workspace and pause the wrong records.
+    const leadWhere = data.workspaceHint
+      ? and(eq(leadsTable.email, normalizedSender), eq(leadsTable.workspaceId, data.workspaceHint))
+      : eq(leadsTable.email, normalizedSender);
     const leadByEmail = await db.select({ id: leadsTable.id })
       .from(leadsTable)
-      .where(eq(leadsTable.email, normalizedSender))
+      .where(leadWhere)
       .limit(1);
     if (leadByEmail.length > 0) {
       leadId = leadByEmail[0].id;
@@ -213,6 +220,16 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
     const [wsRow] = await db.select({ workspaceId: leadsTable.workspaceId })
       .from(leadsTable).where(eq(leadsTable.id, leadId)).limit(1);
     derivedWorkspaceId = wsRow?.workspaceId ?? null;
+  }
+  // Contact-only replies (no matching lead) still derive their workspace from
+  // the matching contact so cross-pipeline reply handling stays tenant-correct.
+  if (!derivedWorkspaceId && normalizedSender) {
+    const contactWhere = data.workspaceHint
+      ? and(eq(contactsTable.email, normalizedSender), eq(contactsTable.workspaceId, data.workspaceHint))
+      : eq(contactsTable.email, normalizedSender);
+    const [c] = await db.select({ workspaceId: contactsTable.workspaceId })
+      .from(contactsTable).where(contactWhere).limit(1);
+    if (c) derivedWorkspaceId = c.workspaceId;
   }
   const ws = derivedWorkspaceId ?? data.workspaceHint ?? 1;
 
@@ -344,6 +361,12 @@ export async function processInboundEmail(data: InboundEmailData): Promise<Proce
     }
   }
 
+  // Cross-pipeline pause: a human reply pauses the contact sequence pipeline as
+  // well, matched by the sender's email — independent of whether a lead matched.
+  if (replyClassification.classification === "human_reply" && AUTO_PAUSE_ON_REPLY) {
+    sequencesPaused += await pauseContactSequencesByEmail(ws, normalizedSender);
+  }
+
   return {
     matched: !!leadId,
     leadId,
@@ -391,6 +414,64 @@ async function pauseSequencesForLead(leadId: number): Promise<number> {
   }
 
   return futureEmails.length;
+}
+
+// Pauses the contact-side pipeline (sequence_steps + any contact-attached
+// scheduled_emails) for every contact matching the replier's email.
+async function pauseContactSequencesByEmail(workspaceId: number, email: string): Promise<number> {
+  if (!email) return 0;
+  const contacts = await db.select({ id: contactsTable.id })
+    .from(contactsTable)
+    .where(and(eq(contactsTable.workspaceId, workspaceId), eq(contactsTable.email, email.toLowerCase())));
+  if (contacts.length === 0) return 0;
+
+  const now = new Date();
+  let paused = 0;
+  for (const c of contacts) {
+    const steps = await db.update(sequenceStepsTable)
+      .set({ status: "canceled", canceledAt: now })
+      .where(and(
+        eq(sequenceStepsTable.contactId, c.id),
+        eq(sequenceStepsTable.status, "scheduled"),
+        eq(sequenceStepsTable.workspaceId, workspaceId),
+      ))
+      .returning({ id: sequenceStepsTable.id });
+    paused += steps.length;
+
+    const se = await db.update(scheduledEmailsTable)
+      .set({ status: "paused", pauseReason: "reply_received", pausedAt: now, updatedAt: now })
+      .where(and(
+        eq(scheduledEmailsTable.contactId, c.id),
+        inArray(scheduledEmailsTable.status, ["scheduled", "queued"]),
+        eq(scheduledEmailsTable.workspaceId, workspaceId),
+      ))
+      .returning({ id: scheduledEmailsTable.id });
+    paused += se.length;
+
+    await db.update(sequenceEnrollmentsTable)
+      .set({ sequenceStatus: "paused_replied", pausedReason: "reply_detected", updatedAt: now })
+      .where(and(
+        eq(sequenceEnrollmentsTable.contactId, c.id),
+        eq(sequenceEnrollmentsTable.sequenceStatus, "active"),
+        eq(sequenceEnrollmentsTable.workspaceId, workspaceId),
+      ));
+
+    await db.update(contactsTable)
+      .set({ sequenceStatus: "paused_replied", lastReplyAt: now, nextSendAt: null, updatedAt: now })
+      .where(and(eq(contactsTable.id, c.id), eq(contactsTable.workspaceId, workspaceId)));
+  }
+
+  if (paused > 0) {
+    await db.insert(activityTable).values({
+      workspaceId,
+      type: "sequence_paused",
+      description: `Contact sequence paused — reply received (${paused} step${paused !== 1 ? "s" : ""} stopped)`,
+      metadata: { reason: "reply_received", email, pausedCount: paused },
+      createdBy: "system",
+    });
+  }
+
+  return paused;
 }
 
 export async function getConversationThread(leadId: number): Promise<any[]> {

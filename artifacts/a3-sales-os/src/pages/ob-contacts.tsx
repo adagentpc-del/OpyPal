@@ -16,11 +16,15 @@ import {
   useUpdateContactCustomLine,
   useBulkGeneratePersonalization,
   useBulkClearPersonalization,
+  useGetAssets,
   getGetContactsQueryKey,
   getGetOutboundAnalyticsQueryKey,
+  getGetAssetsQueryKey,
+  getGetScheduledEmailsQueryKey,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Search,
   Pause,
@@ -44,10 +48,48 @@ import {
   Loader2,
   Pencil,
   Check,
+  Tag,
+  Upload,
+  Plus,
+  Paperclip,
+  Users,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { deriveLifecycleStatus, LIFECYCLE_COLORS } from "@/lib/lifecycle";
+import { assignSegment, bulkImportContacts } from "@/lib/segments-api";
+import { uploadCampaignFile, storageObjectUrl } from "@/lib/campaign-api";
+
+const REFERRAL_STATUSES = ["Prospect", "Active", "Inactive", "Declined"];
+
+const emptyContact = {
+  fullName: "", firstName: "", lastName: "", company: "", title: "", email: "", phone: "",
+  location: "", industry: "", intentSignal: "", notes: "",
+  event: "", companyWebsite: "", segmentId: undefined as number | undefined,
+  referral: false, referredBy: "", referralNotes: "", referralPartnerStatus: "",
+};
+
+function parseContactsCsv(text: string): any[] {
+  const lines = text.trim().split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map((h) => h.trim());
+  return lines
+    .slice(1)
+    .map((line) => {
+      const cells = line.split(",");
+      const obj: any = {};
+      headers.forEach((h, i) => {
+        const v = (cells[i] || "").trim();
+        if (!v) return;
+        if (h === "segmentId") obj[h] = Number(v);
+        else if (h === "referral") obj[h] = ["true", "1", "yes"].includes(v.toLowerCase());
+        else obj[h] = v;
+      });
+      return obj;
+    })
+    .filter((o) => o.email);
+}
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-gray-100 text-gray-700",
@@ -83,6 +125,13 @@ export default function ObContacts() {
   const [clFilter, setClFilter] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [editingContact, setEditingContact] = useState<any>(null);
+  const [contactForm, setContactForm] = useState({ ...emptyContact });
+  const [savingContact, setSavingContact] = useState(false);
+  const [assignContact, setAssignContact] = useState<any>(null);
+  const [assigning, setAssigning] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   const { data: contacts, isLoading } = useGetContacts({
     search: search || undefined,
@@ -108,6 +157,66 @@ export default function ObContacts() {
     queryClient.invalidateQueries({ queryKey: getGetOutboundAnalyticsQueryKey() });
   };
 
+  const openNewContact = () => {
+    setEditingContact(null);
+    setContactForm({ ...emptyContact });
+    setShowContactModal(true);
+  };
+
+  const openEditContact = (c: any) => {
+    setEditingContact(c);
+    setContactForm({
+      fullName: c.fullName || "", firstName: c.firstName || "", lastName: c.lastName || "",
+      company: c.company || "", title: c.title || "", email: c.email || "", phone: c.phone || "",
+      location: c.location || "", industry: c.industry || "", intentSignal: c.intentSignal || "", notes: c.notes || "",
+      event: c.event || "", companyWebsite: c.companyWebsite || "", segmentId: c.segmentId ?? undefined,
+      referral: !!c.referral, referredBy: c.referredBy || "", referralNotes: c.referralNotes || "",
+      referralPartnerStatus: c.referralPartnerStatus || "",
+    });
+    setShowContactModal(true);
+  };
+
+  const handleSaveContact = async () => {
+    if (!contactForm.fullName || !contactForm.company || !contactForm.email) {
+      toast({ title: "Full name, company, and email are required", variant: "destructive" });
+      return;
+    }
+    setSavingContact(true);
+    try {
+      const base = import.meta.env.BASE_URL + "api";
+      const url = editingContact ? `${base}/contacts/${editingContact.id}` : `${base}/contacts`;
+      const res = await fetch(url, {
+        method: editingContact ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contactForm),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Save failed");
+      invalidate();
+      toast({ title: editingContact ? "Contact updated" : "Contact created" });
+      setShowContactModal(false);
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  const handleAssignSegment = async (subject: string, body: string, scheduledFor?: string) => {
+    if (!assignContact) return;
+    setAssigning(true);
+    try {
+      const res = await assignSegment({ contactIds: [assignContact.id], subject, body, scheduledFor: scheduledFor || undefined });
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: getGetScheduledEmailsQueryKey() });
+      toast({ title: "Assigned to segment", description: `${res.emailsCreated ?? 0} email(s) scheduled, ${res.skipped ?? 0} skipped` });
+      setAssignContact(null);
+    } catch (err: any) {
+      toast({ title: "Assign failed", description: err.message, variant: "destructive" });
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   const handleAction = (mutFn: any, id: number, label: string) => {
     mutFn.mutate({ id }, {
       onSuccess: () => { invalidate(); toast({ title: label }); },
@@ -115,8 +224,8 @@ export default function ObContacts() {
     });
   };
 
-  const uniqueCampaigns = [...new Set((contacts || []).map((c: any) => c.campaignName).filter(Boolean))];
-  const uniqueSegments = [...new Set((contacts || []).map((c: any) => c.segmentType).filter(Boolean))];
+  const uniqueCampaigns = [...new Set((contacts || []).map((c: any) => c.campaignName).filter(Boolean))] as string[];
+  const uniqueSegments = [...new Set((contacts || []).map((c: any) => c.segmentType).filter(Boolean))] as string[];
 
   const filtered = (contacts || []).filter((c: any) => {
     if (segmentFilter && c.segmentType !== segmentFilter) return false;
@@ -175,6 +284,14 @@ export default function ObContacts() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Contacts</h1>
             <p className="text-muted-foreground mt-1">Manage outbound contacts, engagement scoring, and AI personalization.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowBulkImport(true)} className="rounded-xl gap-1.5">
+              <Users className="h-4 w-4" /> Bulk Import
+            </Button>
+            <Button onClick={openNewContact} className="rounded-xl gap-1.5 bg-primary text-white">
+              <Plus className="h-4 w-4" /> Add Contact
+            </Button>
           </div>
         </div>
 
@@ -266,6 +383,7 @@ export default function ObContacts() {
                 <th className="text-left px-4 py-3 font-medium">Score</th>
                 <th className="text-left px-4 py-3 font-medium">Custom Line</th>
                 <th className="text-left px-4 py-3 font-medium">Status</th>
+                <th className="text-left px-4 py-3 font-medium">Lifecycle</th>
                 <th className="text-left px-4 py-3 font-medium">Step</th>
                 <th className="text-left px-4 py-3 font-medium">Actions</th>
               </tr>
@@ -316,6 +434,11 @@ export default function ObContacts() {
                           {c.sequenceStatus?.replace(/_/g, " ")}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className={`text-xs font-medium ${LIFECYCLE_COLORS[deriveLifecycleStatus(c)]}`}>
+                          {deriveLifecycleStatus(c)}
+                        </Badge>
+                      </td>
                       <td className="px-4 py-3">{c.currentStep || 0}/7</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
@@ -353,12 +476,24 @@ export default function ObContacts() {
                             onClick={() => handleAction(dncMut, c.id, "Marked do not contact")}>
                             <Ban className="h-3.5 w-3.5" />
                           </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-violet-600" title="Assign to segment"
+                            onClick={() => setAssignContact(c)}>
+                            <Tag className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit"
+                            onClick={() => openEditContact(c)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" title="Delete"
+                            onClick={() => handleAction(deleteMut, c.id, "Contact deleted")}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
                     {expandedId === c.id && (
                       <tr key={`${c.id}-detail`}>
-                        <td colSpan={10} className="px-4 py-4 bg-muted/10">
+                        <td colSpan={11} className="px-4 py-4 bg-muted/10">
                           <ContactDetail contact={c} onUpdate={invalidate} />
                         </td>
                       </tr>
@@ -374,6 +509,28 @@ export default function ObContacts() {
           )}
         </div>
       </div>
+
+      {showContactModal && (
+        <ContactFormModal
+          form={contactForm}
+          setForm={setContactForm}
+          editing={!!editingContact}
+          saving={savingContact}
+          onClose={() => setShowContactModal(false)}
+          onSave={handleSaveContact}
+        />
+      )}
+      {assignContact && (
+        <AssignSegmentModal
+          recordName={assignContact.fullName}
+          onClose={() => setAssignContact(null)}
+          onAssign={handleAssignSegment}
+          assigning={assigning}
+        />
+      )}
+      {showBulkImport && (
+        <BulkImportModal onClose={() => setShowBulkImport(false)} onDone={invalidate} />
+      )}
     </AppLayout>
   );
 }
@@ -438,6 +595,7 @@ function ContactDetail({ contact, onUpdate }: { contact: any; onUpdate: () => vo
       </div>
 
       {tab === "details" && (
+        <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <h4 className="font-semibold text-sm">Contact Info</h4>
@@ -476,6 +634,20 @@ function ContactDetail({ contact, onUpdate }: { contact: any; onUpdate: () => vo
             )}
             {contact.notes && <div className="text-sm"><span className="text-muted-foreground">Notes:</span> {contact.notes}</div>}
           </div>
+        </div>
+        {(contact.referral || contact.event || contact.companyWebsite) && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm border-t border-border/40 pt-3">
+            {contact.event && <div><span className="text-muted-foreground">Event:</span> {contact.event}</div>}
+            {contact.companyWebsite && <div><span className="text-muted-foreground">Website:</span> {contact.companyWebsite}</div>}
+            {contact.referral && (
+              <div>
+                <span className="text-muted-foreground">Referral:</span> {contact.referredBy || "Yes"}
+                {contact.referralPartnerStatus ? ` (${contact.referralPartnerStatus})` : ""}
+              </div>
+            )}
+          </div>
+        )}
+        <ContactUploads contactId={contact.id} />
         </div>
       )}
 
@@ -632,6 +804,238 @@ function ContactDetail({ contact, onUpdate }: { contact: any; onUpdate: () => vo
           )) : <p className="text-sm text-muted-foreground">No engagement events yet.</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, type = "text" }: any) {
+  return (
+    <div>
+      <label className="text-sm font-medium text-foreground block mb-1.5">{label}</label>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
+        className="w-full p-2.5 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none" />
+    </div>
+  );
+}
+
+function SelectField({ label, value, options, onChange }: any) {
+  return (
+    <div>
+      <label className="text-sm font-medium text-foreground block mb-1.5">{label}</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)}
+        className="w-full p-2.5 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none">
+        <option value="">—</option>
+        {options.map((o: string) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function ContactFormModal({ form, setForm, editing, saving, onClose, onSave }: any) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-12 px-4 overflow-y-auto">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-2xl border border-border z-10 my-8">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between sticky top-0 bg-card rounded-t-2xl">
+          <h2 className="text-lg font-bold">{editing ? "Edit Contact" : "Add Contact"}</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
+        </div>
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Full Name *" value={form.fullName} onChange={(v: string) => setForm({ ...form, fullName: v })} />
+          <Field label="Company *" value={form.company} onChange={(v: string) => setForm({ ...form, company: v })} />
+          <Field label="Email *" value={form.email} onChange={(v: string) => setForm({ ...form, email: v })} />
+          <Field label="Phone" value={form.phone} onChange={(v: string) => setForm({ ...form, phone: v })} />
+          <Field label="First Name" value={form.firstName} onChange={(v: string) => setForm({ ...form, firstName: v })} />
+          <Field label="Last Name" value={form.lastName} onChange={(v: string) => setForm({ ...form, lastName: v })} />
+          <Field label="Title" value={form.title} onChange={(v: string) => setForm({ ...form, title: v })} />
+          <Field label="Industry" value={form.industry} onChange={(v: string) => setForm({ ...form, industry: v })} />
+          <Field label="Location" value={form.location} onChange={(v: string) => setForm({ ...form, location: v })} />
+          <Field label="Intent Signal" value={form.intentSignal} onChange={(v: string) => setForm({ ...form, intentSignal: v })} />
+          <Field label="Event" value={form.event} onChange={(v: string) => setForm({ ...form, event: v })} />
+          <Field label="Company Website" value={form.companyWebsite} onChange={(v: string) => setForm({ ...form, companyWebsite: v })} />
+          <Field label="Segment ID" type="number" value={form.segmentId != null ? String(form.segmentId) : ""}
+            onChange={(v: string) => setForm({ ...form, segmentId: v ? Number(v) : undefined })} />
+          <div className="sm:col-span-2">
+            <label className="text-sm font-medium text-foreground block mb-1.5">Notes</label>
+            <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              className="w-full p-2.5 border border-border rounded-xl text-sm bg-background outline-none min-h-[60px] resize-y" />
+          </div>
+          <div className="sm:col-span-2 border border-border/60 rounded-xl p-3 space-y-3">
+            <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+              <input type="checkbox" checked={!!form.referral} onChange={(e) => setForm({ ...form, referral: e.target.checked })}
+                className="h-4 w-4 rounded border-border text-primary cursor-pointer" />
+              Referral
+            </label>
+            {form.referral && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Referred By" value={form.referredBy} onChange={(v: string) => setForm({ ...form, referredBy: v })} />
+                <SelectField label="Referral Partner Status" value={form.referralPartnerStatus} options={REFERRAL_STATUSES}
+                  onChange={(v: string) => setForm({ ...form, referralPartnerStatus: v })} />
+                <div className="sm:col-span-2">
+                  <label className="text-sm font-medium text-foreground block mb-1.5">Referral Notes</label>
+                  <textarea value={form.referralNotes || ""} onChange={(e) => setForm({ ...form, referralNotes: e.target.value })}
+                    className="w-full p-2.5 border border-border rounded-xl text-sm bg-background outline-none min-h-[50px] resize-y" />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-border flex justify-end gap-3 sticky bottom-0 bg-card rounded-b-2xl">
+          <Button variant="outline" onClick={onClose} className="rounded-xl">Cancel</Button>
+          <Button onClick={onSave} disabled={saving} className="rounded-xl bg-primary text-white hover:bg-primary/90">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />} {editing ? "Save" : "Create"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AssignSegmentModal({ recordName, onClose, onAssign, assigning }: any) {
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [scheduledFor, setScheduledFor] = useState("");
+  const canSubmit = subject.trim() && body.trim();
+  return (
+    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-16 px-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border z-10">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <h2 className="text-lg font-bold flex items-center gap-2"><Tag className="h-4 w-4" /> Assign to Segment</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
+        </div>
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-muted-foreground">Stamp lifecycle and schedule an email for <span className="font-medium text-foreground">{recordName}</span>.</p>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Subject</label>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)}
+              className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none" />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Email Body</label>
+            <textarea value={body} onChange={(e) => setBody(e.target.value)}
+              className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none min-h-[120px] resize-y" />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Schedule For (optional)</label>
+            <input type="datetime-local" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)}
+              className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose} className="rounded-xl">Cancel</Button>
+          <Button onClick={() => onAssign(subject, body, scheduledFor ? new Date(scheduledFor).toISOString() : undefined)}
+            disabled={!canSubmit || assigning} className="rounded-xl bg-primary text-white hover:bg-primary/90">
+            {assigning ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Tag className="h-4 w-4 mr-1" />} Assign
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BulkImportModal({ onClose, onDone }: any) {
+  const [text, setText] = useState("");
+  const [dedupe, setDedupe] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const { toast } = useToast();
+  const parsed = parseContactsCsv(text);
+  const handleImport = async () => {
+    if (parsed.length === 0) { toast({ title: "No valid rows (need a header row and an email column)", variant: "destructive" }); return; }
+    setImporting(true);
+    try {
+      const res = await bulkImportContacts(parsed, dedupe);
+      toast({ title: "Bulk import complete", description: `${res.created ?? 0} created, ${res.skipped ?? 0} skipped` });
+      onDone();
+      onClose();
+    } catch (err: any) {
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-16 px-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-lg border border-border z-10">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <h2 className="text-lg font-bold flex items-center gap-2"><Users className="h-4 w-4" /> Bulk Import Contacts</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
+        </div>
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-muted-foreground">Paste CSV with a header row. Recognized columns: fullName, firstName, lastName, company, email, phone, title, industry, location, event, companyWebsite, segmentId, referral.</p>
+          <textarea value={text} onChange={(e) => setText(e.target.value)}
+            placeholder={"fullName,company,email\nJane Doe,Acme,jane@acme.com"}
+            className="w-full p-3 border border-border rounded-xl text-xs font-mono bg-background outline-none min-h-[160px] resize-y" />
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={dedupe} onChange={(e) => setDedupe(e.target.checked)} className="h-4 w-4 rounded" />
+              Skip duplicates by email
+            </label>
+            <span className="text-xs text-muted-foreground">{parsed.length} valid row(s)</span>
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose} className="rounded-xl">Cancel</Button>
+          <Button onClick={handleImport} disabled={importing || parsed.length === 0} className="rounded-xl bg-primary text-white hover:bg-primary/90">
+            {importing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />} Import
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactUploads({ contactId }: { contactId: number }) {
+  const { data: assets } = useGetAssets();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [uploading, setUploading] = useState(false);
+  const linked = ((assets as any[]) || []).filter((a) => a.linkedContactId === contactId);
+  const handleUpload = async (e: any) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const up = await uploadCampaignFile(file);
+      const res = await fetch(`${import.meta.env.BASE_URL}api/assets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: up.name, category: "Upload", url: storageObjectUrl(up.objectPath),
+          contentType: up.contentType, objectPath: up.objectPath, linkedContactId: contactId,
+        }),
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      queryClient.invalidateQueries({ queryKey: getGetAssetsQueryKey() });
+      toast({ title: "File uploaded" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+  return (
+    <div className="border border-border/60 rounded-xl p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <h4 className="font-semibold text-sm flex items-center gap-1.5"><Paperclip className="h-3.5 w-3.5" /> Uploads</h4>
+        <label className="cursor-pointer">
+          <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border border-border hover:bg-muted">
+            {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />} Upload
+          </span>
+        </label>
+      </div>
+      {linked.length > 0 ? (
+        <div className="space-y-1">
+          {linked.map((a: any) => (
+            <a key={a.id} href={a.url || storageObjectUrl(a.objectPath)} target="_blank" rel="noreferrer"
+              className="flex items-center gap-2 text-xs text-primary hover:underline">
+              <Paperclip className="h-3 w-3" /> {a.title}
+            </a>
+          ))}
+        </div>
+      ) : <p className="text-xs text-muted-foreground">No files uploaded.</p>}
     </div>
   );
 }

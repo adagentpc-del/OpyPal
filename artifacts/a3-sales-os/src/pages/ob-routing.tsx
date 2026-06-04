@@ -228,6 +228,36 @@ export default function ObRouting() {
           <p className="text-muted-foreground mt-1">Intelligent lead routing, prioritization, and next-action recommendations.</p>
         </div>
 
+        <Card className="p-4 border-emerald-200 bg-emerald-50/50">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 rounded-lg bg-emerald-100 p-2">
+              <Shield className="h-5 w-5 text-emerald-700" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-emerald-900">Converged pipeline — reply auto-pause</h3>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-600 text-white">Active</span>
+              </div>
+              <p className="text-sm text-emerald-800/90">
+                When a human reply is detected it pauses outreach across <strong>both pipelines</strong>:
+              </p>
+              <ul className="text-sm text-emerald-800/90 space-y-1 mt-1">
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  <span><strong>Leads</strong> — future <code className="text-xs bg-emerald-100 px-1 rounded">scheduled_emails</code> are paused (reply_received).</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  <span><strong>Contacts</strong> — pending <code className="text-xs bg-emerald-100 px-1 rounded">sequence_steps</code> and scheduled emails are stopped, and the contact is marked <em>paused_replied</em>.</span>
+                </li>
+              </ul>
+              <p className="text-xs text-emerald-700/80 mt-1">
+                Replies are matched by tagged reply-to address and by sender email, so cross-pipeline contacts stay in sync.
+              </p>
+            </div>
+          </div>
+        </Card>
+
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <Card className="p-4 border-red-200">
             <div className="flex items-center gap-2 mb-1"><Flame className="h-4 w-4 text-red-600" /><span className="text-xs text-muted-foreground">Hot Priority</span></div>

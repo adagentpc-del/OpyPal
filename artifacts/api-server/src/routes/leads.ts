@@ -30,6 +30,24 @@ function calculateForecast(proposalValue: string | null, dealValueEstimate: stri
   return null;
 }
 
+// Converged lead fields that are not part of the api-zod Create/Update bodies
+// (which must never be edited). Pull them straight off req.body so the segment /
+// referral / event metadata persists. Only defined keys are returned so updates
+// never null out existing values.
+const LEAD_EXTRA_KEYS = [
+  "event", "companyWebsite", "segmentId", "referral",
+  "referredBy", "referralNotes", "referralPartnerStatus", "lifecycleStatus",
+] as const;
+
+function extraLeadFields(body: any): Record<string, any> {
+  const out: Record<string, any> = {};
+  if (!body) return out;
+  for (const k of LEAD_EXTRA_KEYS) {
+    if (body[k] !== undefined) out[k] = body[k];
+  }
+  return out;
+}
+
 const EVENT_KEYWORDS = [
   "hotel", "venue", "convention", "hospitality", "resort", "casino", "event",
   "events", "conference", "banquet", "catering", "meeting", "ballroom",
@@ -102,6 +120,7 @@ router.post("/leads", requireRole("operator"), async (req, res) => {
 
     const [lead] = await db.insert(leadsTable).values({
       ...data,
+      ...extraLeadFields(req.body),
       estimatedBudget: data.estimatedBudget?.toString(),
       dealValueEstimate: data.dealValueEstimate?.toString(),
       proposalValue: data.proposalValue?.toString(),
@@ -149,6 +168,7 @@ router.put("/leads/:id", requireRole("operator"), async (req, res) => {
     const [lead] = await db.update(leadsTable)
       .set({
         ...data,
+        ...extraLeadFields(req.body),
         estimatedBudget: data.estimatedBudget?.toString(),
         dealValueEstimate: data.dealValueEstimate?.toString(),
         proposalValue: data.proposalValue?.toString(),

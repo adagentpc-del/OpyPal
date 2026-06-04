@@ -3,13 +3,15 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { workspacesTable } from "./workspaces";
 import { leadsTable } from "./leads";
+import { contactsTable } from "./contacts";
 
 export const scheduledEmailsTable = pgTable("scheduled_emails", {
   id: serial("id").primaryKey(),
   workspaceId: integer("workspace_id")
     .references(() => workspacesTable.id)
     .notNull(),
-  leadId: integer("lead_id").references(() => leadsTable.id, { onDelete: "cascade" }).notNull(),
+  leadId: integer("lead_id").references(() => leadsTable.id, { onDelete: "cascade" }),
+  contactId: integer("contact_id").references(() => contactsTable.id, { onDelete: "cascade" }),
   templateId: integer("template_id"),
   subject: text("subject").notNull(),
   body: text("body").notNull(),

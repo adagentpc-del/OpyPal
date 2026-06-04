@@ -39,7 +39,12 @@ router.get("/assets", async (req, res) => {
 router.post("/assets", requireRole("operator"), async (req, res) => {
   try {
     const data = CreateAssetBody.parse(req.body);
-    const [asset] = await db.insert(assetsTable).values({ ...data, workspaceId: req.workspaceId! }).returning();
+    const extra: Record<string, any> = {};
+    if (req.body.contentType != null) extra.contentType = req.body.contentType;
+    if (req.body.objectPath != null) extra.objectPath = req.body.objectPath;
+    if (req.body.linkedContactId != null) extra.linkedContactId = req.body.linkedContactId;
+    if (req.body.linkedCompanyId != null) extra.linkedCompanyId = req.body.linkedCompanyId;
+    const [asset] = await db.insert(assetsTable).values({ ...data, ...extra, workspaceId: req.workspaceId! }).returning();
     res.status(201).json(asset);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
