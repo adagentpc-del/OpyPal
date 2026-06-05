@@ -34,7 +34,14 @@ back to an unscoped lookup when there is no hint.
 the wrong workspace's records.
 **How to apply:** any new sender-based matching path needs the same scoping.
 
-## Known drift
-`/segments/assign` schedules a SINGLE email for non-enrolled contacts; it does
-NOT enroll them into the full multi-step sequence. Bridging segment assignment
-to full sequence enrollment is deferred follow-up work.
+## Segment assignment enrolls full sequences (contacts)
+`/segments/assign` now enrolls eligible non-active contacts into the FULL
+multi-step sequence (creates a sequence_enrollment + sequence_steps cadence via
+the sequence engine), not a single scheduled_emails row. Template set resolves
+in priority: payload templateSetId → passed template's linkedTemplateSetId →
+contact.templateSetId; with no set it falls back to the default delay cadence
+and seeds step 1 with the composed subject/body. Leads still use scheduled_emails
+(no sequence engine). Invariant 1 still holds: active/pending/enrolled contacts
+are skipped, and because contacts now go through sequence_steps (not
+scheduled_emails) only the sequence engine owns them — no background-scheduler
+double-send.

@@ -35,6 +35,7 @@ export interface AssignSegmentInput {
   scheduledFor?: string;
   sendVia?: string;
   templateId?: number | null;
+  templateSetId?: number | null;
   campaignId?: number | null;
   source?: string;
   setLifecycle?: boolean;
