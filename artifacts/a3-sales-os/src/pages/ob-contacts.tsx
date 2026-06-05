@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout";
 import {
   useGetContacts,
@@ -58,7 +58,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { deriveLifecycleStatus, LIFECYCLE_COLORS } from "@/lib/lifecycle";
-import { assignSegment, bulkImportContacts } from "@/lib/segments-api";
+import { assignSegment, bulkImportContacts, bulkSendContacts } from "@/lib/segments-api";
 import { uploadCampaignFile, storageObjectUrl } from "@/lib/campaign-api";
 
 const REFERRAL_STATUSES = ["Prospect", "Active", "Inactive", "Declined"];
@@ -132,6 +132,8 @@ export default function ObContacts() {
   const [assignContact, setAssignContact] = useState<any>(null);
   const [assigning, setAssigning] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showBulkSend, setShowBulkSend] = useState(false);
+  const [bulkSending, setBulkSending] = useState(false);
 
   const { data: contacts, isLoading } = useGetContacts({
     search: search || undefined,
@@ -277,6 +279,33 @@ export default function ObContacts() {
     });
   };
 
+  const handleBulkSend = async (subject: string, body: string, scheduledFor?: string, templateId?: number) => {
+    const ids = Array.from(selectedIds);
+    setBulkSending(true);
+    try {
+      const res = await bulkSendContacts({
+        contactIds: ids,
+        subject,
+        body,
+        scheduledFor: scheduledFor || undefined,
+        templateId: templateId ?? undefined,
+        source: "bulk_send",
+      });
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: getGetScheduledEmailsQueryKey() });
+      toast({
+        title: scheduledFor ? "Emails scheduled" : "Emails queued to send",
+        description: `${res.emailsCreated ?? 0} email(s) queued, ${res.skipped ?? 0} skipped (already active or unsubscribed)`,
+      });
+      setShowBulkSend(false);
+      setSelectedIds(new Set());
+    } catch (err: any) {
+      toast({ title: "Send failed", description: err.message, variant: "destructive" });
+    } finally {
+      setBulkSending(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -343,6 +372,10 @@ export default function ObContacts() {
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-violet-800">{selectedIds.size} contacts selected</span>
               <div className="flex gap-2">
+                <Button size="sm" onClick={() => setShowBulkSend(true)}
+                  className="rounded-xl gap-1.5 text-xs bg-primary text-white hover:bg-primary/90">
+                  <Send className="h-3 w-3" /> Send Email
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => handleBulkGenerate("safe")}
                   disabled={bulkGenMut.isPending} className="rounded-xl gap-1.5 text-xs border-violet-200">
                   {bulkGenMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
@@ -530,6 +563,14 @@ export default function ObContacts() {
       )}
       {showBulkImport && (
         <BulkImportModal onClose={() => setShowBulkImport(false)} onDone={invalidate} />
+      )}
+      {showBulkSend && (
+        <BulkSendModal
+          count={selectedIds.size}
+          onClose={() => setShowBulkSend(false)}
+          onSend={handleBulkSend}
+          sending={bulkSending}
+        />
       )}
     </AppLayout>
   );
@@ -979,6 +1020,95 @@ function BulkImportModal({ onClose, onDone }: any) {
           <Button variant="outline" onClick={onClose} className="rounded-xl">Cancel</Button>
           <Button onClick={handleImport} disabled={importing || parsed.length === 0} className="rounded-xl bg-primary text-white hover:bg-primary/90">
             {importing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />} Import
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BulkSendModal({ count, onClose, onSend, sending }: any) {
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loadingT, setLoadingT] = useState(true);
+  const [templateId, setTemplateId] = useState<number | "">("");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [scheduledFor, setScheduledFor] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(import.meta.env.BASE_URL + "api/templates?isActive=true");
+        if (res.ok) setTemplates(await res.json());
+      } catch {
+        /* templates are optional; user can still type subject/body */
+      } finally {
+        setLoadingT(false);
+      }
+    })();
+  }, []);
+
+  const pickTemplate = (idStr: string) => {
+    if (!idStr) { setTemplateId(""); return; }
+    const id = Number(idStr);
+    setTemplateId(id);
+    const t = templates.find((x) => x.id === id);
+    if (t) {
+      if (t.subject) setSubject(t.subject);
+      if (t.body) setBody(t.body);
+    }
+  };
+
+  const canSubmit = count > 0 && subject.trim() && body.trim() && !sending;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-12 px-4 overflow-y-auto">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-lg border border-border z-10 my-8">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between sticky top-0 bg-card rounded-t-2xl">
+          <h2 className="text-lg font-bold flex items-center gap-2"><Send className="h-4 w-4" /> Send Email</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
+        </div>
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Sending to <span className="font-medium text-foreground">{count} selected contact{count === 1 ? "" : "s"}</span>.
+            Contacts already in an active sequence or unsubscribed are skipped automatically.
+          </p>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Template</label>
+            <select value={templateId === "" ? "" : String(templateId)} onChange={(e) => pickTemplate(e.target.value)}
+              disabled={loadingT}
+              className="w-full p-2.5 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none">
+              <option value="">{loadingT ? "Loading templates..." : "— No template (write your own) —"}</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}{t.category ? ` (${t.category})` : ""}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-muted-foreground mt-1">Picking a template fills the subject &amp; body below — you can still edit them. Tokens like <code>{"{{firstName}}"}</code> and <code>{"{{company}}"}</code> are personalized per contact.</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Subject</label>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)}
+              className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none" />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Email Body</label>
+            <textarea value={body} onChange={(e) => setBody(e.target.value)}
+              className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none min-h-[140px] resize-y" />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-1.5">Schedule For (optional — leave empty to send now)</label>
+            <input type="datetime-local" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)}
+              className="w-full p-3 border border-border rounded-xl text-sm bg-background focus:border-primary outline-none" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-border flex justify-end gap-3 sticky bottom-0 bg-card rounded-b-2xl">
+          <Button variant="outline" onClick={onClose} className="rounded-xl">Cancel</Button>
+          <Button
+            onClick={() => onSend(subject, body, scheduledFor ? new Date(scheduledFor).toISOString() : undefined, templateId === "" ? undefined : templateId)}
+            disabled={!canSubmit} className="rounded-xl bg-primary text-white hover:bg-primary/90">
+            {sending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
+            {scheduledFor ? "Schedule" : "Send Now"}
           </Button>
         </div>
       </div>

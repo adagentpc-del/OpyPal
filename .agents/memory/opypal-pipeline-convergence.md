@@ -45,3 +45,17 @@ and seeds step 1 with the composed subject/body. Leads still use scheduled_email
 are skipped, and because contacts now go through sequence_steps (not
 scheduled_emails) only the sequence engine owns them — no background-scheduler
 double-send.
+
+## Ad-hoc "Send Email" ≠ segment assign (use the right endpoint)
+For a one-off bulk "send this email" to selected contacts (template + schedule),
+use `POST /contacts/bulk-send` (segments-ops.ts), NOT `/segments/assign`.
+`/segments/assign` enrolls into a 7-step sequence and, when a linked template
+set resolves, would IGNORE the user's edited subject/body. `/contacts/bulk-send`
+creates exactly ONE scheduled_emails row per eligible contact rendered from the
+submitted subject/body (edits always honored; templateId stored only for
+attribution). It still enforces Invariant 1 (skip active+stopped+suppressed) so
+the background-scheduler doesn't double-send alongside an active sequence step.
+**Why:** "send email" is a direct send; sequence enrollment is a different
+intent. **How to apply:** single sends → scheduled_emails directly; full nurture
+→ sequence engine. Single sends only need scheduled-emails query invalidation
+(no sequence-queue), since no sequence_steps are created.

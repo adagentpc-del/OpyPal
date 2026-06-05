@@ -54,6 +54,29 @@ export function assignSegment(input: AssignSegmentInput): Promise<AssignSegmentR
   return apiPost<AssignSegmentResult>("/segments/assign", input);
 }
 
+export interface BulkSendInput {
+  contactIds: number[];
+  subject: string;
+  body: string;
+  scheduledFor?: string;
+  sendVia?: string;
+  templateId?: number | null;
+  source?: string;
+}
+
+export interface BulkSendResult {
+  emailsCreated: number;
+  skipped: number;
+}
+
+// Ad-hoc "Send Email" to selected contacts: creates ONE scheduled email per
+// eligible contact (honoring the edited subject/body), not a multi-step
+// sequence enrollment. Contacts already in an active sequence or suppressed are
+// skipped server-side to avoid double-sends.
+export function bulkSendContacts(input: BulkSendInput): Promise<BulkSendResult> {
+  return apiPost<BulkSendResult>("/contacts/bulk-send", input);
+}
+
 export interface BulkContactInput {
   fullName?: string;
   firstName?: string;

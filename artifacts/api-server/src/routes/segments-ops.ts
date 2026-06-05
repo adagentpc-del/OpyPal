@@ -298,6 +298,95 @@ router.post("/segments/assign", requireRole("operator"), async (req, res) => {
   }
 });
 
+const bulkSendSchema = z.object({
+  contactIds: z.array(z.number().int()).min(1),
+  subject: z.string().min(1),
+  body: z.string().min(1),
+  scheduledFor: z.string().optional(),
+  sendVia: z.string().optional(),
+  templateId: z.number().int().nullish(),
+  source: z.string().optional(),
+});
+
+// Ad-hoc bulk "Send Email": create exactly ONE scheduled_email per eligible
+// contact using the composed (and editable) subject/body. Unlike
+// /segments/assign — which enrolls contacts into a full multi-step sequence —
+// this is a single direct send, so the user's edited subject/body is always
+// honored. The background scheduler delivers each row on schedule.
+router.post("/contacts/bulk-send", requireRole("operator"), async (req, res) => {
+  try {
+    const ws = req.workspaceId!;
+    const parsed = bulkSendSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ message: "Invalid request", errors: parsed.error.issues }); return; }
+    const { contactIds, subject, body, scheduledFor, sendVia, templateId, source } = parsed.data;
+
+    const when = scheduledFor ? new Date(scheduledFor) : new Date();
+    let emailsCreated = 0;
+    let skipped = 0;
+
+    // Suppression set for this workspace (lowercased emails).
+    const suppressed = new Set(
+      (await db.select({ email: suppressionListTable.email })
+        .from(suppressionListTable)
+        .where(eq(suppressionListTable.workspaceId, ws)))
+        .map((s) => (s.email || "").toLowerCase())
+    );
+
+    const contacts = await db.select().from(contactsTable)
+      .where(and(eq(contactsTable.workspaceId, ws), inArray(contactsTable.id, contactIds)));
+
+    // Skip stopped contacts (replied/paused/DNC/unsubscribed/bounced) AND
+    // contacts still actively driven by the sequence engine. Creating a single
+    // scheduled_email for an actively-enrolled contact would double-send (the
+    // sequence step AND this row both fire).
+    const stopSeq = ["paused_replied", "paused_manual", "do_not_contact", "unsubscribed", "bounce"];
+    const activeSeq = ["active", "pending", "enrolled", "in_progress", "scheduled"];
+    for (const c of contacts) {
+      const seq = (c.sequenceStatus || "").toLowerCase();
+      if (
+        !c.email || c.doNotContact || c.unsubscribed || c.bounced ||
+        stopSeq.includes(seq) || activeSeq.includes(seq) ||
+        suppressed.has(c.email.toLowerCase())
+      ) {
+        skipped++;
+        continue;
+      }
+
+      const tc = contactToTemplate(c);
+      const renderedSubject = renderSubject(tc, subject);
+      const renderedBody = renderTemplate(tc, body);
+      const [se] = await db.insert(scheduledEmailsTable).values({
+        workspaceId: ws,
+        contactId: c.id,
+        templateId: templateId ?? null,
+        subject: renderedSubject,
+        body: renderedBody,
+        originalSubject: renderedSubject,
+        originalBody: renderedBody,
+        scheduledFor: when,
+        status: "scheduled",
+        source: source || "bulk_send",
+        sendVia: sendVia || "auto",
+      }).returning({ id: scheduledEmailsTable.id });
+      emailsCreated++;
+
+      await db.insert(activityTable).values({
+        workspaceId: ws,
+        type: "email_scheduled",
+        description: `Bulk send scheduled email: ${renderedSubject}`,
+        relatedTemplateId: templateId ?? null,
+        relatedScheduledEmailId: se.id,
+        metadata: { contactId: c.id, source: source || "bulk_send" },
+        createdBy: req.body.createdBy || "user",
+      });
+    }
+
+    res.json({ emailsCreated, skipped });
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 const bulkContactSchema = z.object({
   fullName: z.string().optional(),
   firstName: z.string().optional(),
