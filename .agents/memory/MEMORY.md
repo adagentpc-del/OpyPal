@@ -6,4 +6,5 @@
 - [Data-visibility audit](opypal-data-visibility-audit.md) — "data wiped" reports = workspace scoping not deletion; real data lives in workspace 1 (A3 Visual); use sequence is_called to prove never-existed vs deleted.
 - [Platform/workspace two-level shell](opypal-platform-workspace-shell.md) — route is source of truth for shell; scope synced to route; super admins with zero workspaces bypass workspace gating; white-label theme only in workspace shell.
 - [Pipeline convergence](opypal-pipeline-convergence.md) — leads(scheduled_emails)+contacts(sequence_steps) unified; /segments/assign must skip sequence-active contacts (no double-send); reply matching by sender email must be workspaceHint-scoped.
+- [Membership & assign-eligibility (auth/testing)](opypal-membership-auth-testing.md) — workspace_members.email matched lowercased (seed lowercase); assign skips active/pending, eligible = completed/null.
 - [A3 additive template seeding](a3-premium-seed.md) — A3 (ws1) library built by multiple idempotent name-keyed boot seeders; never overwrite editable records; link default sequence only where linked_template_set_id IS NULL.
