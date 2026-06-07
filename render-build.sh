@@ -8,7 +8,7 @@ corepack enable
 corepack prepare pnpm@9 --activate
 
 echo "==> Installing dependencies"
-pnpm install --no-frozen-lockfile
+pnpm install --no-frozen-lockfile --prod=false
 
 export NODE_ENV=production
 
