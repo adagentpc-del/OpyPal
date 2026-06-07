@@ -10,6 +10,18 @@ const CACHE_TTL = 4 * 60 * 1000;
 async function getCredentials(): Promise<{ apiKey: string; fromEmail: string }> {
   if (cachedSettings && Date.now() - cacheTime < CACHE_TTL) return cachedSettings;
 
+  // Preferred path for standard hosting (Render, etc.): read the Resend key
+  // directly from an environment variable. Falls back to the Replit connector
+  // below when running inside Replit without RESEND_API_KEY set.
+  if (process.env.RESEND_API_KEY) {
+    cachedSettings = {
+      apiKey: process.env.RESEND_API_KEY,
+      fromEmail: process.env.RESEND_FROM_EMAIL || DEFAULT_FROM_EMAIL,
+    };
+    cacheTime = Date.now();
+    return cachedSettings;
+  }
+
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? "repl " + process.env.REPL_IDENTITY
