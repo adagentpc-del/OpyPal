@@ -26,7 +26,8 @@
     "pino": "^9",
     "pino-http": "^10",
     "resend": "4.0.0",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@supabase/supabase-js": "^2.45.0"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
