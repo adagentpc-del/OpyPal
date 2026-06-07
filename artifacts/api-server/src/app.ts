@@ -1,4 +1,6 @@
 import express, { type Express } from "express";
+import path from "path";
+import fs from "fs";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
@@ -52,5 +54,33 @@ app.use(
 );
 
 app.use("/api", router);
+
+// ---------------------------------------------------------------------------
+// Production static serving for a single-service deploy (e.g. Render).
+// The build step copies the built SPAs next to the bundled server:
+//   <dist>/client                     -> a3-sales-os        (served at "/")
+//   <dist>/client/a3-partner-portal   -> a3-partner-portal  (served at "/a3-partner-portal")
+// In development the Vite dev servers handle the frontends, so this is skipped.
+// ---------------------------------------------------------------------------
+if (process.env.NODE_ENV === "production") {
+  const clientDir = path.join(__dirname, "client");
+  const partnerDir = path.join(clientDir, "a3-partner-portal");
+
+  if (fs.existsSync(partnerDir)) {
+    app.use("/a3-partner-portal", express.static(partnerDir, { index: false }));
+    app.get(/^\/a3-partner-portal(\/.*)?$/, (_req, res) => {
+      res.sendFile(path.join(partnerDir, "index.html"));
+    });
+  }
+
+  if (fs.existsSync(clientDir)) {
+    app.use(express.static(clientDir, { index: false }));
+    // SPA fallback for the Sales OS app: any non-/api, non-asset route returns
+    // the SPA shell so client-side routing works on refresh/deep links.
+    app.get(/^\/(?!api\/).*/, (_req, res) => {
+      res.sendFile(path.join(clientDir, "index.html"));
+    });
+  }
+}
 
 export default app;

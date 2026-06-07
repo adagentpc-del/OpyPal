@@ -1,0 +1,91 @@
+# Render deployment for OpyPal (Opypal Core)
+# Single web service: Express API that also serves both built React SPAs.
+# Secrets (sync: false) must be set in the Render dashboard / Blueprint prompts.
+services:
+  - type: web
+    name: opypal
+    runtime: node
+    plan: starter
+    branch: master
+    autoDeploy: true
+    buildCommand: ./render-build.sh
+    startCommand: node artifacts/api-server/dist/index.cjs
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22.22.0"
+
+      # --- Database (Supabase IPv4 session pooler) ---
+      - key: DATABASE_URL
+        sync: false
+
+      # --- Auth (Clerk) ---
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      # Build-time (baked into the SPA bundles by Vite)
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: VITE_CLERK_PROXY_URL
+        sync: false
+
+      # --- AI ---
+      - key: AI_INTEGRATIONS_OPENAI_API_KEY
+        sync: false
+      - key: AI_INTEGRATIONS_ANTHROPIC_API_KEY
+        sync: false
+
+      # --- Email (Resend) ---
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+
+      # --- File storage (Supabase Storage) ---
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: opypal-uploads
+
+      # --- App / security ---
+      - key: APP_BASE_URL
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: OAUTH_STATE_SECRET
+        generateValue: true
+      - key: ENGAGEMENT_WEBHOOK_SECRET
+        sync: false
+      - key: INBOUND_EMAIL_WEBHOOK_SECRET
+        sync: false
+
+      # --- Outlook / Microsoft Graph (optional integration) ---
+      - key: OUTLOOK_CLIENT_ID
+        sync: false
+      - key: OUTLOOK_CLIENT_SECRET
+        sync: false
+      - key: OUTLOOK_TENANT_ID
+        sync: false
+      - key: OUTLOOK_REDIRECT_URI
+        sync: false
+
+      # --- Google / Gmail (optional integration) ---
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REDIRECT_URI
+        sync: false
+      - key: GOOGLE_SPREADSHEET_ID
+        sync: false
