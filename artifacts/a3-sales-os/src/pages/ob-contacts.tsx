@@ -21,6 +21,7 @@ import {
   getGetOutboundAnalyticsQueryKey,
   getGetAssetsQueryKey,
   getGetScheduledEmailsQueryKey,
+  getGetSequenceQueueQueryKey,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -134,6 +135,7 @@ export default function ObContacts() {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [showBulkSend, setShowBulkSend] = useState(false);
   const [bulkSending, setBulkSending] = useState(false);
+  const [restarting, setRestarting] = useState(false);
 
   const { data: contacts, isLoading } = useGetContacts({
     search: search || undefined,
@@ -279,6 +281,31 @@ export default function ObContacts() {
     });
   };
 
+  const handleBulkRestart = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!window.confirm(`Restart the template sequence for ${ids.length} contact(s)? Their follow-up sequence will be re-armed and rescheduled from today. Past send history is kept.`)) return;
+    setRestarting(true);
+    try {
+      const base = import.meta.env.BASE_URL + "api";
+      const res = await fetch(`${base}/contacts/restart-sequences`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactIds: ids }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Restart failed");
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: getGetSequenceQueueQueryKey() });
+      toast({ title: "Sequences restarted", description: `${data.restarted ?? 0} contact(s) re-armed, ${data.totalSteps ?? 0} steps scheduled` });
+      setSelectedIds(new Set());
+    } catch (err: any) {
+      toast({ title: "Restart failed", description: err.message, variant: "destructive" });
+    } finally {
+      setRestarting(false);
+    }
+  };
+
   const handleBulkSend = async (subject: string, body: string, scheduledFor?: string, templateId?: number) => {
     const ids = Array.from(selectedIds);
     setBulkSending(true);
@@ -390,6 +417,11 @@ export default function ObContacts() {
                   disabled={bulkClearMut.isPending} className="rounded-xl gap-1.5 text-xs border-red-200 text-red-600">
                   <X className="h-3 w-3" />
                   Clear Lines
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleBulkRestart}
+                  disabled={restarting} className="rounded-xl gap-1.5 text-xs border-emerald-300 text-emerald-700">
+                  {restarting ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                  Restart Sequence
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} className="rounded-xl text-xs">
                   Deselect

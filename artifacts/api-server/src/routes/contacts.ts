@@ -241,6 +241,85 @@ router.post("/contacts/:id/enroll", requireRole("operator"), async (req, res) =>
   }
 });
 
+// Bulk restart: re-arm the full template sequence for selected contacts so it
+// can run again (useful for demos). Existing send_logs/email_events history is
+// preserved; only the sequence steps are reset and rescheduled from now.
+router.post("/contacts/restart-sequences", requireRole("operator"), async (req, res) => {
+  try {
+    const ids: number[] = Array.isArray(req.body?.contactIds)
+      ? req.body.contactIds.map((n: any) => parseInt(n)).filter((n: number) => !isNaN(n))
+      : [];
+    if (ids.length === 0) return res.status(400).json({ message: "No contactIds provided" });
+
+    const now = new Date();
+    let restarted = 0;
+    let totalSteps = 0;
+    const skipped: number[] = [];
+
+    for (const id of ids) {
+      const [contact] = await db.select().from(contactsTable)
+        .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)));
+      if (!contact) { skipped.push(id); continue; }
+
+      // wipe existing steps (history in send_logs/email_events is kept)
+      await db.delete(sequenceStepsTable)
+        .where(and(eq(sequenceStepsTable.contactId, id), eq(sequenceStepsTable.workspaceId, req.workspaceId!)));
+
+      const tsId = contact.templateSetId || req.body.templateSetId || null;
+
+      const [enrollment] = await db.insert(sequenceEnrollmentsTable).values({
+        contactId: id,
+        campaignId: contact.campaignId || null,
+        templateSetId: tsId,
+        currentStep: 1,
+        sequenceStatus: "active",
+        enrolledAt: now,
+        nextSendAt: now,
+        workspaceId: req.workspaceId!,
+      }).returning();
+
+      let steps: any[];
+      if (tsId) {
+        steps = await buildSequenceStepsFromTemplates(id, contact, tsId, enrollment.id, now, req.workspaceId!);
+      } else {
+        steps = SEQUENCE_DELAYS.map((delay, idx) => ({
+          contactId: id,
+          enrollmentId: enrollment.id,
+          stepNumber: idx + 1,
+          templateSetName: contact.assignedTemplateSet || null,
+          templateId: null,
+          delayDays: delay,
+          subjectRendered: null,
+          bodyRendered: null,
+          subject: null,
+          body: null,
+          status: "scheduled" as const,
+          scheduledFor: delay === 0 ? now : addBusinessDays(now, delay),
+          workspaceId: req.workspaceId!,
+        }));
+      }
+      await db.insert(sequenceStepsTable).values(steps);
+
+      const first = steps[0];
+      await db.update(contactsTable).set({
+        sequenceStatus: "active",
+        currentStep: first?.stepNumber ?? 1,
+        nextSendAt: first?.scheduledFor || now,
+        lastEmailSentAt: null,
+        lastReplyAt: null,
+        updatedAt: now,
+      }).where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)));
+
+      restarted++;
+      totalSteps += steps.length;
+    }
+
+    res.json({ success: true, restarted, totalSteps, skipped, message: `Restarted ${restarted} sequence(s)` });
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 router.post("/contacts/:id/pause", requireRole("operator"), async (req, res) => {
   try {
     const id = parseInt(req.params.id);

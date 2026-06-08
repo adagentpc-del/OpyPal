@@ -113,39 +113,103 @@ function SignUpPage() {
 }
 
 function LandingPage() {
+  const pillars: Array<[string, string]> = [
+    ["Opportunity", PLATFORM.pillars.opportunity],
+    ["Operations", PLATFORM.pillars.operations],
+    ["Pal", PLATFORM.pillars.pal],
+  ];
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-gradient-to-b from-white to-gray-50 px-6 text-center">
-      <img src={`${basePath}/logo.svg`} alt={PLATFORM.name} className="h-12 mb-8" />
-      <h1 className="max-w-2xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-        {PLATFORM.tagline}
-      </h1>
-      <p className="mt-4 max-w-xl text-lg text-muted-foreground">
-        {PLATFORM.fullName} — the system that supports and organizes your business.
-      </p>
-      <div className="mt-8 grid max-w-2xl gap-3 text-left sm:grid-cols-3">
-        <div className="rounded-lg border bg-white/60 p-4">
-          <p className="text-sm font-semibold text-foreground">Opportunity</p>
-          <p className="mt-1 text-sm text-muted-foreground">{PLATFORM.pillars.opportunity}</p>
-        </div>
-        <div className="rounded-lg border bg-white/60 p-4">
-          <p className="text-sm font-semibold text-foreground">Operations</p>
-          <p className="mt-1 text-sm text-muted-foreground">{PLATFORM.pillars.operations}</p>
-        </div>
-        <div className="rounded-lg border bg-white/60 p-4">
-          <p className="text-sm font-semibold text-foreground">Pal</p>
-          <p className="mt-1 text-sm text-muted-foreground">{PLATFORM.pillars.pal}</p>
-        </div>
+    <div className="relative min-h-[100dvh] overflow-hidden bg-[#0B2A20] text-[#F7F4EC]">
+      {/* ambient brand glows */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-48 left-1/2 h-[44rem] w-[44rem] -translate-x-1/2 rounded-full bg-[#1C5C44] opacity-40 blur-[130px]" />
+        <div className="absolute -bottom-48 -right-32 h-[34rem] w-[34rem] rounded-full bg-[#C9A24B] opacity-[0.12] blur-[130px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(255,255,255,0.06),_transparent_55%)]" />
       </div>
-      <div className="mt-8 flex items-center gap-3">
+
+      {/* top bar */}
+      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
+        <div className="flex items-center gap-3">
+          <img
+            src={`${basePath}/divini-logo-white.png`}
+            alt="Divini Group"
+            className="h-9 w-auto opacity-95"
+          />
+          <span className="hidden text-xs font-medium uppercase tracking-[0.3em] text-[#C9A24B] sm:inline">
+            Divini Group
+          </span>
+        </div>
         <Link href="/sign-in">
-          <Button size="lg">Sign in</Button>
-        </Link>
-        <Link href="/sign-up">
-          <Button size="lg" variant="outline">
-            Create account
+          <Button
+            variant="ghost"
+            className="text-[#F7F4EC] hover:bg-white/10 hover:text-white"
+          >
+            Sign in
           </Button>
         </Link>
-      </div>
+      </header>
+
+      {/* hero */}
+      <main className="relative z-10 mx-auto flex max-w-4xl flex-col items-center px-6 pb-24 pt-10 text-center sm:pt-16">
+        <span className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#C9A24B]/40 bg-white/[0.04] px-4 py-1.5 text-[0.7rem] font-medium uppercase tracking-[0.28em] text-[#E7D9AE]">
+          OpyPal by Divini Group
+        </span>
+
+        <h1 className="font-display text-6xl font-semibold leading-[1.02] tracking-tight sm:text-7xl">
+          {PLATFORM.name}
+        </h1>
+
+        <div className="mt-6 h-px w-28 bg-gradient-to-r from-transparent via-[#C9A24B] to-transparent" />
+
+        <p className="mt-6 font-display text-2xl font-medium tracking-tight text-[#F7F4EC] sm:text-3xl">
+          {PLATFORM.tagline}
+        </p>
+        <p className="mt-4 max-w-xl text-base leading-relaxed text-[#F7F4EC]/70 sm:text-lg">
+          {PLATFORM.fullName} — the all-in-one system that surfaces opportunity,
+          runs your operations, and keeps every deal moving.
+        </p>
+
+        {/* pillars */}
+        <div className="mt-12 grid w-full max-w-3xl gap-4 text-left sm:grid-cols-3">
+          {pillars.map(([title, body]) => (
+            <div
+              key={title}
+              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-sm transition-colors hover:border-[#C9A24B]/40 hover:bg-white/[0.07]"
+            >
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#C9A24B]/70 to-transparent" />
+              <p className="text-sm font-semibold uppercase tracking-wider text-[#C9A24B]">
+                {title}
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-[#F7F4EC]/70">{body}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* CTAs */}
+        <div className="mt-12 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row">
+          <Link href="/sign-up" className="w-full sm:w-auto">
+            <Button
+              size="lg"
+              className="w-full bg-[#C9A24B] px-8 font-semibold text-[#0B2A20] shadow-lg shadow-[#C9A24B]/20 hover:bg-[#d8b566] sm:w-auto"
+            >
+              Create account
+            </Button>
+          </Link>
+          <Link href="/sign-in" className="w-full sm:w-auto">
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full border-white/25 bg-transparent px-8 text-[#F7F4EC] hover:bg-white/10 hover:text-white sm:w-auto"
+            >
+              Sign in
+            </Button>
+          </Link>
+        </div>
+
+        <p className="mt-12 text-[0.7rem] uppercase tracking-[0.3em] text-[#F7F4EC]/40">
+          A Divini Group Platform
+        </p>
+      </main>
     </div>
   );
 }
