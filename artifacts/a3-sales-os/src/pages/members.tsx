@@ -53,6 +53,7 @@ interface Member {
   status: string;
   clerkUserId: string | null;
   createdBy: string | null;
+  replyToEmail: string | null;
   createdAt: string;
 }
 
@@ -69,6 +70,30 @@ function StatusBadge({ status }: { status: string }) {
     <Badge variant="outline" className="border-emerald-300 text-emerald-700 bg-emerald-50">
       Active
     </Badge>
+  );
+}
+
+function ReplyEmailCell({ member, busy, onSave }: { member: Member; busy: boolean; onSave: (v: string | null) => void }) {
+  const [val, setVal] = useState(member.replyToEmail ?? "");
+  useEffect(() => { setVal(member.replyToEmail ?? ""); }, [member.replyToEmail]);
+  const dirty = (val.trim() || null) !== (member.replyToEmail ?? null);
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        type="email"
+        value={val}
+        placeholder={member.email}
+        onChange={(e) => setVal(e.target.value)}
+        className="h-8 w-[220px]"
+        disabled={busy}
+      />
+      {dirty && (
+        <Button size="sm" variant="outline" className="h-8" disabled={busy}
+          onClick={() => onSave(val.trim() ? val.trim() : null)}>
+          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -153,6 +178,26 @@ export default function MembersPage() {
     }
   };
 
+  const saveReplyEmail = async (m: Member, replyToEmail: string | null) => {
+    setBusyId(m.id);
+    try {
+      const res = await fetch(`${API_BASE}/members/${m.id}/reply-email`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ replyToEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Failed to update");
+      setMembers((prev) => prev.map((x) => (x.id === m.id ? data : x)));
+      toast({ title: "Reply-to updated" });
+    } catch (err) {
+      toast({ title: "Could not update reply-to", description: err instanceof Error ? err.message : undefined, variant: "destructive" });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const remove = async (m: Member) => {
     setBusyId(m.id);
     try {
@@ -210,6 +255,7 @@ export default function MembersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Email</TableHead>
+                  <TableHead>Reply-to (replies route here)</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Invited by</TableHead>
@@ -227,6 +273,9 @@ export default function MembersPage() {
                         {isSelf && (
                           <span className="ml-2 text-xs text-muted-foreground">(you)</span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <ReplyEmailCell member={m} busy={busy} onSave={(v) => saveReplyEmail(m, v)} />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

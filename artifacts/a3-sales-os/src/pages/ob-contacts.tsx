@@ -136,6 +136,16 @@ export default function ObContacts() {
   const [showBulkSend, setShowBulkSend] = useState(false);
   const [bulkSending, setBulkSending] = useState(false);
   const [restarting, setRestarting] = useState(false);
+  const [reps, setReps] = useState<{ id: number; email: string; replyToEmail: string | null }[]>([]);
+  const [assignRepId, setAssignRepId] = useState<string>("");
+  const [assigningRep, setAssigningRep] = useState(false);
+
+  useEffect(() => {
+    fetch(import.meta.env.BASE_URL + "api/members", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setReps(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
 
   const { data: contacts, isLoading } = useGetContacts({
     search: search || undefined,
@@ -281,6 +291,34 @@ export default function ObContacts() {
     });
   };
 
+  const handleBulkAssignRep = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0 || !assignRepId) return;
+    const memberId = assignRepId === "none" ? null : Number(assignRepId);
+    setAssigningRep(true);
+    try {
+      const base = import.meta.env.BASE_URL + "api";
+      let ok = 0;
+      for (const id of ids) {
+        const res = await fetch(`${base}/contacts/${id}/assign-rep`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ memberId }),
+        });
+        if (res.ok) ok++;
+      }
+      invalidate();
+      toast({ title: "Reps assigned", description: `${ok}/${ids.length} contact(s) updated` });
+      setSelectedIds(new Set());
+      setAssignRepId("");
+    } catch (err: any) {
+      toast({ title: "Assign failed", description: err.message, variant: "destructive" });
+    } finally {
+      setAssigningRep(false);
+    }
+  };
+
   const handleBulkRestart = async () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
@@ -422,6 +460,24 @@ export default function ObContacts() {
                   disabled={restarting} className="rounded-xl gap-1.5 text-xs border-emerald-300 text-emerald-700">
                   {restarting ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                   Restart Sequence
+                </Button>
+                <select
+                  value={assignRepId}
+                  onChange={(e) => setAssignRepId(e.target.value)}
+                  disabled={assigningRep}
+                  className="h-8 rounded-xl border border-blue-200 bg-white px-2 text-xs"
+                  title="Route replies for the selected contacts to this rep"
+                >
+                  <option value="">Assign rep…</option>
+                  {reps.map((r) => (
+                    <option key={r.id} value={String(r.id)}>{r.replyToEmail || r.email}</option>
+                  ))}
+                  <option value="none">Unassign</option>
+                </select>
+                <Button size="sm" variant="outline" onClick={handleBulkAssignRep}
+                  disabled={assigningRep || !assignRepId} className="rounded-xl gap-1.5 text-xs border-blue-300 text-blue-700">
+                  {assigningRep && <Loader2 className="h-3 w-3 animate-spin" />}
+                  Assign rep
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} className="rounded-xl text-xs">
                   Deselect
