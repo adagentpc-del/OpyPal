@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, contactsTable, sequenceStepsTable, sendLogsTable, sequenceTemplatesTable, templateSetsTable, sequenceEnrollmentsTable, emailEventsTable, suppressionListTable } from "@workspace/db";
+import { db, contactsTable, sequenceStepsTable, sendLogsTable, sequenceTemplatesTable, templateSetsTable, sequenceEnrollmentsTable, emailEventsTable, suppressionListTable, workspaceMembersTable } from "@workspace/db";
 import { eq, and, or, ilike, sql, desc } from "drizzle-orm";
 import { renderTemplate, renderSubject, splitFullName, calculateEngagementScore, getEngagementTier, type TemplateContact } from "../lib/template-engine";
 import { requireRole } from "../middleware/clerk-auth";
@@ -641,6 +641,32 @@ router.get("/contacts/:id/events", async (req, res) => {
       .where(and(eq(emailEventsTable.contactId, id), eq(emailEventsTable.workspaceId, req.workspaceId!)))
       .orderBy(desc(emailEventsTable.timestamp));
     res.json(events);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// Assign (or clear) the rep whose inbox replies for this contact route to.
+router.patch("/contacts/:id/assign-rep", requireRole("workspace_admin"), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const raw = req.body?.memberId;
+    const memberId = raw === null || raw === undefined ? null : Number(raw);
+    if (memberId !== null && !Number.isFinite(memberId)) {
+      return res.status(400).json({ message: "memberId must be a number or null" });
+    }
+    if (memberId !== null) {
+      const [rep] = await db.select({ id: workspaceMembersTable.id })
+        .from(workspaceMembersTable)
+        .where(and(eq(workspaceMembersTable.id, memberId), eq(workspaceMembersTable.workspaceId, req.workspaceId!)));
+      if (!rep) return res.status(400).json({ message: "Rep is not a member of this workspace" });
+    }
+    const [updated] = await db.update(contactsTable)
+      .set({ assignedMemberId: memberId, updatedAt: new Date() })
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, req.workspaceId!)))
+      .returning();
+    if (!updated) return res.status(404).json({ message: "Contact not found" });
+    res.json(updated);
   } catch (err: any) {
     res.status(400).json({ message: err.message });
   }

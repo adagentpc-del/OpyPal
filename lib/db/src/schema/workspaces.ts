@@ -34,6 +34,8 @@ export interface WorkspaceSenderIdentity {
   // Manual forwarding inbox address. Inbound mail forwarded to this address is
   // attributed to this workspace and parsed for the original sender/reply.
   forwardingInbox?: string;
+  // Fallback Reply-To for contacts with no assigned rep (a real monitored inbox).
+  defaultRepReplyTo?: string;
 }
 
 // Which product modules are enabled for a workspace.
@@ -119,6 +121,10 @@ export const workspaceMembersTable = pgTable(
     status: text("status").default("active").notNull(),
     // Email of the super_admin / workspace_admin who created the membership.
     createdBy: text("created_by"),
+    // Address replies to this rep should route to (defaults to `email` when null).
+    replyToEmail: text("reply_to_email"),
+    // Optional display name for the rep.
+    displayName: text("display_name"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

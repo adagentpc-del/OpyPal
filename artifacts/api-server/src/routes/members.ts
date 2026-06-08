@@ -198,4 +198,38 @@ router.delete("/members/:id", async (req, res) => {
   res.json({ message: "Member removed" });
 });
 
+const replyEmailSchema = z.object({
+  replyToEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("A valid email is required")
+    .nullable(),
+});
+
+// Register / update the address replies should route to for this rep.
+router.patch("/members/:id/reply-email", async (req, res) => {
+  const ws = req.workspaceId!;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ message: "Invalid member id" });
+    return;
+  }
+  const parsed = replyEmailSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const [updated] = await db
+    .update(workspaceMembersTable)
+    .set({ replyToEmail: parsed.data.replyToEmail, updatedAt: new Date() })
+    .where(and(eq(workspaceMembersTable.id, id), eq(workspaceMembersTable.workspaceId, ws)))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ message: "Member not found" });
+    return;
+  }
+  res.json(updated);
+});
+
 export default router;

@@ -3,6 +3,7 @@ import { eq, and, lte, inArray, asc, sql } from "drizzle-orm";
 import { getPrimaryConnection, syncInbox, isOutlookConfigured, OUTLOOK_PROVIDER } from "./outlook-graph";
 import { syncGmailInbox, isGmailConfigured, getPrimaryGmailConnection, GMAIL_PROVIDER } from "./gmail-api";
 import { sendForWorkspace, resolveSendChain } from "./providers";
+import { resolveContactReplyTo } from "./reply-routing";
 import type { ProviderType } from "@workspace/db";
 
 let schedulerRunning = false;
@@ -153,8 +154,25 @@ async function processFollowUps(): Promise<{ sent: number; failed: number; skipp
         ? (email.sendVia as ProviderType)
         : undefined;
 
+      // Per-rep reply routing: a contact's replies must go to the assigned
+      // rep's inbox — never to hello@ or the admin. Block if none resolvable.
+      let repReplyTo: string | undefined;
+      if (email.contactId) {
+        repReplyTo = await resolveContactReplyTo(ws, email.contactId);
+        if (!repReplyTo) {
+          await db.update(scheduledEmailsTable).set({
+            status: "failed",
+            sendError: "No assigned rep reply address (assign a rep / set rep reply email or workspace defaultRepReplyTo)",
+            updatedAt: new Date(),
+          }).where(eq(scheduledEmailsTable.id, email.id));
+          failed++;
+          continue;
+        }
+      }
+
       const result = await sendForWorkspace(ws, {
         to: recipientEmail,
+        replyTo: repReplyTo,
         subject: email.subject,
         html: htmlBody,
         text: textBody,

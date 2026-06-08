@@ -28,6 +28,8 @@ export const contactsTable = pgTable("contacts", {
   campaignName: text("campaign_name"),
   campaignId: integer("campaign_id"),
   assignedTemplateSet: text("assigned_template_set"),
+  // FK -> workspace_members.id. The rep replies route to (nullable).
+  assignedMemberId: integer("assigned_member_id"),
   templateSetId: integer("template_set_id"),
   currentStep: integer("current_step").default(0),
   sequenceStatus: text("sequence_status").notNull().default("pending"),
