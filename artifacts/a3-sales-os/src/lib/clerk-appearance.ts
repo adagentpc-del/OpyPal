@@ -1,55 +1,66 @@
-import { shadcn } from "@clerk/themes";
+import { dark } from "@clerk/themes";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-// Branded Clerk appearance matching the Opypal navy/gold theme and Outfit font.
+// Branded Clerk appearance — dark emerald "glass" card matching the
+// OpyPal by Divini Group theme: deep emerald (#0B2A20), gold (#C9A24B),
+// cream text (#F7F4EC), Outfit display font. Sits on the emerald AuthShell,
+// echoing the glassy feature cards on the landing page.
 export const clerkAppearance = {
-  theme: shadcn,
+  theme: dark,
   cssLayerName: "clerk",
   options: {
+    // The AuthShell already shows the Divini logo + wordmark above the card,
+    // so the in-card logo is hidden to avoid duplication.
     logoPlacement: "inside" as const,
     logoLinkUrl: basePath || "/",
-    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+    logoImageUrl: `${window.location.origin}${basePath}/divini-logo-white.png`,
   },
   variables: {
-    colorPrimary: "hsl(215 79% 28%)",
-    colorForeground: "hsl(215 79% 10%)",
-    colorMutedForeground: "hsl(215 20% 46%)",
-    colorDanger: "hsl(0 84% 60%)",
-    colorBackground: "hsl(0 0% 100%)",
-    colorInput: "hsl(0 0% 100%)",
-    colorInputForeground: "hsl(215 79% 10%)",
-    colorNeutral: "hsl(220 13% 91%)",
+    colorPrimary: "#C9A24B",
+    colorBackground: "transparent",
+    colorForeground: "#F7F4EC",
+    colorMutedForeground: "#A9B8AF",
+    colorInput: "rgba(255, 255, 255, 0.05)",
+    colorInputForeground: "#F7F4EC",
+    colorNeutral: "#F7F4EC",
+    colorDanger: "hsl(0 84% 66%)",
+    colorSuccess: "hsl(150 55% 55%)",
     fontFamily: "'Outfit', 'Inter', system-ui, sans-serif",
-    borderRadius: "0.5rem",
+    borderRadius: "0.75rem",
   },
   elements: {
     rootBox: "w-full flex justify-center",
     cardBox:
-      "bg-white rounded-2xl w-[440px] max-w-full overflow-hidden shadow-xl border border-gray-200",
-    card: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    headerTitle: "text-gray-900 font-semibold",
-    headerSubtitle: "text-gray-500",
-    socialButtonsBlockButtonText: "text-gray-700",
-    formFieldLabel: "text-gray-700",
-    footerActionLink: "text-[hsl(215_79%_28%)] font-medium",
-    footerActionText: "text-gray-500",
-    dividerText: "text-gray-400",
-    identityPreviewEditButton: "text-[hsl(215_79%_28%)]",
-    formFieldSuccessText: "text-green-600",
-    alertText: "text-gray-700",
-    logoBox: "justify-center",
-    logoImage: "h-10",
-    socialButtonsBlockButton: "border border-gray-200 hover:bg-gray-50",
+      "w-[440px] max-w-full overflow-hidden rounded-2xl border border-[#C9A24B]/25 bg-[#0E3327]/80 shadow-2xl shadow-black/40 backdrop-blur-xl",
+    card: "!bg-transparent !shadow-none !border-0 !rounded-none",
+    footer: "!bg-transparent !shadow-none !border-0 !rounded-none",
+    // AuthShell already renders the brand logo above the card.
+    logoBox: "hidden",
+    headerTitle: "text-[#F7F4EC] font-semibold",
+    headerSubtitle: "text-[#F7F4EC]/60",
+    socialButtonsBlockButton:
+      "border border-white/15 bg-white/[0.04] text-[#F7F4EC] hover:bg-white/[0.08]",
+    socialButtonsBlockButtonText: "text-[#F7F4EC]",
+    dividerText: "text-[#F7F4EC]/40",
+    dividerLine: "bg-white/15",
+    formFieldLabel: "text-[#F7F4EC]/80",
+    formFieldInput:
+      "bg-white/[0.05] border border-white/15 text-[#F7F4EC] placeholder:text-[#F7F4EC]/40 focus:border-[#C9A24B]/60",
     formButtonPrimary:
-      "bg-[hsl(215_79%_28%)] hover:bg-[hsl(215_79%_24%)] text-white",
-    formFieldInput: "bg-white border border-gray-200 text-gray-900",
+      "bg-[#C9A24B] text-[#0B2A20] font-semibold shadow-lg shadow-[#C9A24B]/20 hover:bg-[#d8b566]",
+    footerActionText: "text-[#F7F4EC]/60",
+    footerActionLink: "text-[#C9A24B] font-medium hover:text-[#d8b566]",
     footerAction: "",
-    dividerLine: "bg-gray-200",
-    alert: "",
-    otpCodeFieldInput: "text-gray-900",
-    formFieldRow: "",
-    main: "",
+    identityPreviewText: "text-[#F7F4EC]",
+    identityPreviewEditButton: "text-[#C9A24B] hover:text-[#d8b566]",
+    formFieldSuccessText: "text-green-400",
+    formFieldErrorText: "text-red-300",
+    formFieldAction: "text-[#C9A24B] hover:text-[#d8b566]",
+    formResendCodeLink: "text-[#C9A24B] hover:text-[#d8b566]",
+    otpCodeFieldInput: "text-[#F7F4EC] border-white/15",
+    alertText: "text-[#F7F4EC]/80",
+    userPreviewMainIdentifier: "text-[#F7F4EC]",
+    userPreviewSecondaryIdentifier: "text-[#F7F4EC]/60",
   },
 };
