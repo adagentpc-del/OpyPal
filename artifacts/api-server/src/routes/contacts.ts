@@ -1,7 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, contactsTable, sequenceStepsTable, sendLogsTable, sequenceTemplatesTable, templateSetsTable, sequenceEnrollmentsTable, emailEventsTable, suppressionListTable, workspaceMembersTable } from "@workspace/db";
-import { activityTable, leadsTable } from "@workspace/db";
-import { eq, and, or, ilike, sql, desc } from "drizzle-orm";
+import { activityTable, leadsTable, tasksTable } from "@workspace/db";import { eq, and, or, ilike, sql, desc } from "drizzle-orm";
 import { renderTemplate, renderSubject, splitFullName, calculateEngagementScore, getEngagementTier, type TemplateContact } from "../lib/template-engine";
 import { requireRole } from "../middleware/clerk-auth";
 
@@ -781,6 +780,70 @@ router.patch("/contacts/:id/follow-up-date", requireRole("operator"), async (req
     res.status(400).json({ message: err.message });
   }
 });
+// Mark an Outlook-composed email as actually SENT (the rep confirms after
+// sending inside Outlook). Logs an "email_sent" activity, advances the contact
+// to "Email Sent", and auto-creates a follow-up task on the chosen date.
+// Body: { templateName?, subjectPreview?, opportunityId?, followUpDate?, followUpLabel? }
+router.post("/contacts/:id/mark-sent", requireRole("operator"), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const ws = req.workspaceId!;
+    const { templateName, subjectPreview, opportunityId, followUpDate, followUpLabel } = req.body ?? {};
+
+    const [contact] = await db.select().from(contactsTable)
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, ws)));
+    if (!contact) return res.status(404).json({ message: "Contact not found" });
+
+    let leadId: number | null = typeof opportunityId === "number" ? opportunityId : null;
+    if (leadId === null && contact.email) {
+      const [lead] = await db.select({ id: leadsTable.id }).from(leadsTable)
+        .where(and(eq(leadsTable.email, contact.email), eq(leadsTable.workspaceId, ws)))
+        .limit(1);
+      if (lead) leadId = lead.id;
+    }
+
+    const now = new Date();
+    const due = followUpDate ? new Date(followUpDate) : addBusinessDays(now, 3);
+    const dueStr = due.toISOString().split("T")[0];
+    const tmpl = typeof templateName === "string" && templateName.trim() ? templateName.trim() : "Custom";
+    const subjPreview = typeof subjectPreview === "string" ? subjectPreview.slice(0, 200) : "";
+    const by = req.authContext?.email ?? null;
+
+    await db.insert(activityTable).values({
+      workspaceId: ws,
+      type: "email_sent",
+      description: `Email sent to ${contact.fullName} (${contact.email}) via Outlook using "${tmpl}" template`,
+      contactId: id,
+      leadId,
+      createdBy: by,
+      metadata: { templateName: tmpl, subjectPreview: subjPreview, contactEmail: contact.email, contactName: contact.fullName, opportunityId: leadId, channel: "outlook" },
+    });
+
+    await db.insert(tasksTable).values({
+      workspaceId: ws,
+      title: `Follow up with ${contact.fullName}`,
+      contactId: id,
+      leadId,
+      taskType: "follow_up",
+      priority: "medium",
+      status: "open",
+      dueDate: dueStr,
+      source: "outlook",
+      createdBy: by,
+      notes: `Auto-created after Outlook send (${followUpLabel || "follow-up"}). Template: ${tmpl}.`,
+    });
+
+    const [updated] = await db.update(contactsTable)
+      .set({ outreachStatus: "Email Sent", outlookStatus: "sent", lastEmailSentAt: now, followUpDate: due, updatedAt: now })
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, ws)))
+      .returning();
+
+    res.json(updated);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 
 
 export default router;
