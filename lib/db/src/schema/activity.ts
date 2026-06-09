@@ -12,6 +12,7 @@ export const activityTable = pgTable("activity", {
   type: text("type").notNull(),
   description: text("description").notNull(),
   leadId: integer("lead_id").references(() => leadsTable.id, { onDelete: "cascade" }),
+  contactId: integer("contact_id"),
   metadata: jsonb("metadata"),
   relatedTemplateId: integer("related_template_id"),
   relatedSequenceId: integer("related_sequence_id"),

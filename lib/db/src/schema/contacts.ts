@@ -59,6 +59,8 @@ export const contactsTable = pgTable("contacts", {
   referralNotes: text("referral_notes"),
   referralPartnerStatus: text("referral_partner_status"),
   lifecycleStatus: text("lifecycle_status"),
+  outlookStatus: text("outlook_status"),
+  followUpDate: timestamp("follow_up_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

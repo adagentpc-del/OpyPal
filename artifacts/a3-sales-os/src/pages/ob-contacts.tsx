@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout";
+import { SendViaOutlook } from "@/components/send-via-outlook";
 import {
   useGetContacts,
   useDeleteContact,
@@ -597,7 +598,7 @@ export default function ObContacts() {
                             onClick={() => handleAction(dncMut, c.id, "Marked do not contact")}>
                             <Ban className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-violet-600" title="Assign to segment"
+                          <SendViaOutlook contact={c} variant="icon" onUpdated={invalidate} /><Button variant="ghost" size="icon" className="h-7 w-7 text-violet-600" title="Assign to segment"
                             onClick={() => setAssignContact(c)}>
                             <Tag className="h-3.5 w-3.5" />
                           </Button>
@@ -714,7 +715,7 @@ function ContactDetail({ contact, onUpdate }: { contact: any; onUpdate: () => vo
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 border-b border-border">
+      <div className="flex items-center justify-end gap-2 mb-2"><SendViaOutlook contact={contact} variant="button" onUpdated={() => { queryClient.invalidateQueries({ queryKey: getGetContactsQueryKey() }); onUpdate(); }} /></div><div className="flex gap-2 border-b border-border">
         {(["details", "personalization", "routing", "steps", "events"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition ${tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
