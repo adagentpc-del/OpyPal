@@ -21,6 +21,7 @@ import {
   Settings,
   StickyNote,
   Activity,
+  Wrench,
   MessageCircle,
   UserCog,
   ShieldCheck,
@@ -51,6 +52,7 @@ export const navigationConfig: NavGroup[] = [
     label: "Main",
     items: [
       { name: "Dashboard", href: "/", icon: LayoutDashboard, description: "Overview of your sales pipeline and activity" },
+      { name: "Outreach Dashboard", href: "/outreach-dashboard", icon: Activity, description: "Activity-based outbound reporting" },
       { name: "Leads", href: "/leads", icon: Users, description: "Manage your leads and CRM data" },
       { name: "Companies", href: "/companies", icon: Building2, description: "Track companies and accounts" },
       { name: "Contacts", href: "/contacts", icon: Contact, description: "Manage outbound contacts" },
@@ -88,6 +90,7 @@ export const navigationConfig: NavGroup[] = [
       { name: "Reply Review", href: "/reply-review", icon: MessageCircle, description: "Review uncertain email replies" },
       { name: "Team Notes", href: "/team-notes", icon: StickyNote, description: "Shared notes and documentation" },
       { name: "Activity Log", href: "/activity-log", icon: Activity, description: "System activity history", minRole: "manager" },
+      { name: "CRM Maintenance", href: "/crm-maintenance", icon: Wrench, description: "Reset outreach history for a clean campaign", minRole: "workspace_admin" },
     ],
   },
   {

@@ -61,6 +61,8 @@ export const contactsTable = pgTable("contacts", {
   lifecycleStatus: text("lifecycle_status"),
   outlookStatus: text("outlook_status"),
   followUpDate: timestamp("follow_up_date"),
+  outreachStatus: text("outreach_status").notNull().default("Not Contacted"),
+  emailStatus: text("email_status").notNull().default("Ready For Outreach"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
