@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, contactsTable, sequenceStepsTable, sendLogsTable, sequenceTemplatesTable, templateSetsTable, sequenceEnrollmentsTable, emailEventsTable, suppressionListTable, workspaceMembersTable } from "@workspace/db";
+import { activityTable, leadsTable } from "@workspace/db";
 import { eq, and, or, ilike, sql, desc } from "drizzle-orm";
 import { renderTemplate, renderSubject, splitFullName, calculateEngagementScore, getEngagementTier, type TemplateContact } from "../lib/template-engine";
 import { requireRole } from "../middleware/clerk-auth";
@@ -671,5 +672,115 @@ router.patch("/contacts/:id/assign-rep", requireRole("workspace_admin"), async (
     res.status(400).json({ message: err.message });
   }
 });
+// --- Send via Outlook ----------------------------------------------------
+// The Outlook compose window is opened client-side (deep link / mailto) so the
+// email stays visible in Outlook and is reviewed/sent manually. The server only
+// records intent: it logs a CRM activity, marks the contact "outlook_draft_opened"
+// (NEVER "sent"), and seeds a follow-up date. The rep manually marks status after.
+
+const OUTLOOK_STATUSES = ["outlook_draft_opened", "sent", "needs_follow_up"] as const;
+type OutlookStatus = (typeof OUTLOOK_STATUSES)[number];
+
+// Record that an Outlook compose window was opened for this contact.
+router.post("/contacts/:id/outlook-opened", requireRole("operator"), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const ws = req.workspaceId!;
+    const { templateName, subjectPreview, opportunityId, followUpDate } = req.body ?? {};
+
+    const [contact] = await db.select().from(contactsTable)
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, ws)));
+    if (!contact) return res.status(404).json({ message: "Contact not found" });
+
+    let leadId: number | null = typeof opportunityId === "number" ? opportunityId : null;
+    if (leadId === null && contact.email) {
+      const [lead] = await db.select({ id: leadsTable.id }).from(leadsTable)
+        .where(and(eq(leadsTable.email, contact.email), eq(leadsTable.workspaceId, ws)))
+        .limit(1);
+      if (lead) leadId = lead.id;
+    }
+
+    const due = followUpDate ? new Date(followUpDate) : addBusinessDays(new Date(), 3);
+    const tmpl = typeof templateName === "string" && templateName.trim() ? templateName.trim() : "Custom";
+    const subjPreview = typeof subjectPreview === "string" ? subjectPreview.slice(0, 200) : "";
+
+    await db.insert(activityTable).values({
+      workspaceId: ws,
+      type: "outlook_email_opened",
+      description: `Outlook draft opened for ${contact.fullName} (${contact.email}) using "${tmpl}" template`,
+      contactId: id,
+      leadId,
+      createdBy: req.authContext?.email ?? null,
+      metadata: {
+        templateName: tmpl,
+        subjectPreview: subjPreview,
+        contactEmail: contact.email,
+        contactName: contact.fullName,
+        opportunityId: leadId,
+      },
+    });
+
+    const [updated] = await db.update(contactsTable)
+      .set({ outlookStatus: "outlook_draft_opened", followUpDate: due, updatedAt: new Date() })
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, ws)))
+      .returning();
+
+    res.json(updated);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// Manually set the Outlook draft status: "sent" | "needs_follow_up" | "outlook_draft_opened".
+router.patch("/contacts/:id/outlook-status", requireRole("operator"), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const ws = req.workspaceId!;
+    const status = req.body?.status as OutlookStatus;
+    if (!OUTLOOK_STATUSES.includes(status)) {
+      return res.status(400).json({ message: `Invalid status. Expected one of: ${OUTLOOK_STATUSES.join(", ")}` });
+    }
+
+    const [updated] = await db.update(contactsTable)
+      .set({ outlookStatus: status, updatedAt: new Date() })
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, ws)))
+      .returning();
+    if (!updated) return res.status(404).json({ message: "Contact not found" });
+
+    await db.insert(activityTable).values({
+      workspaceId: ws,
+      type: "outlook_status_changed",
+      description: `Outlook status set to "${status.replace(/_/g, " ")}" for ${updated.fullName}`,
+      contactId: id,
+      createdBy: req.authContext?.email ?? null,
+      metadata: { status },
+    });
+
+    res.json(updated);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// Set or clear the manual follow-up date. Body: { followUpDate: ISO string | null }.
+router.patch("/contacts/:id/follow-up-date", requireRole("operator"), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const ws = req.workspaceId!;
+    const raw = req.body?.followUpDate;
+    const due = raw ? new Date(raw) : null;
+    if (raw && isNaN(due!.getTime())) return res.status(400).json({ message: "Invalid followUpDate" });
+
+    const [updated] = await db.update(contactsTable)
+      .set({ followUpDate: due, updatedAt: new Date() })
+      .where(and(eq(contactsTable.id, id), eq(contactsTable.workspaceId, ws)))
+      .returning();
+    if (!updated) return res.status(404).json({ message: "Contact not found" });
+    res.json(updated);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 
 export default router;
