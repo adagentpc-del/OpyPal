@@ -207,6 +207,57 @@ export function SendViaOutlook({
     }
   }
 
+  // One-click: merge the chosen template synchronously and open Outlook in the
+  // SAME user gesture (popup-safe), then log the draft. No extra clicks.
+  function openTemplate(id: string, mode: ComposeMode) {
+    if (!contact.email) {
+      toast({ title: "No email address", description: "This contact has no email.", variant: "destructive" });
+      return;
+    }
+    let subj = "";
+    let bod = "";
+    let name = "Custom";
+    if (id.startsWith("builtin:")) {
+      const t = BUILTIN_TEMPLATES.find((x) => `builtin:${x.id}` === id);
+      if (!t) return;
+      name = t.name;
+      subj = mergeTemplate(t.subject, mergeCtx, opp, rep);
+      bod = mergeTemplate(t.body, mergeCtx, opp, rep);
+    } else {
+      const sid = Number(id.replace("saved:", ""));
+      const t = saved.find((x) => x.id === sid);
+      if (!t) return;
+      name = t.name;
+      subj = mergeTemplate(t.subject || "", mergeCtx, opp, rep);
+      bod = mergeTemplate(t.body || "", mergeCtx, opp, rep);
+    }
+    try {
+      localStorage.setItem(REP_STORAGE_KEY, JSON.stringify(rep));
+    } catch {
+      /* ignore */
+    }
+    // Open Outlook FIRST, synchronously, so the browser keeps the popup.
+    const url = buildOutlookComposeUrl({ to: contact.email, subject: subj, body: bod, mode });
+    window.open(url, "_blank", "noopener");
+    setTemplateId(id);
+    setSubject(subj);
+    setBody(bod);
+    setBusy(true);
+    apiPost(`/contacts/${contact.id}/outlook-opened`, {
+      templateName: name,
+      subjectPreview: subj.slice(0, 120),
+      opportunityId: opportunity?.id ?? null,
+    })
+      .then(() => {
+        setStep("opened");
+        onUpdated?.();
+      })
+      .catch((err: any) =>
+        toast({ title: "Opened, but logging failed", description: err.message, variant: "destructive" }),
+      )
+      .finally(() => setBusy(false));
+  }
+
   async function confirmSent() {
     setBusy(true);
     try {
@@ -277,6 +328,43 @@ export function SendViaOutlook({
 
           {step === "compose" && (
             <div className="space-y-4">
+              <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-3">
+                <p className="text-xs font-semibold text-sky-900 mb-2">
+                  One click — open Outlook instantly with a template:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {BUILTIN_TEMPLATES.map((t) => (
+                    <Button
+                      key={`quick-${t.id}`}
+                      type="button"
+                      size="sm"
+                      className="rounded-xl gap-1.5 bg-sky-600 text-white hover:bg-sky-700"
+                      disabled={busy || !contact.email}
+                      onClick={() => openTemplate(`builtin:${t.id}`, "web")}
+                      title={`Open Outlook with "${t.name}"`}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" /> {t.name}
+                    </Button>
+                  ))}
+                  {saved.map((t) => (
+                    <Button
+                      key={`quick-saved-${t.id}`}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl gap-1.5"
+                      disabled={busy || !contact.email}
+                      onClick={() => openTemplate(`saved:${t.id}`, "web")}
+                      title={`Open Outlook with "${t.name}"`}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" /> {t.name}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-sky-800/70 mt-2">
+                  Or customize the subject/body below, then click Open in Outlook.
+                </p>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Template</Label>

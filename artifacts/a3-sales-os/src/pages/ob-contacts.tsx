@@ -598,7 +598,7 @@ export default function ObContacts() {
                             onClick={() => handleAction(dncMut, c.id, "Marked do not contact")}>
                             <Ban className="h-3.5 w-3.5" />
                           </Button>
-                          <SendViaOutlook contact={c} variant="icon" onUpdated={invalidate} /><Button variant="ghost" size="icon" className="h-7 w-7 text-violet-600" title="Assign to segment"
+                          <SendViaOutlook contact={c} variant="button" onUpdated={invalidate} /><Button variant="ghost" size="icon" className="h-7 w-7 text-violet-600" title="Assign to segment"
                             onClick={() => setAssignContact(c)}>
                             <Tag className="h-3.5 w-3.5" />
                           </Button>
