@@ -57,7 +57,7 @@ export default function Dashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground text-sm mt-1">Pipeline overview for {CURRENT_WORKSPACE.name} sales team.</p>
+            <p className="text-muted-foreground text-sm mt-1">Email outreach overview for {CURRENT_WORKSPACE.name}.</p>
           </div>
           {(d.overdueFollowUps > 0) && (
             <div className="flex items-center gap-2 bg-destructive/10 text-destructive px-4 py-2 rounded-xl text-sm font-semibold">
@@ -67,27 +67,20 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-          <MiniKpi label="Total Leads" value={d.totalLeads} />
-          <MiniKpi label="Active Leads" value={activeLeads} color="text-primary" icon={<Target className="h-3.5 w-3.5" />} />
-          <MiniKpi label="New Leads" value={d.newLeads} color="text-blue-600" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <MiniKpi label="Total Contacts" value={d.totalLeads} />
+          <MiniKpi label="In Sequence" value={(d as any).inSequence ?? activeLeads} color="text-primary" icon={<Target className="h-3.5 w-3.5" />} />
+          <MiniKpi label="New" value={d.newLeads} color="text-blue-600" />
           <MiniKpi label="Contacted" value={d.contacted} color="text-sky-600" />
-          <MiniKpi label="Replied" value={d.replied} color="text-cyan-600" />
-          <MiniKpi label="Qualified" value={d.qualified} color="text-teal-600" />
-          <MiniKpi label="Meetings Booked" value={d.meetingsBooked} color="text-indigo-600" />
-          <MiniKpi label="Meetings Done" value={d.meetingsCompleted} color="text-violet-600" />
-          <MiniKpi label="Proposals Sent" value={d.proposalsSent} color="text-purple-600" />
-          <MiniKpi label="Negotiation" value={d.negotiation} color="text-orange-600" />
-          <MiniKpi label="Closed Won" value={d.closedWon} color="text-emerald-600" icon={<CheckCircle2 className="h-3.5 w-3.5" />} />
-          <MiniKpi label="Closed Lost" value={d.closedLost} color="text-red-600" icon={<XCircle className="h-3.5 w-3.5" />} />
+          <MiniKpi label="Replied" value={(d as any).repliedEmails ?? d.replied} color="text-cyan-600" icon={<MessageSquare className="h-3.5 w-3.5" />} />
           <MiniKpi label="Nurture" value={d.nurture} color="text-amber-600" icon={<Repeat className="h-3.5 w-3.5" />} />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <BigKpi label="Pipeline Value" value={`$${formatNum(d.totalPipelineValue)}`} icon={DollarSign} accent="bg-primary/10 text-primary" />
-          <BigKpi label="Forecast Value" value={`$${formatNum(d.totalForecastValue)}`} icon={TrendingUp} accent="bg-blue-500/10 text-blue-600" />
-          <BigKpi label="Closed Revenue" value={`$${formatNum(d.closedRevenue)}`} icon={Handshake} accent="bg-emerald-500/10 text-emerald-600" />
-          <BigKpi label="Follow-Ups Due Today" value={d.followUpsDueToday.toString()} icon={CalendarCheck} accent="bg-accent/20 text-yellow-700" sub={d.overdueFollowUps > 0 ? `${d.overdueFollowUps} overdue` : undefined} subColor="text-destructive" />
+          <BigKpi label="Emails Sent" value={formatNum((d as any).emailsSent ?? 0)} icon={Mail} accent="bg-primary/10 text-primary" />
+          <BigKpi label="Delivered" value={`${(d as any).deliveredRate ?? 100}%`} icon={CheckCircle2} accent="bg-emerald-500/10 text-emerald-600" sub={`${formatNum((d as any).delivered ?? 0)} delivered`} />
+          <BigKpi label="Open Rate" value={`${(d as any).openRate ?? 0}%`} icon={Mail} accent="bg-blue-500/10 text-blue-600" sub={`${formatNum((d as any).opened ?? 0)} opens`} />
+          <BigKpi label="Reply Rate" value={`${(d as any).replyRate ?? 0}%`} icon={MessageSquare} accent="bg-violet-500/10 text-violet-600" sub={`${formatNum((d as any).repliedEmails ?? 0)} replies`} />
         </div>
 
         {taskSummary && (taskSummary.overdue > 0 || taskSummary.urgent > 0 || taskSummary.dueToday > 0 || alerts.length > 0) && (
@@ -103,37 +96,37 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <Card className="p-5 lg:col-span-2 border-border/50 bg-card rounded-2xl">
-            <h3 className="text-base font-bold mb-4">Pipeline by Stage</h3>
+            <h3 className="text-base font-bold mb-4">Outreach Funnel</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={d.pipelineByStage.filter(s => s.count > 0)} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
                   <XAxis dataKey="stage" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} interval={0} angle={-25} textAnchor="end" height={60} />
-                  <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
+                  <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}`} />
                   <RechartsTooltip
                     contentStyle={{ borderRadius: "12px", border: "1px solid hsl(var(--border))", fontSize: 13 }}
-                    formatter={(value: number) => [`$${value.toLocaleString()}`, "Value"]}
+                    formatter={(value: number) => [`${value}`, "Contacts"]}
                   />
-                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} maxBarSize={45} />
+                  <Bar dataKey="count" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} maxBarSize={45} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </Card>
 
           <Card className="p-5 border-border/50 bg-card rounded-2xl flex flex-col">
-            <h3 className="text-base font-bold mb-2">Pipeline by Type</h3>
+            <h3 className="text-base font-bold mb-2">Contacts by Type</h3>
             <div className="flex-1 min-h-[200px] relative flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={d.pipelineByType} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value" stroke="none">
+                  <Pie data={d.pipelineByType} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="count" stroke="none">
                     {d.pipelineByType.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
+                  <RechartsTooltip formatter={(value: number) => `${value} contacts`} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-                <span className="text-xl font-bold">${formatNum(d.totalPipelineValue)}</span>
+                <span className="text-xl font-bold">{formatNum(d.totalLeads)}</span>
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Total</span>
               </div>
             </div>

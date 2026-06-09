@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, leadsTable, tasksTable, activityTable } from "@workspace/db";
+import { db, leadsTable, tasksTable, activityTable, sendLogsTable, emailEventsTable, contactsTable } from "@workspace/db";
 import { eq, sql, lt, and, desc } from "drizzle-orm";
 import { requireRole } from "../middleware/clerk-auth";
 
@@ -76,7 +76,23 @@ router.get("/dashboard", async (req, res) => {
       value: data.value,
     }));
 
+    const wsId = req.workspaceId!;
+    const cnt = async (tbl: any, ...conds: any[]) => {
+      const [r] = await db.select({ c: sql<number>`count(*)::int` }).from(tbl).where(and(...conds));
+      return r?.c || 0;
+    };
+    const emailsSent = await cnt(sendLogsTable, eq(sendLogsTable.workspaceId, wsId), eq(sendLogsTable.status, "sent"));
+    const bounced = await cnt(emailEventsTable, eq(emailEventsTable.workspaceId, wsId), eq(emailEventsTable.eventType, "bounce"));
+    const delivered = Math.max(0, emailsSent - bounced);
+    const opened = await cnt(emailEventsTable, eq(emailEventsTable.workspaceId, wsId), eq(emailEventsTable.eventType, "open"));
+    const repliedEmails = await cnt(emailEventsTable, eq(emailEventsTable.workspaceId, wsId), eq(emailEventsTable.eventType, "reply"));
+    const inSequence = await cnt(contactsTable, eq(contactsTable.workspaceId, wsId), eq(contactsTable.sequenceStatus, "active"));
+    const openRate = emailsSent ? Math.round((opened / emailsSent) * 1000) / 10 : 0;
+    const replyRate = emailsSent ? Math.round((repliedEmails / emailsSent) * 1000) / 10 : 0;
+    const deliveredRate = emailsSent ? Math.round((delivered / emailsSent) * 1000) / 10 : 0;
+
     res.json({
+      emailsSent, delivered, opened, repliedEmails, inSequence, openRate, replyRate, deliveredRate,
       totalLeads: leads.length,
       newLeads: statusCounts["New Lead"],
       contacted: statusCounts["Contacted"],
