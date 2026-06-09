@@ -8,6 +8,8 @@ const router: IRouter = Router();
 // Outreach-history tables that get cleared on a reset. Order matters for FKs:
 // child/log tables first, parents last. CRM content (contacts, companies,
 // leads/opportunities, templates, imports, assets, notes, tasks) is preserved.
+// NOTE: the suppression_list is intentionally NOT cleared — real opt-outs must
+// survive a reset so we never email someone who unsubscribed.
 const OUTREACH_TABLES = [
   "email_events",
   "send_logs",
@@ -17,7 +19,6 @@ const OUTREACH_TABLES = [
   "sequence_enrollments",
   "bulk_send_campaigns",
   "personalization_logs",
-  "suppression_list",
   "reply_review_queue",
   "routing_logs",
   "lead_engagement_events",
@@ -39,8 +40,9 @@ async function countRows(table: string, workspaceId: number): Promise<number> {
 router.get("/crm-maintenance/preview", requireRole("workspace_admin"), async (req, res) => {
   try {
     const ws = req.workspaceId!;
-    const [contacts, leads, templates, imports] = await Promise.all([
+    const [contacts, companies, leads, templates, imports] = await Promise.all([
       countRows("contacts", ws),
+      countRows("companies", ws),
       countRows("leads", ws),
       countRows("templates", ws),
       countRows("imports", ws),
@@ -57,7 +59,7 @@ router.get("/crm-maintenance/preview", requireRole("workspace_admin"), async (re
     res.json({
       preserved: {
         contacts,
-        companies: contacts, // companies are stored on contacts; none are deleted
+        companies,
         opportunities: leads,
         templates,
         imports,
@@ -71,9 +73,10 @@ router.get("/crm-maintenance/preview", requireRole("workspace_admin"), async (re
 });
 
 // Execute the reset: clear all outreach history and reset every contact to a
-// clean "Not Contacted" / "Ready For Outreach" state. Preserves contacts,
-// companies, opportunities (leads), templates, imports, assets, notes, tags,
-// segments, custom fields and rep/account ownership.
+// clean "Not Contacted" state. Preserves contacts, companies, opportunities
+// (leads), templates, imports, assets, notes, tags, segments, custom fields and
+// rep/account ownership — AND real opt-outs (unsubscribed, do-not-contact,
+// bounced, suppression list) so we never re-email someone who opted out.
 router.post("/crm-maintenance/reset-outreach", requireRole("workspace_admin"), async (req, res) => {
   try {
     const ws = req.workspaceId!;
@@ -91,7 +94,11 @@ router.post("/crm-maintenance/reset-outreach", requireRole("workspace_admin"), a
         sql.raw(`UPDATE contacts SET
           sequence_status = 'pending',
           outreach_status = 'Not Contacted',
-          email_status = 'Ready For Outreach',
+          email_status = CASE
+            WHEN do_not_contact = true THEN 'Do Not Contact'
+            WHEN unsubscribed = true THEN 'Unsubscribed'
+            WHEN bounced = true THEN 'Bounced'
+            ELSE 'Ready For Outreach' END,
           engagement_score = 0,
           engagement_tier = 'cold',
           current_step = 0,
@@ -100,10 +107,6 @@ router.post("/crm-maintenance/reset-outreach", requireRole("workspace_admin"), a
           next_send_at = NULL,
           outlook_status = NULL,
           follow_up_date = NULL,
-          bounced = false,
-          bounce_status = NULL,
-          unsubscribed = false,
-          do_not_contact = false,
           routing_state = 'standard_nurture',
           routing_locked = false,
           recommended_next_action = NULL,
@@ -122,7 +125,7 @@ router.post("/crm-maintenance/reset-outreach", requireRole("workspace_admin"), a
       throw e;
     }
 
-    res.json({ success: true, removed, message: `Reset complete — ${removed} outreach records removed; all contacts set to "Not Contacted".` });
+    res.json({ success: true, removed, message: `Reset complete — ${removed} outreach records removed; all contacts set to "Not Contacted". Opt-outs preserved.` });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
