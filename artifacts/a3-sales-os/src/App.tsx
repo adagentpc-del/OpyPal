@@ -54,6 +54,8 @@ import SettingsPage from "./pages/settings";
 import ProvidersPage from "./pages/providers";
 import TeamNotes from "./pages/team-notes";
 import ActivityLog from "./pages/activity-log";
+import CrmMaintenance from "./pages/crm-maintenance";
+import OutreachDashboard from "./pages/outreach-dashboard";
 import ReplyReview from "./pages/reply-review";
 import Members from "./pages/members";
 import Users from "./pages/users";
@@ -493,6 +495,8 @@ function AppRoutes() {
       <Route path="/reply-review" component={protectedRoute(ReplyReview)} />
       <Route path="/team-notes" component={protectedRoute(TeamNotes)} />
       <Route path="/activity-log" component={roleRoute(ActivityLog, { min: "manager" })} />
+            <Route path="/crm-maintenance" component={roleRoute(CrmMaintenance, { min: "workspace_admin" })} />
+      <Route path="/outreach-dashboard" component={protectedRoute(OutreachDashboard)} />
 
       {/* User management */}
       <Route path="/members" component={roleRoute(Members, { min: "workspace_admin" })} />
