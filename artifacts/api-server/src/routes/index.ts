@@ -35,6 +35,8 @@ import settingsRouter from "./settings";
 import seedRouter from "./seed-templates";
 import storageRouter from "./storage";
 import segmentsOpsRouter from "./segments-ops";
+import crmMaintenanceRouter from "./crm-maintenance";
+import activityDashboardRouter from "./activity-dashboard";
 
 const router: IRouter = Router();
 
@@ -73,6 +75,8 @@ router.use(...scoped, leadsRouter);
 router.use(...scoped, tasksRouter);
 router.use(...scoped, templatesRouter);
 router.use(...scoped, assetsRouter);
+router.use(...scoped, crmMaintenanceRouter);
+router.use(...scoped, activityDashboardRouter);
 router.use(...scoped, dashboardRouter);
 router.use(...scoped, syncRouter);
 router.use(...scoped, contactsRouter);
